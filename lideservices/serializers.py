@@ -17,7 +17,7 @@ class SampleSerializer(serializers.ModelSerializer):
         'filter_type', 'study', 'study_site_name', 'study_site_id', 'collaborator_sample_id',
         'sampler_name', 'notes', 'description', 'collect_start_date', 'collect_end_date', 
         'collect_start_time', 'collect_end_time', 'meter_reading_initial', 'meter_reading_final',
-        'meter_reading_unit', 'total_volume_sampled_initial', 'total_volume_sampled_unit_initial'
+        'meter_reading_unit', 'total_volume_sampled_initial', 'total_volume_sampled_unit_initial',
         'total_volume_sampled', 'filtered_volume', 'filter_born_on_date', 'matrix', 'filter_flag',
         'secondary_concentration_flag', 'analysisbatches',)
 
@@ -140,8 +140,8 @@ class ControlTypeSerializer(serializers.ModelSerializer):
 class ControlSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = ControlSerializer
-        fields = ('id', 'example', 'type', 'sample', 'target', 'cycle_of_quantification', 'controls_date',)
+        model = Control
+        fields = ('id', 'type', 'sample', 'target', 'cycle_of_quantification', 'control_date',)
 
 
 ######
