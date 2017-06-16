@@ -95,7 +95,7 @@ class Sample(HistoryModel):
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_sample"
@@ -108,7 +108,7 @@ class SampleType(NameModel):
     """
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_sampletype"
@@ -120,7 +120,7 @@ class SampleEnvironment(NameModel):
     """
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_sampleenvironment"
@@ -132,7 +132,7 @@ class SampleLocation(NameModel):
     """
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_samplelocation"
@@ -146,7 +146,7 @@ class FilterType(NameModel):
     matrix = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_filtertype"
@@ -158,7 +158,7 @@ class WaterType(NameModel):
     """
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_watertype"
@@ -172,7 +172,7 @@ class Study(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_study"
@@ -194,7 +194,7 @@ class SampleAnalysisBatch(HistoryModel):
     analysis_batch = models.ForeignKey('AnalysisBatch')
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_sampleanalysisbatch"
@@ -210,7 +210,7 @@ class AnalysisBatch(HistoryModel):
     samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_analysisbatch"
@@ -228,7 +228,7 @@ class Extraction(HistoryModel):
     extraction_date = models.DateField(null=True, blank=True) #QUESTION: is this just create_date?
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_extraction"
@@ -245,7 +245,7 @@ class Inhibition(NameModel):
     dilution = models.FloatField(null=True, blank=True)
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_inhibition"
@@ -263,7 +263,7 @@ class ReverseTranscription(NameModel):
     reverse_transcription_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_reversetranscription"
@@ -288,7 +288,7 @@ class PCRReplicate(HistoryModel):
     concentration_unit = models.CharField(max_length=128, null=True, blank=True) #QUESTION: shouldn't this be in it's own table ("Unit") and just related here with a foreign key?
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_pcrreplicate"
@@ -305,7 +305,7 @@ class StandardCurve(HistoryModel):
     efficiency = models.CharField(max_length=128, null=True, blank=True) #QUESTION: what is the actual field type (char, int, float)? This is just a guess.
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_standardcurve"
@@ -320,7 +320,7 @@ class Target(HistoryModel):
     type = models.CharField(max_length=128, null=True, blank=True) #QUESTION: how is this different from the name field?
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_target"
@@ -342,7 +342,7 @@ class ControlType(NameModel):
     abbreviation = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_controltype"
@@ -362,7 +362,7 @@ class Control(NameModel):
     control_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_control"
@@ -386,7 +386,7 @@ class OtherAnalysis(HistoryModel):
     other_analysis_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = "lide_otheranalysis"
