@@ -62,14 +62,9 @@ class SampleTypeViewSet(HistoryViewSet):
     serializer_class = SampleTypeSerializer
 
 
-class SampleEnvironmentViewSet(HistoryViewSet):
-    queryset = SampleEnvironment.objects.all()
-    serializer_class = SampleEnvironmentSerializer
-
-
-class SampleLocationViewSet(HistoryViewSet):
-    queryset = SampleLocation.objects.all()
-    serializer_class = SampleLocationSerializer
+class MatrixTypeViewSet(HistoryViewSet):
+    queryset = MatrixType.objects.all()
+    serializer_class = MatrixTypeSerializer
 
 
 class FilterTypeViewSet(HistoryViewSet):
@@ -77,14 +72,14 @@ class FilterTypeViewSet(HistoryViewSet):
     serializer_class = FilterTypeSerializer
 
 
-class WaterTypeViewSet(HistoryViewSet):
-    queryset = WaterType.objects.all()
-    serializer_class = WaterTypeSerializer
-
-
 class StudyViewSet(HistoryViewSet):
     queryset = Study.objects.all()
     serializer_class = StudySerializer
+
+
+class UnitTypeViewSet(HistoryViewSet):
+    queryset = UnitType.objects.all()
+    serializer_class = UnitTypeSerializer
 
 
 ######

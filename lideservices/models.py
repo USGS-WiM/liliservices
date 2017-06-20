@@ -63,36 +63,39 @@ class Sample(HistoryModel):
     """
 
     sample_type = models.ForeignKey('SampleType', related_name='samples')
-    sample_environment = models.ForeignKey('SampleEnvironment', related_name='samples')
-    sample_location = models.ForeignKey('SampleLocation', related_name='samples')
-    water_type = models.ForeignKey('WaterType', related_name='samples')
+    matrix_type = models.ForeignKey('MatrixType', related_name='samples')
     filter_type = models.ForeignKey('FilterType', related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
-    study_site_name = models.CharField(max_length=128, null=True, blank=True) #QUESTION: shouldn't this be in its own table ("StudySite") and just related here with a foreign key?
-    study_site_id = models.IntegerField() #QUESTION: shouldn't this be in its own table ("StudySite") and just related here with a foreign key?
-    collaborator_sample_id = models.IntegerField(unique=True)
-    sampler_name = models.CharField(max_length=128, null=True, blank=True) #QUESTION: shouldn't this be in its own table ("Sampler" or "Person") and just related here with a foreign key?
-    notes = models.TextField(blank=True)
-    description = models.TextField(blank=True)
-    collect_start_date = models.DateField(null=True, blank=True)
-    collect_start_time = models.TimeField(null=True, blank=True)
-    collect_end_date = models.DateField(null=True, blank=True)
-    collect_end_time = models.TimeField(null=True, blank=True)
-    meter_reading_initial = models.FloatField(null=True, blank=True)
-    meter_reading_final = models.FloatField(null=True, blank=True)
-    meter_reading_unit = models.CharField(max_length=128, null=True, blank=True) #QUESTION: shouldn't this be in its own table ("Unit") and just related here with a foreign key?
+    study_site_name = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: I don't like this. Location information should be kept in a dedicated table for possible future use in spatial analysis
+    collaborator_sample_id = models.CharField(max_length=128, unique=True)
+    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sampler_name', null=True, blank=True)
+    sample_notes = models.TextField(blank=True)
+    sample_description = models.TextField(blank=True)
+    arrival_date = models.DateField(null=True, blank=True)
+    arrival_notes = models.TextField(blank=True)
+    collection_start_date = models.DateField(null=True, blank=True)
+    collection_start_time = models.TimeField(null=True, blank=True)
+    collection_end_date = models.DateField(null=True, blank=True)
+    collection_end_time = models.TimeField(null=True, blank=True)
+    meter_reading_initial = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    meter_reading_final = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    meter_reading_unit = models.ForeignKey('UnitType', null=True, related_name='samples_meter_units')  # COMMENT: this field doesn't belong here, it should go in a related table dedicated to this matrix type
     total_volume_sampled_initial = models.FloatField(null=True, blank=True)
-    total_volume_sampled_unit_initial = models.CharField(max_length=128, null=True, blank=True) #QUESTION: shouldn't this be in it's own table ("Unit") and just related here with a foreign key?
+    total_volume_sampled_unit_initial = models.ForeignKey('UnitType', null=True, related_name='samples_tvs_units')
     total_volume_sampled = models.FloatField(null=True, blank=True)
-    total_volume_sampled_stage = models.FloatField(null=True, blank=True) #QUESTION: Shouldn't this reside solely in the application code, and not in the DB? 
-    total_volume_sampled_calculation = models.FloatField(null=True, blank=True) #QUESTION: Shouldn't this reside solely in the application code, and not in the DB? 
-    total_volume_sampled_stage_calculation = models.FloatField(null=True, blank=True) #QUESTION: Shouldn't this reside solely in the application code, and not in the DB? 
-    filtered_volume = models.FloatField(null=True, blank=True)
-    filter_born_on_date = models.DateField(null=True, blank=True) #QUESTION: is this just the filter's create date?
-    matrix = models.CharField(max_length=128, null=True, blank=True) #QUESTION: why is this here and in Filter Type? Shouldn't this be in it's own table ("Matrix") and just related here with a foreign key?
-    filter_flag = models.BooleanField(default=False) #QUESTION: what is the purpose of this flag? Shouldn't it be a control?
-    secondary_concentration_flag = models.BooleanField(default=False) #QUESTION: what is the purpose of this flag? Shouldn't it be a control?
-    analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
+    sample_volume_initial = models.FloatField(null=True, blank=True)
+    sample_volume_filtered = models.FloatField(null=True, blank=True)
+    filter_born_on_date = models.DateField(null=True, blank=True)  # COMMENT: Are these throw-away filters? Or do they need/want to keep track of them for later analysis? If the latter, it would need a dedicated table, yes?
+    filter_flag = models.BooleanField(default=False)
+    secondary_concentration_flag = models.BooleanField(default=False)
+    elution_date = models.DateField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    elution_notes = models.TextField(blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    technician_initials = models.CharField(max_length=4, null=True, blank=True)  # COMMENT: this field could be replaced by the created_by/edited_by fields
+    air_subsample_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    post_dilution_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    pump_flow_rate = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
+                                             related_name='sampleanalysisbatches')
 
     def __str__(self):
         return str(self.id)
@@ -107,6 +110,8 @@ class SampleType(NameModel):
     Sample Type
     """
 
+    code = models.CharField(max_length=128, unique=True)
+
     def __str__(self):
         return str(self.id)
 
@@ -114,28 +119,18 @@ class SampleType(NameModel):
         db_table = "lide_sampletype"
 
 
-class SampleEnvironment(NameModel):
+class MatrixType(NameModel):
     """
-    Sample Environment
+    Matrix Type
     """
+
+    code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_sampleenvironment"
-
-
-class SampleLocation(NameModel):
-    """
-    Sample Location
-    """
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_samplelocation"
+        db_table = "lide_matrixtype"
 
 
 class FilterType(NameModel):
@@ -143,25 +138,13 @@ class FilterType(NameModel):
     Filter Type
     """
 
-    matrix = models.CharField(max_length=128, null=True, blank=True)
+    matrix = models.ForeignKey('MatrixType', related_name='filters')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_filtertype"
-
-
-class WaterType(NameModel):
-    """
-    Water Type
-    """
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_watertype"
 
 
 class Study(NameModel):
@@ -176,6 +159,19 @@ class Study(NameModel):
 
     class Meta:
         db_table = "lide_study"
+
+
+class UnitType(models.Model):
+    """Defined units of measurement for data values."""
+
+    unit = models.CharField(max_length=128, unique=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_unittype"
 
 
 ######
@@ -222,17 +218,34 @@ class Extraction(HistoryModel):
     Extraction
     """
 
-    #QUESTION: shouldn't this relate directly to sample, since an extract comes from a sample?
+    sample = models.ForeignKey('Sample', related_name='extractions')
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractions')
-    extraction_code = models.IntegerField(unique=True) #QUESTION: how will this be determined/assigned?
-    extraction_date = models.DateField(null=True, blank=True) #QUESTION: is this just create_date?
+    extraction_number = models.IntegerField(unique=True)
+    inhibition = models.ManyToManyField('Inhibition', through='ExtractionInhibition',
+                                        related_name='extractioninhibitions')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_extraction"
-        #TODO: 'unique together' fields
+        unique_together = ("sample", "extraction_number")
+
+
+class ExtractionInhibition(HistoryModel):
+    """
+    Table to allow many-to-many relationship between Extractions and Inhibitions.
+    """
+
+    extraction = models.ForeignKey('Extraction')
+    inhibition = models.ForeignKey('Inhibition')
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_extractioninhibition"
+        unique_together = ("extraction", "inhibition")
 
 
 class Inhibition(NameModel):
@@ -240,9 +253,10 @@ class Inhibition(NameModel):
     Inhibition
     """
 
-    #QUESTION: How is this table related to other tables? I took the liberty of adding a foreign key to PCRReplicate
-    type = models.CharField(max_length=128, null=True, blank=True) #QUESTION: how is this different from the name field?
+    type = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: this should be a controlled list, either an enum field or a FK to a type table
     dilution = models.FloatField(null=True, blank=True)
+    extraction = models.ManyToManyField('Extraction', through='ExtractionInhibition',
+                                        related_name='extractioninhibitions')
 
     def __str__(self):
         return str(self.id)
@@ -260,7 +274,6 @@ class ReverseTranscription(NameModel):
     volume_in = models.FloatField(null=True, blank=True)
     volume_out = models.FloatField(null=True, blank=True)
     cycle_of_quantification = models.FloatField(null=True, blank=True)
-    reverse_transcription_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
 
     def __str__(self):
         return str(self.id)
@@ -274,18 +287,16 @@ class PCRReplicate(HistoryModel):
     Polymerase Chain Reaction Replicate
     """
 
-    sample = models.ForeignKey('Sample', related_name='pcrreplicates') #QUESTION: should this relation really be here, since the replicate comes directly from an extraction, which in turn comes directly from a sample?
     extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
     inhibition =  models.ForeignKey('Inhibition', related_name='pcrreplicates')
     reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='pcrreplicates')
     target = models.ForeignKey('Target', related_name='pcrreplicates')
     replicate = models.IntegerField()
-    pcr_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
     cycle_of_quantification = models.FloatField(null=True, blank=True)
-    gc_rxn = models.FloatField(null=True, blank=True) #QUESTION: what is this?
+    guanine_cytosine_content_reaction = models.FloatField(null=True, blank=True)
     concentration = models.FloatField(null=True, blank=True)
-    sample_mean_concentration = models.FloatField(null=True, blank=True) #QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
-    concentration_unit = models.CharField(max_length=128, null=True, blank=True) #QUESTION: shouldn't this be in it's own table ("Unit") and just related here with a foreign key?
+    #sample_mean_concentration = models.FloatField(null=True, blank=True) #QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
+    concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')
 
     def __str__(self):
         return str(self.id)
@@ -302,7 +313,7 @@ class StandardCurve(HistoryModel):
 
     r_value = models.FloatField(null=True, blank=True)
     slope = models.FloatField(null=True, blank=True)
-    efficiency = models.CharField(max_length=128, null=True, blank=True) #QUESTION: what is the actual field type (char, int, float)? This is just a guess.
+    efficiency = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return str(self.id)
@@ -317,7 +328,7 @@ class Target(HistoryModel):
     """
 
     abbreviation = models.CharField(max_length=128, null=True, blank=True)
-    type = models.CharField(max_length=128, null=True, blank=True) #QUESTION: how is this different from the name field?
+    type = models.CharField(max_length=128, null=True, blank=True) #COMMENT: this should be a controlled list, either an enum field or a FK to a type table
 
     def __str__(self):
         return str(self.id)
@@ -353,13 +364,11 @@ class Control(NameModel):
     Control
     """
 
-    #QUESTION: shouldn't there also be some kind of 'qc value' field and a 'qc flag' field?
-    #QUESTION: aren't qcs performed on other objects besides samples, like extraction or replicate?
     type = models.ForeignKey('ControlType', related_name='controls')
     sample = models.ForeignKey('Sample', related_name='controls')
     target = models.ForeignKey('Target', related_name='controls')
-    cycle_of_quantification = models.FloatField(null=True, blank=True) #QUESTION: why would a qc have a CQ?
-    control_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
+    qc_value = models.FloatField(null=True, blank=True)
+    qc_flag = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.id)
@@ -383,7 +392,6 @@ class OtherAnalysis(HistoryModel):
 
     description = models.TextField(blank=True)
     data = models.TextField(blank=True)
-    other_analysis_date = models.DateField(null=True, blank=True) #QUESTION: is this just create date?
 
     def __str__(self):
         return str(self.id)
