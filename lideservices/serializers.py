@@ -54,7 +54,7 @@ class StudySerializer(serializers.ModelSerializer):
 class UnitTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = UnitType
-        fields = ('id', 'name', 'unit', 'description',)
+        fields = ('id', 'name', 'description',)
 
 
 ######
