@@ -96,6 +96,7 @@ class Sample(HistoryModel):
     pump_flow_rate = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
+    samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
 
     def __str__(self):
         return str(self.id)
@@ -175,6 +176,42 @@ class UnitType(NameModel):
 
 ######
 #
+#  Sample Groups
+#
+######
+
+
+class SampleSampleGroup(HistoryModel):
+    """
+    Table to allow many-to-many relationship between SampleGroups and Samples.
+    """
+
+    sample = models.ForeignKey('Sample')
+    samplegroup = models.ForeignKey('SampleGroup')
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return str(self.case) + " - " + str(self.tag)
+
+    class Meta:
+        db_table = "lide_samplesamplegroup"
+        unique_together = ("sample", "samplegroup")
+
+
+class SampleGroup(HistoryModel):
+    """
+    Terms or keywords used to describe, categorize, or group similar Samples for easier searching and reporting.
+    """
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lide_samplegroup"
+
+
+######
+#
 #  Analyses
 #
 ######
@@ -209,6 +246,21 @@ class AnalysisBatch(HistoryModel):
 
     class Meta:
         db_table = "lide_analysisbatch"
+        #TODO: 'unique together' fields
+
+
+class AnalysisBatchTemplate(HistoryModel):
+    """
+    Analysis Batch Template
+    """
+
+    some_field = models.CharField(max_length=128, null=True, blank=True) #Temporary placeholder until further details are known.
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_analysisbatchtemplate"
         #TODO: 'unique together' fields
 
 
