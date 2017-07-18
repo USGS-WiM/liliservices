@@ -198,10 +198,12 @@ class SampleSampleGroup(HistoryModel):
         unique_together = ("sample", "samplegroup")
 
 
-class SampleGroup(HistoryModel):
+class SampleGroup(NameModel):
     """
     Terms or keywords used to describe, categorize, or group similar Samples for easier searching and reporting.
     """
+
+    description = models.TextField(blank=True)
 
     def __str__(self):
         return self.name

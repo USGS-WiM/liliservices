@@ -84,6 +84,23 @@ class UnitTypeViewSet(HistoryViewSet):
 
 ######
 #
+#  Sample Groups
+#
+######
+
+
+class SampleSampleGroupViewSet(HistoryViewSet):
+    queryset = SampleSampleGroup.objects.all()
+    serializer_class = SampleSampleGroupSerializer
+
+
+class SampleGroupViewSet(HistoryViewSet):
+    queryset = SampleGroup.objects.all()
+    serializer_class = SampleGroupSerializer
+
+
+######
+#
 #  Analyses
 #
 ######

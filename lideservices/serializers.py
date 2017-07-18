@@ -59,6 +59,25 @@ class UnitTypeSerializer(serializers.ModelSerializer):
 
 ######
 #
+#  Sample Groups
+#
+######
+
+
+class SampleSampleGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnitType
+        fields = ('id', 'sample', 'samplegroup',)
+
+
+class SampleGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnitType
+        fields = ('id', 'name', 'description',)
+
+
+######
+#
 #  Analyses
 #
 ######
