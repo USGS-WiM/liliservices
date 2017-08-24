@@ -11,6 +11,13 @@ from lideservices.models import *
 
 class SampleSerializer(serializers.ModelSerializer):
 
+    final_concentrated_sample_volume = serializers.FloatField(
+        source='final_concentrated_sample_volumes.final_concentrated_sample_volume', read_only=True)
+    final_concentrated_sample_volume_type = serializers.StringRelatedField(
+        source='final_concentrated_sample_volumes.concentration_type', read_only=True)
+    final_concentrated_sample_volume_notes = serializers.CharField(
+        source='final_concentrated_sample_volumes.final_concentrated_sample_volume_notes', read_only=True)
+
     class Meta:
         model = Sample
         fields = ('id', 'sample_type', 'matrix_type', 'filter_type', 'study', 'study_site_name',
@@ -20,14 +27,16 @@ class SampleSerializer(serializers.ModelSerializer):
                   'total_volume_sampled_initial', 'total_volume_sampled_unit_initial', 'total_volume_sampled',
                   'sample_volume_initial', 'sample_volume_filtered', 'filter_born_on_date', 'filter_flag',
                   'secondary_concentration_flag', 'elution_date', 'elution_notes', 'technician_initials',
-                  'air_subsample_volume', 'post_dilution_volume', 'pump_flow_rate', 'analysisbatches',)
+                  'air_subsample_volume', 'post_dilution_volume', 'pump_flow_rate', 'analysisbatches',
+                  'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
+                  'final_concentrated_sample_volume_notes',)
 
 
 class AliquotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Aliquot
-        fields = ('id', 'sample', 'aliquot', 'frozen', 'freezer_location')
+        fields = ('id', 'sample', 'aliquot', 'frozen', 'freezer_location',)
 
 
 class SampleTypeSerializer(serializers.ModelSerializer):
@@ -76,7 +85,7 @@ class FreezerLocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FreezerLocation
-        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot')
+        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot',)
 
 
 class FreezerSerializer(serializers.ModelSerializer):
