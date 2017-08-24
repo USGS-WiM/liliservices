@@ -23,6 +23,13 @@ class SampleSerializer(serializers.ModelSerializer):
                   'air_subsample_volume', 'post_dilution_volume', 'pump_flow_rate', 'analysisbatches',)
 
 
+class AliquotSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Aliquot
+        fields = ('id', 'sample', 'aliquot', 'frozen', 'freezer_location')
+
+
 class SampleTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -52,8 +59,51 @@ class StudySerializer(serializers.ModelSerializer):
 
 
 class UnitTypeSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = UnitType
+        fields = ('id', 'name', 'description',)
+
+
+######
+#
+#  Freezer Locations
+#
+######
+
+
+class FreezerLocationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = FreezerLocation
+        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot')
+
+
+class FreezerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Freezer
+        fields = ('id', 'racks', 'boxes', 'rows', 'spots',)
+
+
+######
+#
+#  Concentrated Sample Volumes
+#
+######
+
+
+class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = FinalConcentratedSampleVolume
+        fields = ('id', 'name', 'description',)
+
+
+class ConcentrationTypeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ConcentrationType
         fields = ('id', 'name', 'description',)
 
 
@@ -65,12 +115,14 @@ class UnitTypeSerializer(serializers.ModelSerializer):
 
 
 class SampleSampleGroupSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = UnitType
         fields = ('id', 'sample', 'samplegroup',)
 
 
 class SampleGroupSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = UnitType
         fields = ('id', 'name', 'description',)
@@ -90,11 +142,19 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         fields = ('id', 'some_field', 'samples',)
 
 
+class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = AnalysisBatchTemplate
+        fields = ('id', 'description', 'extraction_volume', 'elution_volume', 'target',)
+
+
 class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition',)
+        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
+                  'inhibition',)
 
 
 class InhibitionSerializer(serializers.ModelSerializer):

@@ -106,6 +106,24 @@ class Sample(HistoryModel):
         #TODO: 'unique together' fields
 
 
+class Aliquot(HistoryModel):
+    """"
+    Aliquot
+    """
+
+    sample = models.ForeignKey('Sample', related_name='aliquots')
+    aliquot = models.IntegerField()
+    frozen = models.BooleanField()
+    freezer_location = models.OneToOneField('FreezerLocation', related_name='aliquot')
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_aliquot"
+        unique_together = ("sample", "aliquot")
+
+
 class SampleType(NameModel):
     """
     Sample Type
@@ -163,7 +181,9 @@ class Study(NameModel):
 
 
 class UnitType(NameModel):
-    """Defined units of measurement for data values."""
+    """
+    Defined units of measurement for data values.
+    """
 
     description = models.TextField(blank=True)
 
@@ -172,6 +192,84 @@ class UnitType(NameModel):
 
     class Meta:
         db_table = "lide_unittype"
+
+
+######
+#
+#  Freezer Locations
+#
+######
+
+
+class FreezerLocation(HistoryModel):
+    """
+    Freezer Location
+    """
+
+    freezer = models.ForeignKey('Freezer', related_name='freezerlocations')
+    rack = models.IntegerField()
+    box = models.IntegerField()
+    row = models.IntegerField()
+    spot = models.IntegerField()
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_freezer_location"
+
+
+class Freezer(HistoryModel):
+    """
+    Freezer
+    """
+
+    racks = models.IntegerField()
+    boxes = models.IntegerField()
+    rows = models.IntegerField()
+    spots = models.IntegerField()
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_freezer"
+
+
+######
+#
+#  Concentrated Sample Volumes
+#
+######
+
+
+class FinalConcentratedSampleVolume(HistoryModel):
+    """
+    Final Concentrated Sample Volume
+    """
+
+    sample = models.ForeignKey('Sample')
+    concentration_type = models.ForeignKey('ConcentrationType')
+    final_concentrated_sample_volume = models.FloatField(null=True, blank=True)
+    final_concentrated_sample_volume_notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return str(self.case) + " - " + str(self.tag)
+
+    class Meta:
+        db_table = "lide_finalconcentratedsamplevolume"
+
+
+class ConcentrationType(NameModel):
+    """
+    Concentration Type
+    """
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lide_concentrationtype"
 
 
 ######
@@ -188,7 +286,6 @@ class SampleSampleGroup(HistoryModel):
 
     sample = models.ForeignKey('Sample')
     samplegroup = models.ForeignKey('SampleGroup')
-    history = HistoricalRecords()
 
     def __str__(self):
         return str(self.case) + " - " + str(self.tag)
@@ -251,19 +348,21 @@ class AnalysisBatch(HistoryModel):
         #TODO: 'unique together' fields
 
 
-class AnalysisBatchTemplate(HistoryModel):
+class AnalysisBatchTemplate(NameModel):
     """
     Analysis Batch Template
     """
 
-    some_field = models.CharField(max_length=128, null=True, blank=True) #Temporary placeholder until further details are known.
+    description = models.TextField(blank=True)
+    extraction_volume = models.FloatField(null=True, blank=True)
+    elution_volume = models.FloatField(null=True, blank=True)
+    target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_analysisbatchtemplate"
-        #TODO: 'unique together' fields
 
 
 class Extraction(HistoryModel):
@@ -274,6 +373,8 @@ class Extraction(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='extractions')
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractions')
     extraction_number = models.IntegerField(unique=True)
+    extraction_volume = models.FloatField(null=True, blank=True)
+    elution_volume = models.FloatField(null=True, blank=True)
     inhibition = models.ManyToManyField('Inhibition', through='ExtractionInhibition',
                                         related_name='extractioninhibitions')
 
@@ -282,7 +383,6 @@ class Extraction(HistoryModel):
 
     class Meta:
         db_table = "lide_extraction"
-        unique_together = ("sample", "extraction_number")
 
 
 class ExtractionInhibition(HistoryModel):
@@ -418,7 +518,7 @@ class Control(NameModel):
     """
 
     type = models.ForeignKey('ControlType', related_name='controls')
-    sample = models.ForeignKey('Sample', related_name='controls')
+    extraction = models.ForeignKey('Extraction', related_name='controls')
     target = models.ForeignKey('Target', related_name='controls')
     qc_value = models.FloatField(null=True, blank=True)
     qc_flag = models.BooleanField(default=False)

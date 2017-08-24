@@ -57,6 +57,11 @@ class SampleViewSet(HistoryViewSet):
     serializer_class = SampleSerializer
 
 
+class AliquotViewSet(HistoryViewSet):
+    queryset = Aliquot.objects.all()
+    serializer_class = AliquotSerializer
+
+
 class SampleTypeViewSet(HistoryViewSet):
     queryset = SampleType.objects.all()
     serializer_class = SampleTypeSerializer
@@ -80,6 +85,40 @@ class StudyViewSet(HistoryViewSet):
 class UnitTypeViewSet(HistoryViewSet):
     queryset = UnitType.objects.all()
     serializer_class = UnitTypeSerializer
+
+
+######
+#
+#  Freezer Locations
+#
+######
+
+
+class FreezerLocationViewSet(HistoryViewSet):
+    queryset = FreezerLocation.objects.all()
+    serializer_class = FreezerLocationSerializer
+
+
+class FreezerViewSet(HistoryViewSet):
+    queryset = Freezer.objects.all()
+    serializer_class = FreezerSerializer
+
+
+######
+#
+#  Concentrated Sample Volumes
+#
+######
+
+
+class FinalConcentratedSampleVolumeViewSet(HistoryViewSet):
+    queryset = FinalConcentratedSampleVolume.objects.all()
+    serializer_class = FinalConcentratedSampleVolumeSerializer
+
+
+class ConcentrationTypeViewSet(HistoryViewSet):
+    queryset = ConcentrationType.objects.all()
+    serializer_class = ConcentrationTypeSerializer
 
 
 ######
@@ -109,6 +148,11 @@ class SampleGroupViewSet(HistoryViewSet):
 class AnalysisBatchViewSet(HistoryViewSet):
     queryset = AnalysisBatch.objects.all()
     serializer_class = AnalysisBatchSerializer
+
+
+class AnalysisBatchTemplateViewSet(HistoryViewSet):
+    queryset = AnalysisBatchTemplate.objects.all()
+    serializer_class = AnalysisBatchTemplateSerializer
 
 
 class ExtractionViewSet(HistoryViewSet):
@@ -182,7 +226,7 @@ class UserViewSet(HistoryViewSet):
 
     def get_queryset(self):
         # do not return the admin and public users
-        queryset = User.objects.all().exclude(id__in=[1, 2])
+        queryset = User.objects.all().exclude(id__in=[1])
         # filter by username, exact
         username = self.request.query_params.get('username', None)
         if username is not None:
