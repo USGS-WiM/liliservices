@@ -12,11 +12,11 @@ from lideservices.models import *
 class SampleSerializer(serializers.ModelSerializer):
 
     final_concentrated_sample_volume = serializers.FloatField(
-        source='final_concentrated_sample_volumes.final_concentrated_sample_volume', read_only=True)
+        source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
     final_concentrated_sample_volume_type = serializers.StringRelatedField(
-        source='final_concentrated_sample_volumes.concentration_type', read_only=True)
+        source='final_concentrated_sample_volume.concentration_type.name', read_only=True)
     final_concentrated_sample_volume_notes = serializers.CharField(
-        source='final_concentrated_sample_volumes.final_concentrated_sample_volume_notes', read_only=True)
+        source='final_concentrated_sample_volume.final_concentrated_sample_volume_notes', read_only=True)
 
     class Meta:
         model = Sample

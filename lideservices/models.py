@@ -248,7 +248,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
     Final Concentrated Sample Volume
     """
 
-    sample = models.ForeignKey('Sample', related_name='final_concentrated_sample_volumes')
+    sample = models.OneToOneField('Sample', related_name='final_concentrated_sample_volume')
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
     final_concentrated_sample_volume = models.FloatField(null=True, blank=True)
     final_concentrated_sample_volume_notes = models.TextField(blank=True)
