@@ -106,14 +106,15 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FinalConcentratedSampleVolume
-        fields = ('id', 'name', 'description',)
+        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
+                  'final_concentrated_sample_volume_notes',)
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConcentrationType
-        fields = ('id', 'name', 'description',)
+        fields = ('id', 'name',)
 
 
 ######
@@ -177,8 +178,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'name', 'extraction', 'volume_in', 'volume_out', 'cycle_of_quantification',
-                  'reverse_transcription_date',)
+        fields = ('id', 'name', 'extraction', 'volume_in', 'volume_out', 'cycle_of_quantification',)
 
 
 class PCRReplicateSerializer(serializers.ModelSerializer):
@@ -222,7 +222,7 @@ class ControlSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Control
-        fields = ('id', 'type', 'sample', 'target', 'qc_value', 'qc_flag',)
+        fields = ('id', 'type', 'extraction', 'target', 'qc_value', 'qc_flag',)
 
 
 ######
