@@ -29,49 +29,51 @@ class SampleSerializer(serializers.ModelSerializer):
                   'secondary_concentration_flag', 'elution_date', 'elution_notes', 'technician_initials',
                   'air_subsample_volume', 'post_dilution_volume', 'pump_flow_rate', 'analysisbatches',
                   'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
-                  'final_concentrated_sample_volume_notes',)
+                  'final_concentrated_sample_volume_notes',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AliquotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Aliquot
-        fields = ('id', 'sample', 'aliquot', 'frozen', 'freezer_location',)
+        fields = ('id', 'sample', 'aliquot', 'frozen', 'freezer_location',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SampleType
-        fields = ('id', 'name', 'code',)
+        fields = ('id', 'name', 'code', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class MatrixTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MatrixType
-        fields = ('id', 'name', 'code',)
+        fields = ('id', 'name', 'code', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class FilterTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FilterType
-        fields = ('id', 'name', 'matrix',)
+        fields = ('id', 'name', 'matrix',  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class StudySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Study
-        fields = ('id', 'name', 'description',)
+        fields = ('id', 'name', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class UnitTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UnitType
-        fields = ('id', 'name', 'description',)
+        fields = ('id', 'name', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -85,14 +87,16 @@ class FreezerLocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FreezerLocation
-        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot',)
+        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class FreezerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Freezer
-        fields = ('id', 'racks', 'boxes', 'rows', 'spots',)
+        fields = ('id', 'racks', 'boxes', 'rows', 'spots',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -107,14 +111,15 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinalConcentratedSampleVolume
         fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
-                  'final_concentrated_sample_volume_notes',)
+                  'final_concentrated_sample_volume_notes',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConcentrationType
-        fields = ('id', 'name',)
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -128,14 +133,14 @@ class SampleSampleGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UnitType
-        fields = ('id', 'sample', 'samplegroup',)
+        fields = ('id', 'sample', 'samplegroup', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UnitType
-        fields = ('id', 'name', 'description',)
+        fields = ('id', 'name', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -149,14 +154,15 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'some_field', 'samples',)
+        fields = ('id', 'some_field', 'samples', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnalysisBatchTemplate
-        fields = ('id', 'description', 'extraction_volume', 'elution_volume', 'target',)
+        fields = ('id', 'description', 'extraction_volume', 'elution_volume', 'target',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ExtractionSerializer(serializers.ModelSerializer):
@@ -164,21 +170,23 @@ class ExtractionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Extraction
         fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
-                  'inhibition',)
+                  'inhibition', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class InhibitionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'name', 'type', 'dilution', 'extraction',)
+        fields = ('id', 'name', 'type', 'dilution', 'extraction',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'name', 'extraction', 'volume_in', 'volume_out', 'cycle_of_quantification',)
+        fields = ('id', 'name', 'extraction', 'volume_in', 'volume_out', 'cycle_of_quantification',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class PCRReplicateSerializer(serializers.ModelSerializer):
@@ -187,21 +195,21 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         model = PCRReplicate
         fields = ('id', 'extraction', 'inhibition', 'reverse_transcription', 'target', 'replicate',
                   'cycle_of_quantification', 'guanine_cytosine_content_reaction', 'concentration',
-                  'concentration_unit',)
+                  'concentration_unit', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class StandardCurveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StandardCurve
-        fields = ('id', 'r_value', 'slope', 'efficiency',)
+        fields = ('id', 'r_value', 'slope', 'efficiency', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class TargetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Target
-        fields = ('id', 'abbreviation', 'type')
+        fields = ('id', 'abbreviation', 'type' 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -215,14 +223,15 @@ class ControlTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ControlType
-        fields = ('id', 'name', 'abbreviation')
+        fields = ('id', 'name', 'abbreviation', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ControlSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Control
-        fields = ('id', 'type', 'extraction', 'target', 'qc_value', 'qc_flag',)
+        fields = ('id', 'type', 'extraction', 'target', 'qc_value', 'qc_flag',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -236,7 +245,7 @@ class OtherAnalysisSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OtherAnalysis
-        fields = ('id', 'description', 'data',)
+        fields = ('id', 'description', 'data', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
