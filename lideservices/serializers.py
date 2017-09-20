@@ -282,7 +282,7 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
         if obj.created_by is not None:
             username = obj.created_by.username
         return username
-    created_by = serializers.SerializerMethodField()
+    created_by = serializers.StringRelatedField()
 	
 	#modified by username
     def get_modified_by(self, obj):
@@ -290,7 +290,7 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
         if obj.modified_by is not None:
             username = obj.modified_by.username
         return username
-    modified_by = serializers.SerializerMethodField()	
+    modified_by = serializers.StringRelatedField()	
 	
     class Meta:
         model = AnalysisBatch
