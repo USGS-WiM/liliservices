@@ -337,8 +337,9 @@ class AnalysisBatch(HistoryModel):
     Analysis Batch
     """
 
-    some_field = models.CharField(max_length=128, null=True, blank=True) #Temporary placeholder until further details are known.
     samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
+    analysis_batch_description = models.CharField(max_length=128, null=True, blank=True)
+    analysis_batch_notes = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
         return str(self.id)
@@ -363,8 +364,9 @@ class AnalysisBatchTemplate(NameModel):
 
     class Meta:
         db_table = "lide_analysisbatchtemplate"
-
-
+	
+		
+	
 class Extraction(HistoryModel):
     """
     Extraction
@@ -377,12 +379,27 @@ class Extraction(HistoryModel):
     elution_volume = models.FloatField(null=True, blank=True)
     inhibition = models.ManyToManyField('Inhibition', through='ExtractionInhibition',
                                         related_name='extractioninhibitions')
+    extraction_method = models.OneToOneField('ExtractionMethod', related_name='extractions')
+    extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)	
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_extraction"
+
+		
+		
+class ExtractionMethod(NameModel):
+    """
+    Extraction Method
+    """
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_extractionmethod"			
 
 
 class ExtractionInhibition(HistoryModel):
@@ -406,10 +423,12 @@ class Inhibition(NameModel):
     Inhibition
     """
 
+    inhibition_number = models.IntegerField(unique=True)
     type = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: this should be a controlled list, either an enum field or a FK to a type table
     dilution = models.FloatField(null=True, blank=True)
     extraction = models.ManyToManyField('Extraction', through='ExtractionInhibition',
-                                        related_name='extractioninhibitions')
+                                        related_name='inhibitions')
+    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)	
 
     def __str__(self):
         return str(self.id)
@@ -423,10 +442,13 @@ class ReverseTranscription(NameModel):
     Reverse Transcription
     """
 
-    extraction = models.ForeignKey('Extraction', related_name='reversetranscriptions')
+    rt_number = models.IntegerField(unique=True)
+    extraction = models.ForeignKey('Extraction', related_name='reverse_transcriptions')
     volume_in = models.FloatField(null=True, blank=True)
     volume_out = models.FloatField(null=True, blank=True)
     cycle_of_quantification = models.FloatField(null=True, blank=True)
+    rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)	
+	
 
     def __str__(self):
         return str(self.id)
@@ -475,7 +497,7 @@ class StandardCurve(HistoryModel):
         db_table = "lide_standardcurve"
 
 
-class Target(HistoryModel):
+class Target(NameModel):
     """
     Target
     """

@@ -148,6 +148,18 @@ class SampleGroupViewSet(HistoryViewSet):
 class AnalysisBatchViewSet(HistoryViewSet):
     queryset = AnalysisBatch.objects.all()
     serializer_class = AnalysisBatchSerializer
+	
+class AnalysisBatchDetailViewSet(HistoryViewSet):
+    queryset = AnalysisBatch.objects.all()
+    serializer_class = AnalysisBatchDetailSerializer
+
+	# override the default queryset to allow filtering by URL arguments
+    def get_queryset(self):
+        queryset = AnalysisBatch.objects.all()
+        batch = self.request.query_params.get('id', None)
+        if batch is not None:
+        	queryset = queryset.filter(id__exact=batch)
+        return queryset	
 
 
 class AnalysisBatchTemplateViewSet(HistoryViewSet):
@@ -158,6 +170,10 @@ class AnalysisBatchTemplateViewSet(HistoryViewSet):
 class ExtractionViewSet(HistoryViewSet):
     queryset = Extraction.objects.all()
     serializer_class = ExtractionSerializer
+	
+class ExtractionMethodViewSet(HistoryViewSet):
+    queryset = ExtractionMethod.objects.all()
+    serializer_class = ExtractionMethodSerializer		
 
 
 class InhibitionViewSet(HistoryViewSet):
