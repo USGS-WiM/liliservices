@@ -160,6 +160,10 @@ class AnalysisBatchDetailViewSet(HistoryViewSet):
         if batch is not None:
         	queryset = queryset.filter(id__exact=batch)
         return queryset	
+	
+class AnalysisBatchSummaryViewSet(HistoryViewSet):
+    queryset = AnalysisBatch.objects.all()
+    serializer_class = AnalysisBatchSummarySerializer	
 
 
 class AnalysisBatchTemplateViewSet(HistoryViewSet):

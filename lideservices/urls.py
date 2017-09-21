@@ -19,6 +19,7 @@ router.register(r'concentrationtype', views.ConcentrationTypeViewSet, 'concentra
 router.register(r'samplegroups', views.SampleGroupViewSet, 'samplegroups')
 router.register(r'analysisbatches', views.AnalysisBatchViewSet, 'analysisbatches')
 router.register(r'analysisbatchdetail', views.AnalysisBatchDetailViewSet, 'analysisbatchdetail')
+router.register(r'analysisbatchsummary', views.AnalysisBatchSummaryViewSet, 'analysisbatchsummary')
 router.register(r'analysisbatchtemplatess', views.AnalysisBatchTemplateViewSet, 'analysisbatchtemplates')
 router.register(r'extractions', views.ExtractionViewSet, 'extractions')
 router.register(r'extractionmethods', views.ExtractionMethodViewSet, 'extractionmethods')

@@ -296,6 +296,74 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
         model = AnalysisBatch
         fields = ('id', 'analysis_batch_description', 'analysis_batch_notes','samples','studies','extractions','created_date','created_by','modified_date','modified_by',)	
 		
+class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
+
+	#studies
+    def get_studies(self, obj):
+        studies = []
+        vals = obj.samples.values()        
+        for val in vals:
+            study_id = val.get('study_id')			
+            studies.append(study_id)
+        return studies
+    studies = serializers.SerializerMethodField()
+	
+	#summary: extraction count, inhibition count, reverse transcription count, target count
+    def get_summary(self, obj):
+        summary = {}
+        inhibition_count = 0
+        reverse_transcription_count = 0
+        targets = []		
+        
+        extractions = obj.extractions.values()				
+		
+		#extraction count
+        extraction_count = len(extractions)
+		 
+        for val in extractions:
+            extraction_id = val.get('id')
+			
+            #inhibition count
+            inhibition_count += len(Inhibition.objects.filter(extraction=extraction_id))
+			
+            #reverse transcription count
+            reverse_transcription_count += len(ReverseTranscription.objects.filter(extraction=extraction_id))
+			
+            #target count
+            replicates = PCRReplicate.objects.filter(extraction=extraction_id)
+            for replicate in replicates:
+                target = replicate.target
+                if target not in targets:
+                    targets.append(replicate.target)			
+        
+        summary['extraction_count'] = extraction_count
+        summary['inhibition_count'] = inhibition_count
+        summary['reverse_transcription_count'] = reverse_transcription_count
+        summary['target_count'] = len(targets)
+	
+        return summary
+    summary = serializers.SerializerMethodField()
+	
+	#created by username
+    def get_created_by(self, obj):
+        username = None
+        if obj.created_by is not None:
+            username = obj.created_by.username
+        return username
+    created_by = serializers.StringRelatedField()
+	
+	#modified by username
+    def get_modified_by(self, obj):
+        username = None
+        if obj.modified_by is not None:
+            username = obj.modified_by.username
+        return username
+    modified_by = serializers.StringRelatedField()	
+	
+    class Meta:
+        model = AnalysisBatch
+        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes','studies','summary','created_date','created_by','modified_date','modified_by',)			
+		
 
 ######
 #
