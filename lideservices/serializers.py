@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from lideservices.models import *
+from enumchoicefield import ChoiceEnum, EnumChoiceField
 
 
 ######
@@ -32,13 +33,14 @@ class SampleSerializer(serializers.ModelSerializer):
                   'final_concentrated_sample_volume_notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
-		
+
 class SimpleSampleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sample
         fields = ('id', 'sample_type', 'sample_description')
-		
+
+
 class AliquotSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -160,7 +162,9 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
 
 class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
 
@@ -170,18 +174,29 @@ class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class ExtractionBatchSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Extraction
+        fields = ('id', 'analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
+                  'extraction_method', 'extraction_date',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
-                  'inhibition', 'extraction_date', 'created_date', 'created_by', 'modified_date', 'modified_by',)		
+        fields = ('id', 'sample', 'extraction_batch', 'dilution_factor', 'inhibition',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
 
 class InhibitionSerializer(serializers.ModelSerializer):
+    type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'inhibition_number', 'name', 'type', 'dilution', 'extraction', 'inhibition_date',
+        fields = ('id', 'name', 'inhibition_number', 'inhibition_date', 'type', 'dilution_factor', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -189,7 +204,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'name', 'extraction', 'volume_in', 'volume_out', 'cycle_of_quantification','rt_date',
+        fields = ('id', 'rt_number', 'extraction', 'template_volume', 'reaction_volume', 'cq_value', 'rt_date',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -197,9 +212,9 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'inhibition', 'reverse_transcription', 'target', 'replicate',
-                  'cycle_of_quantification', 'guanine_cytosine_content_reaction', 'concentration',
-                  'concentration_unit', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'extraction', 'reverse_transcription', 'target', 'replicate_number', 'cq_value', 'gc_reaction',
+                  'concentration', 'sample_mean_concentration', 'concentration_unit', 'bad_result_flag', 'pcr_date',
+                  'template_volume', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class StandardCurveSerializer(serializers.ModelSerializer):
@@ -208,28 +223,27 @@ class StandardCurveSerializer(serializers.ModelSerializer):
         model = StandardCurve
         fields = ('id', 'r_value', 'slope', 'efficiency', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
-		
+
 class TargetSerializer(serializers.ModelSerializer):
+    type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = Target
-        fields = ('id', 'abbreviation', 'type', 'created_date', 'created_by', 'modified_date', 'modified_by',)		
+        fields = ('id', 'name', 'code', 'type', 'medium', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
-		
+
 class ExtractionMethodSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionMethod
         fields = ('id', 'name',)		
-	
+
+
 class AnalysisBatchExtractionSerializer(serializers.ModelSerializer):
-    inhibitions = InhibitionSerializer(many=True, read_only=True)
-    reverse_transcriptions = ReverseTranscriptionSerializer(many=True, read_only=True)
-	
-	#targets
+
+    # targets
     def get_targets(self, obj):
         targets = {}
-        data = {}
         vals = obj.pcrreplicates.values()  
         
         for val in vals:
@@ -238,67 +252,59 @@ class AnalysisBatchExtractionSerializer(serializers.ModelSerializer):
             target_name = target.name
             target_abbreviation = target.abbreviation
             target_type = target.type
-			
-			#count the number of replicates associated with each target
+
+            # count the number of replicates associated with each target
             if targets.get(target_id, None) is not None:
                 data = targets[target_id]
                 data['replicates'] += 1
             else:
-                data = {'id' :target_id,'name': target_name, 'abbrevation': target_abbreviation, 'type': target_type, 'replicates': 1}		
+                data = {'id': target_id, 'name': target_name, 'abbrevation': target_abbreviation,
+                        'type': target_type, 'replicates': 1}
             targets[target_id] = data			
         
         return targets.values()
-    
+
+    inhibitions = InhibitionSerializer(many=True, read_only=True)
+    reverse_transcriptions = ReverseTranscriptionSerializer(many=True, read_only=True)
     targets = serializers.SerializerMethodField()
-		
+
     class Meta:
         model = Extraction
-        fields = ('id', 'extraction_number', 'extraction_volume', 'elution_volume','extraction_method',
-                  'inhibitions', 'reverse_transcriptions' ,'targets','extraction_date', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-		
-	
+        fields = ('id', 'extraction_number', 'extraction_volume', 'elution_volume', 'extraction_method',
+                  'inhibitions', 'reverse_transcriptions', 'targets', 'extraction_date',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
-    extractions = AnalysisBatchExtractionSerializer(many=True, read_only=True)
-    samples = SimpleSampleSerializer(many=True, read_only=True)
-    
-	#studies
+
+    # studies
     def get_studies(self, obj):
         studies = []
-        study_id = None
         vals = obj.samples.values()        
         for val in vals:
             study_id = val.get('study_id')
             study = Study.objects.get(id=study_id)
             study_name = study.name
             study_description = study.description
-            data = {'id' :study_id, 'name':study_name, 'description': study_description}			
+            data = {'id': study_id, 'name': study_name, 'description': study_description}
             studies.append(data)
         return studies
+
+    extractions = AnalysisBatchExtractionSerializer(many=True, read_only=True)
+    samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
-	
-	#created by username
-    def get_created_by(self, obj):
-        username = None
-        if obj.created_by is not None:
-            username = obj.created_by.username
-        return username
     created_by = serializers.StringRelatedField()
-	
-	#modified by username
-    def get_modified_by(self, obj):
-        username = None
-        if obj.modified_by is not None:
-            username = obj.modified_by.username
-        return username
     modified_by = serializers.StringRelatedField()	
-	
+
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes','samples','studies','extractions','created_date','created_by','modified_date','modified_by',)	
-		
+        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies', 'extractions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 
-	#studies
+    # studies
     def get_studies(self, obj):
         studies = []
         vals = obj.samples.values()        
@@ -306,9 +312,8 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
             study_id = val.get('study_id')			
             studies.append(study_id)
         return studies
-    studies = serializers.SerializerMethodField()
-	
-	#summary: extraction count, inhibition count, reverse transcription count, target count
+
+    # summary: extraction count, inhibition count, reverse transcription count, target count
     def get_summary(self, obj):
         summary = {}
         inhibition_count = 0
@@ -316,20 +321,20 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         targets = []		
         
         extractions = obj.extractions.values()				
-		
-		#extraction count
+
+        # extraction count
         extraction_count = len(extractions)
-		 
+
         for val in extractions:
             extraction_id = val.get('id')
-			
-            #inhibition count
+
+            # inhibition count
             inhibition_count += len(Inhibition.objects.filter(extraction=extraction_id))
-			
-            #reverse transcription count
+
+            # reverse transcription count
             reverse_transcription_count += len(ReverseTranscription.objects.filter(extraction=extraction_id))
-			
-            #target count
+
+            # target count
             replicates = PCRReplicate.objects.filter(extraction=extraction_id)
             for replicate in replicates:
                 target = replicate.target
@@ -340,30 +345,19 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         summary['inhibition_count'] = inhibition_count
         summary['reverse_transcription_count'] = reverse_transcription_count
         summary['target_count'] = len(targets)
-	
+
         return summary
+
+    studies = serializers.SerializerMethodField()
     summary = serializers.SerializerMethodField()
-	
-	#created by username
-    def get_created_by(self, obj):
-        username = None
-        if obj.created_by is not None:
-            username = obj.created_by.username
-        return username
     created_by = serializers.StringRelatedField()
-	
-	#modified by username
-    def get_modified_by(self, obj):
-        username = None
-        if obj.modified_by is not None:
-            username = obj.modified_by.username
-        return username
     modified_by = serializers.StringRelatedField()	
-	
+
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes','studies','summary','created_date','created_by','modified_date','modified_by',)			
-		
+        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'studies', 'summary',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
 
 ######
 #
@@ -383,7 +377,7 @@ class ControlSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Control
-        fields = ('id', 'type', 'extraction', 'target', 'qc_value', 'qc_flag',
+        fields = ('id', 'name', 'type', 'extraction', 'target', 'qc_value', 'qc_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

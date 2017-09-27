@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.conf import settings
 from simple_history.models import HistoricalRecords
 from simple_history.admin import SimpleHistoryAdmin
+from enumchoicefield import ChoiceEnum, EnumChoiceField
 
 
 # Users will be stored in the core User model instead of a custom model.
@@ -46,6 +47,11 @@ class NameModel(HistoryModel):
 
     class Meta:
         abstract = True
+
+
+class NucleicAcidType(ChoiceEnum):
+    DNA = "DNA"
+    RNA = "RNA"
 
 
 #TODO: assign proper field types and properties to each model field
@@ -364,32 +370,27 @@ class AnalysisBatchTemplate(NameModel):
 
     class Meta:
         db_table = "lide_analysisbatchtemplate"
-	
-		
-	
-class Extraction(HistoryModel):
+
+
+class Inhibition(NameModel):
     """
-    Extraction
+    Inhibition
     """
 
-    sample = models.ForeignKey('Sample', related_name='extractions')
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractions')
-    extraction_number = models.IntegerField(unique=True)
-    extraction_volume = models.FloatField(null=True, blank=True)
-    elution_volume = models.FloatField(null=True, blank=True)
-    inhibition = models.ManyToManyField('Inhibition', through='ExtractionInhibition',
-                                        related_name='extractioninhibitions')
-    extraction_method = models.OneToOneField('ExtractionMethod', related_name='extractions')
-    extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)	
+    sample = models.OneToOneField('Sample', related_name='inhibitions')
+    inhibition_number = models.IntegerField(unique=True)
+    type = EnumChoiceField(enum_class=NucleicAcidType, default=NucleicAcidType.DNA)
+    dilution_factor = models.IntegerField(null=True, blank=True)
+    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_extraction"
+        db_table = "lide_inhibition"
+        unique_together = ("sample", "inhibition_number")
 
-		
-		
+
 class ExtractionMethod(NameModel):
     """
     Extraction Method
@@ -399,42 +400,70 @@ class ExtractionMethod(NameModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_extractionmethod"			
+        db_table = "lide_extractionmethod"
 
 
-class ExtractionInhibition(HistoryModel):
+class ExtractionBatch(HistoryModel):
     """
-    Table to allow many-to-many relationship between Extractions and Inhibitions.
+    Extraction Batch
     """
 
-    extraction = models.ForeignKey('Extraction')
-    inhibition = models.ForeignKey('Inhibition')
+    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
+    extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
+    extraction_number = models.IntegerField()
+    extraction_volume = models.FloatField(null=True, blank=True)
+    elution_volume = models.FloatField(null=True, blank=True)
+    extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_extractioninhibition"
-        unique_together = ("extraction", "inhibition")
+        db_table = "lide_extractionbatch"
+        unique_together = ("analysis_batch", "extraction_number")
 
 
-class Inhibition(NameModel):
+class Extraction(HistoryModel):
     """
-    Inhibition
+    Extraction
     """
 
-    inhibition_number = models.IntegerField(unique=True)
-    type = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: this should be a controlled list, either an enum field or a FK to a type table
-    dilution = models.FloatField(null=True, blank=True)
-    extraction = models.ManyToManyField('Extraction', through='ExtractionInhibition',
-                                        related_name='inhibitions')
-    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)	
+    sample = models.ForeignKey('Sample', related_name='extractions')
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
+    dilution_factor = models.IntegerField(null=True, blank=True)
+    inhibition = models.ForeignKey('Inhibition', related_name='extractions')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_inhibition"
+        db_table = "lide_extraction"
+
+
+class PCRReplicate(HistoryModel):
+    """
+    Polymerase Chain Reaction Replicate
+    """
+
+    extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
+    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='pcrreplicates')
+    target = models.ForeignKey('Target', related_name='pcrreplicates')
+    replicate_number = models.IntegerField()
+    cq_value = models.FloatField(null=True, blank=True)
+    gc_reaction = models.FloatField(null=True, blank=True)
+    concentration = models.FloatField(null=True, blank=True)
+    sample_mean_concentration = models.FloatField(null=True, blank=True) #QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
+    concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')
+    bad_result_flag = models.BooleanField(default=False)
+    pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    template_volume = models.FloatField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_pcrreplicate"
+        #TODO: 'unique together' fields
 
 
 class ReverseTranscription(NameModel):
@@ -444,41 +473,17 @@ class ReverseTranscription(NameModel):
 
     rt_number = models.IntegerField(unique=True)
     extraction = models.ForeignKey('Extraction', related_name='reverse_transcriptions')
-    volume_in = models.FloatField(null=True, blank=True)
-    volume_out = models.FloatField(null=True, blank=True)
-    cycle_of_quantification = models.FloatField(null=True, blank=True)
-    rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)	
-	
+    template_volume = models.FloatField(null=True, blank=True)
+    reaction_volume = models.FloatField(null=True, blank=True)
+    cq_value = models.FloatField(null=True, blank=True)
+    rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_reversetranscription"
-
-
-class PCRReplicate(HistoryModel):
-    """
-    Polymerase Chain Reaction Replicate
-    """
-
-    extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
-    inhibition =  models.ForeignKey('Inhibition', related_name='pcrreplicates')
-    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='pcrreplicates')
-    target = models.ForeignKey('Target', related_name='pcrreplicates')
-    replicate = models.IntegerField()
-    cycle_of_quantification = models.FloatField(null=True, blank=True)
-    guanine_cytosine_content_reaction = models.FloatField(null=True, blank=True)
-    concentration = models.FloatField(null=True, blank=True)
-    #sample_mean_concentration = models.FloatField(null=True, blank=True) #QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
-    concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_pcrreplicate"
-        #TODO: 'unique together' fields
+        unique_together = ("extraction", "rt_number")
 
 
 class StandardCurve(HistoryModel):
@@ -502,14 +507,27 @@ class Target(NameModel):
     Target
     """
 
-    abbreviation = models.CharField(max_length=128, null=True, blank=True)
-    type = models.CharField(max_length=128, null=True, blank=True) #COMMENT: this should be a controlled list, either an enum field or a FK to a type table
+    code = models.CharField(max_length=128, null=True, blank=True)
+    type = EnumChoiceField(enum_class=NucleicAcidType, default=NucleicAcidType.DNA)
+    medium = models.ForeignKey('Medium', related_name='targets')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_target"
+
+
+class Medium(NameModel):
+    """
+    Medium
+    """
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_medium"
 
 
 ######

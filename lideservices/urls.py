@@ -21,6 +21,7 @@ router.register(r'analysisbatches', views.AnalysisBatchViewSet, 'analysisbatches
 router.register(r'analysisbatchdetail', views.AnalysisBatchDetailViewSet, 'analysisbatchdetail')
 router.register(r'analysisbatchsummary', views.AnalysisBatchSummaryViewSet, 'analysisbatchsummary')
 router.register(r'analysisbatchtemplatess', views.AnalysisBatchTemplateViewSet, 'analysisbatchtemplates')
+router.register(r'extractionbatches', views.ExtractionBatchViewSet, 'extractionbatches')
 router.register(r'extractions', views.ExtractionViewSet, 'extractions')
 router.register(r'extractionmethods', views.ExtractionMethodViewSet, 'extractionmethods')
 router.register(r'inhibitions', views.InhibitionViewSet, 'inhibitions')
