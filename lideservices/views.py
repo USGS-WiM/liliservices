@@ -188,6 +188,11 @@ class ExtractionMethodViewSet(HistoryViewSet):
     serializer_class = ExtractionMethodSerializer		
 
 
+class InhibitionBatchViewSet(HistoryViewSet):
+    queryset = InhibitionBatch.objects.all()
+    serializer_class = InhibitionBatchSerializer
+
+
 class InhibitionViewSet(HistoryViewSet):
     queryset = Inhibition.objects.all()
     serializer_class = InhibitionSerializer

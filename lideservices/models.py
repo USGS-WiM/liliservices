@@ -54,7 +54,7 @@ class NucleicAcidType(ChoiceEnum):
     RNA = "RNA"
 
 
-#TODO: assign proper field types and properties to each model field
+# TODO: assign proper field types and properties to each model field
 
 ######
 #
@@ -109,7 +109,7 @@ class Sample(HistoryModel):
 
     class Meta:
         db_table = "lide_sample"
-        #TODO: 'unique together' fields
+        # TODO: 'unique together' fields
 
 
 class Aliquot(HistoryModel):
@@ -118,9 +118,9 @@ class Aliquot(HistoryModel):
     """
 
     sample = models.ForeignKey('Sample', related_name='aliquots')
+    freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
     aliquot = models.IntegerField()
     frozen = models.BooleanField()
-    freezer_location = models.OneToOneField('FreezerLocation', related_name='aliquot')
 
     def __str__(self):
         return str(self.id)
@@ -138,7 +138,7 @@ class SampleType(NameModel):
     code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
-        return str(self.id)
+        return str(self.name)
 
     class Meta:
         db_table = "lide_sampletype"
@@ -152,7 +152,7 @@ class MatrixType(NameModel):
     code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
-        return str(self.id)
+        return str(self.name)
 
     class Meta:
         db_table = "lide_matrixtype"
@@ -166,7 +166,7 @@ class FilterType(NameModel):
     matrix = models.ForeignKey('MatrixType', related_name='filters')
 
     def __str__(self):
-        return str(self.id)
+        return str(self.name)
 
     class Meta:
         db_table = "lide_filtertype"
@@ -180,7 +180,7 @@ class Study(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return str(self.name)
 
     class Meta:
         db_table = "lide_study"
@@ -194,7 +194,7 @@ class UnitType(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return str(self.name)
 
     class Meta:
         db_table = "lide_unittype"
@@ -260,7 +260,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
     final_concentrated_sample_volume_notes = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.case) + " - " + str(self.tag)
+        return str(self.id)
 
     class Meta:
         db_table = "lide_finalconcentratedsamplevolume"
@@ -294,7 +294,7 @@ class SampleSampleGroup(HistoryModel):
     samplegroup = models.ForeignKey('SampleGroup')
 
     def __str__(self):
-        return str(self.case) + " - " + str(self.tag)
+        return str(self.id)
 
     class Meta:
         db_table = "lide_samplesamplegroup"
@@ -352,7 +352,6 @@ class AnalysisBatch(HistoryModel):
 
     class Meta:
         db_table = "lide_analysisbatch"
-        #TODO: 'unique together' fields
 
 
 class AnalysisBatchTemplate(NameModel):
@@ -360,35 +359,50 @@ class AnalysisBatchTemplate(NameModel):
     Analysis Batch Template
     """
 
+    target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
     description = models.TextField(blank=True)
     extraction_volume = models.FloatField(null=True, blank=True)
     elution_volume = models.FloatField(null=True, blank=True)
-    target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_analysisbatchtemplate"
 
 
-class Inhibition(NameModel):
+class InhibitionBatch(HistoryModel):
     """
-    Inhibition
+    Inhibition Batch
     """
 
-    sample = models.OneToOneField('Sample', related_name='inhibitions')
-    inhibition_number = models.IntegerField(unique=True)
+    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitionbatches')
+    inhibition_number = models.IntegerField()
     type = EnumChoiceField(enum_class=NucleicAcidType, default=NucleicAcidType.DNA)
-    dilution_factor = models.IntegerField(null=True, blank=True)
     inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
+        db_table = "lide_inhibitionbatch"
+        unique_together = ("analysis_batch", "inhibition_number")
+
+
+class Inhibition(HistoryModel):
+    """
+    Inhibition
+    """
+
+    sample = models.ForeignKey('Sample', related_name='inhibitions')
+    inhibition_batch = models.ForeignKey('InhibitionBatch', related_name='inhibitions')
+    dilution_factor = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
         db_table = "lide_inhibition"
-        unique_together = ("sample", "inhibition_number")
 
 
 class ExtractionMethod(NameModel):
@@ -397,7 +411,7 @@ class ExtractionMethod(NameModel):
     """
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_extractionmethod"
@@ -409,6 +423,7 @@ class ExtractionBatch(HistoryModel):
     """
 
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
+    reextraction = models.ForeignKey('self', related_name='extractionbatches', null=True)
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField(null=True, blank=True)
@@ -429,9 +444,10 @@ class Extraction(HistoryModel):
     """
 
     sample = models.ForeignKey('Sample', related_name='extractions')
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
-    dilution_factor = models.IntegerField(null=True, blank=True)
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions', null=True)
     inhibition = models.ForeignKey('Inhibition', related_name='extractions')
+    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='extractions')
+    dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return str(self.id)
@@ -446,13 +462,11 @@ class PCRReplicate(HistoryModel):
     """
 
     extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
-    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='pcrreplicates')
     target = models.ForeignKey('Target', related_name='pcrreplicates')
-    replicate_number = models.IntegerField()
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.FloatField(null=True, blank=True)
     concentration = models.FloatField(null=True, blank=True)
-    sample_mean_concentration = models.FloatField(null=True, blank=True) #QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
+    sample_mean_concentration = models.FloatField(null=True, blank=True)  # QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
     concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')
     bad_result_flag = models.BooleanField(default=False)
     pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
@@ -463,16 +477,16 @@ class PCRReplicate(HistoryModel):
 
     class Meta:
         db_table = "lide_pcrreplicate"
-        #TODO: 'unique together' fields
+        # TODO: 'unique together' fields
 
 
-class ReverseTranscription(NameModel):
+class ReverseTranscription(HistoryModel):
     """
     Reverse Transcription
     """
 
-    rt_number = models.IntegerField(unique=True)
-    extraction = models.ForeignKey('Extraction', related_name='reverse_transcriptions')
+    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='reverse_transcriptions')
+    rt_number = models.IntegerField()
     template_volume = models.FloatField(null=True, blank=True)
     reaction_volume = models.FloatField(null=True, blank=True)
     cq_value = models.FloatField(null=True, blank=True)
@@ -483,7 +497,7 @@ class ReverseTranscription(NameModel):
 
     class Meta:
         db_table = "lide_reversetranscription"
-        unique_together = ("extraction", "rt_number")
+        unique_together = ("analysis_batch", "rt_number")
 
 
 class StandardCurve(HistoryModel):
@@ -507,9 +521,9 @@ class Target(NameModel):
     Target
     """
 
+    medium = models.ForeignKey('TargetMedium', related_name='targets')
     code = models.CharField(max_length=128, null=True, blank=True)
     type = EnumChoiceField(enum_class=NucleicAcidType, default=NucleicAcidType.DNA)
-    medium = models.ForeignKey('Medium', related_name='targets')
 
     def __str__(self):
         return str(self.id)
@@ -518,7 +532,7 @@ class Target(NameModel):
         db_table = "lide_target"
 
 
-class Medium(NameModel):
+class TargetMedium(NameModel):
     """
     Medium
     """
@@ -527,7 +541,7 @@ class Medium(NameModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_medium"
+        db_table = "lide_targetmedium"
 
 
 ######
@@ -535,7 +549,7 @@ class Medium(NameModel):
 #  Controls
 #
 ######
-#QUESTION: for completeness/explicitness sake, should these be named "Quality Controls" instead?
+# QUESTION: for completeness/explicitness sake, should these be named "Quality Controls" instead?
 
 
 class ControlType(NameModel):
@@ -546,13 +560,13 @@ class ControlType(NameModel):
     abbreviation = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_controltype"
 
 
-class Control(NameModel):
+class Control(HistoryModel):
     """
     Control
     """
@@ -568,7 +582,7 @@ class Control(NameModel):
 
     class Meta:
         db_table = "lide_control"
-        #TODO: 'unique together' fields
+        # TODO: 'unique together' fields
 
 
 ######
@@ -591,4 +605,3 @@ class OtherAnalysis(HistoryModel):
 
     class Meta:
         db_table = "lide_otheranalysis"
-

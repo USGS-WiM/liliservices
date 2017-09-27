@@ -187,16 +187,24 @@ class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'extraction_batch', 'dilution_factor', 'inhibition',
+        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'reverse_transcription', 'dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class InhibitionSerializer(serializers.ModelSerializer):
+class InhibitionBatchSerializer(serializers.ModelSerializer):
     type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'name', 'inhibition_number', 'inhibition_date', 'type', 'dilution_factor', 'extractions',
+        fields = ('id', 'analysis_batch', 'inhibition_number', 'inhibition_date', 'type',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class InhibitionSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Inhibition
+        fields = ('id', 'sample', 'dilution_factor', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -204,7 +212,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'rt_number', 'extraction', 'template_volume', 'reaction_volume', 'cq_value', 'rt_date',
+        fields = ('id', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'cq_value', 'rt_date',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
