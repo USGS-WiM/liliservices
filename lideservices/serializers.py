@@ -208,6 +208,14 @@ class InhibitionSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class SimpleInhibitionSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Inhibition
+        fields = ('id', 'sample', 'dilution_factor',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)		
+		
+		
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -365,6 +373,22 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         model = AnalysisBatch
         fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'studies', 'summary',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
+		
+
+class SampleInhibitionSerializer(serializers.ModelSerializer):
+    inhibitions = SimpleInhibitionSerializer(many=True, read_only=True)
+	
+    class Meta:
+        model = Sample
+        fields = ('id', 'sample_type', 'sample_description', 'inhibitions',)		
+		
+		
+class AnalysisBatchSampleInhibitionSerializer(serializers.ModelSerializer):
+    samples = SampleInhibitionSerializer(many=True, read_only=True)	
+	
+    class Meta:
+        model = AnalysisBatch
+        fields = ('samples',)		
 
 
 ######
