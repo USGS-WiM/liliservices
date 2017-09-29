@@ -138,7 +138,7 @@ class SampleType(NameModel):
     code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.id)
 
     class Meta:
         db_table = "lide_sampletype"
@@ -152,7 +152,7 @@ class MatrixType(NameModel):
     code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.id)
 
     class Meta:
         db_table = "lide_matrixtype"
@@ -166,7 +166,7 @@ class FilterType(NameModel):
     matrix = models.ForeignKey('MatrixType', related_name='filters')
 
     def __str__(self):
-        return str(self.name)
+        return str(self.id)
 
     class Meta:
         db_table = "lide_filtertype"
@@ -194,7 +194,7 @@ class UnitType(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.id)
 
     class Meta:
         db_table = "lide_unittype"
@@ -272,7 +272,7 @@ class ConcentrationType(NameModel):
     """
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     class Meta:
         db_table = "lide_concentrationtype"
@@ -309,7 +309,7 @@ class SampleGroup(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     class Meta:
         db_table = "lide_samplegroup"
@@ -365,7 +365,7 @@ class AnalysisBatchTemplate(NameModel):
     elution_volume = models.FloatField(null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     class Meta:
         db_table = "lide_analysisbatchtemplate"
@@ -411,7 +411,7 @@ class ExtractionMethod(NameModel):
     """
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     class Meta:
         db_table = "lide_extractionmethod"
@@ -560,7 +560,7 @@ class ControlType(NameModel):
     abbreviation = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     class Meta:
         db_table = "lide_controltype"

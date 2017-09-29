@@ -172,32 +172,17 @@ class AnalysisBatchSampleInhibitionViewSet(HistoryViewSet):
     queryset = AnalysisBatch.objects.all()
     serializer_class = AnalysisBatchSampleInhibitionSerializer		
 
-	# override the default queryset to allow filtering by URL arguments
+    # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
         queryset = AnalysisBatch.objects.all()
         batch = self.request.query_params.get('id', None)
         if batch is not None:
-        	queryset = queryset.filter(id__exact=batch)
+            queryset = queryset.filter(id__exact=batch)
         return queryset
-	
+
 class AnalysisBatchTemplateViewSet(HistoryViewSet):
     queryset = AnalysisBatchTemplate.objects.all()
     serializer_class = AnalysisBatchTemplateSerializer
-
-
-class ExtractionBatchViewSet(HistoryViewSet):
-    queryset = ExtractionBatch.objects.all()
-    serializer_class = ExtractionBatchSerializer
-
-
-class ExtractionViewSet(HistoryViewSet):
-    queryset = Extraction.objects.all()
-    serializer_class = ExtractionSerializer
-
-
-class ExtractionMethodViewSet(HistoryViewSet):
-    queryset = ExtractionMethod.objects.all()
-    serializer_class = ExtractionMethodSerializer		
 
 
 class InhibitionBatchViewSet(HistoryViewSet):
@@ -210,14 +195,29 @@ class InhibitionViewSet(HistoryViewSet):
     serializer_class = InhibitionSerializer
 
 
-class ReverseTranscriptionViewSet(HistoryViewSet):
-    queryset = ReverseTranscription.objects.all()
-    serializer_class = ReverseTranscriptionSerializer
+class ExtractionMethodViewSet(HistoryViewSet):
+    queryset = ExtractionMethod.objects.all()
+    serializer_class = ExtractionMethodSerializer
+
+
+class ExtractionBatchViewSet(HistoryViewSet):
+    queryset = ExtractionBatch.objects.all()
+    serializer_class = ExtractionBatchSerializer
+
+
+class ExtractionViewSet(HistoryViewSet):
+    queryset = Extraction.objects.all()
+    serializer_class = ExtractionSerializer
 
 
 class PCRReplicateViewSet(HistoryViewSet):
     queryset = PCRReplicate.objects.all()
     serializer_class = PCRReplicateSerializer
+
+
+class ReverseTranscriptionViewSet(HistoryViewSet):
+    queryset = ReverseTranscription.objects.all()
+    serializer_class = ReverseTranscriptionSerializer
 
 
 class StandardCurveViewSet(HistoryViewSet):
@@ -228,6 +228,11 @@ class StandardCurveViewSet(HistoryViewSet):
 class TargetViewSet(HistoryViewSet):
     queryset = Target.objects.all()
     serializer_class = TargetSerializer
+
+
+class TargetMediumViewSet(HistoryViewSet):
+    queryset = TargetMedium.objects.all()
+    serializer_class = TargetMediumSerializer
 
 
 ######
