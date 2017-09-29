@@ -171,8 +171,8 @@ class InhibitionBatchSerializer(serializers.ModelSerializer):
     type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
-        model = Inhibition
-        fields = ('id', 'analysis_batch', 'inhibition_number', 'type', 'inhibition_date',
+        model = InhibitionBatch
+        fields = ('id', 'analysis_batch', 'inhibition_number', 'type', 'inhibition_date', 'inhibitions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -196,7 +196,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Extraction
         fields = ('id', 'analysis_batch', 'reextraction', 'extraction_method', 'extraction_number', 'extraction_volume',
-                  'elution_volume', 'extraction_date',
+                  'elution_volume', 'extraction_date', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

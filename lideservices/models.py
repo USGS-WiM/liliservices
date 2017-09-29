@@ -74,7 +74,7 @@ class Sample(HistoryModel):
     study = models.ForeignKey('Study', related_name='samples')
     study_site_name = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: I don't like this. Location information should be kept in a dedicated table for possible future use in spatial analysis
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
-    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sampler_name', null=True, blank=True)
+    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sampler_name', null=True, blank=True)  # QUESTION: This should probably be required, yes?
     sample_notes = models.TextField(blank=True)
     sample_description = models.TextField(blank=True)
     arrival_date = models.DateField(null=True, blank=True)
@@ -85,9 +85,9 @@ class Sample(HistoryModel):
     collection_end_time = models.TimeField(null=True, blank=True)
     meter_reading_initial = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     meter_reading_final = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    meter_reading_unit = models.ForeignKey('UnitType', null=True, related_name='samples_meter_units')  # COMMENT: this field doesn't belong here, it should go in a related table dedicated to this matrix type
+    meter_reading_unit = models.ForeignKey('UnitType', null=True, related_name='samples_meter_units')  # QUESTION: This should probably be required, yes?  # COMMENT: this field doesn't belong here, it should go in a related table dedicated to this matrix type
     total_volume_sampled_initial = models.FloatField(null=True, blank=True)
-    total_volume_sampled_unit_initial = models.ForeignKey('UnitType', null=True, related_name='samples_tvs_units')
+    total_volume_sampled_unit_initial = models.ForeignKey('UnitType', null=True, related_name='samples_tvs_units')  # QUESTION: This should probably be required, yes?
     total_volume_sampled = models.FloatField(null=True, blank=True)
     sample_volume_initial = models.FloatField(null=True, blank=True)
     sample_volume_filtered = models.FloatField(null=True, blank=True)
@@ -378,7 +378,7 @@ class InhibitionBatch(HistoryModel):
 
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitionbatches')
     inhibition_number = models.IntegerField()
-    type = EnumChoiceField(enum_class=NucleicAcidType, default=NucleicAcidType.DNA)
+    type = EnumChoiceField(enum_class=NucleicAcidType)
     inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
@@ -444,7 +444,7 @@ class Extraction(HistoryModel):
     """
 
     sample = models.ForeignKey('Sample', related_name='extractions')
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions', null=True)
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
     inhibition = models.ForeignKey('Inhibition', related_name='extractions')
     reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='extractions')
     dilution_factor = models.IntegerField(null=True, blank=True)
@@ -467,7 +467,7 @@ class PCRReplicate(HistoryModel):
     gc_reaction = models.FloatField(null=True, blank=True)
     concentration = models.FloatField(null=True, blank=True)
     sample_mean_concentration = models.FloatField(null=True, blank=True)  # QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
-    concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')
+    concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     template_volume = models.FloatField(null=True, blank=True)
@@ -523,7 +523,7 @@ class Target(NameModel):
 
     medium = models.ForeignKey('TargetMedium', related_name='targets')
     code = models.CharField(max_length=128, null=True, blank=True)
-    type = EnumChoiceField(enum_class=NucleicAcidType, default=NucleicAcidType.DNA)
+    type = EnumChoiceField(enum_class=NucleicAcidType)
 
     def __str__(self):
         return str(self.id)
