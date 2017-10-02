@@ -195,8 +195,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'analysis_batch', 'reextraction', 'extraction_method', 'extraction_number', 'extraction_volume',
-                  'elution_volume', 'extraction_date', 'extractions',
+        fields = ('id', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note', 'extraction_number',
+                  'extraction_volume', 'elution_volume', 'extraction_date', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

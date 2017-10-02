@@ -423,8 +423,9 @@ class ExtractionBatch(HistoryModel):
     """
 
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
-    reextraction = models.ForeignKey('self', related_name='extractionbatches', null=True)
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
+    reextraction = models.ForeignKey('self', related_name='extractionbatches', null=True)
+    reextraction_note = models.CharField(max_length=255, null=True, blank=True)
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField(null=True, blank=True)
     elution_volume = models.FloatField(null=True, blank=True)
