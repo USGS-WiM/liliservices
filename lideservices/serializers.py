@@ -13,7 +13,7 @@ from enumchoicefield import ChoiceEnum, EnumChoiceField
 class SampleSerializer(serializers.ModelSerializer):
     # sample_type
     def get_sample_type(self, obj):
-        sample_type_id = obj.sample_type
+        sample_type_id = obj.sample_type_id
         sample_type = SampleType.objects.get(id=sample_type_id)
         sample_type_name = sample_type.name
         data = {"id": sample_type_id, "name": sample_type_name}
@@ -21,7 +21,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # matrix_type
     def get_matrix_type(self, obj):
-        matrix_type_id = obj.matrix_type
+        matrix_type_id = obj.matrix_type_id
         matrix_type = MatrixType.objects.get(id=matrix_type_id)
         matrix_type_name = matrix_type.name
         data = {"id": matrix_type_id, "name": matrix_type_name}
@@ -29,7 +29,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # filter type
     def get_filter_type(self, obj):
-        filter_type_id = obj.filter_type
+        filter_type_id = obj.filter_type_id
         filter_type = FilterType.objects.get(id=filter_type_id)
         filter_type_name = filter_type.name
         data = {"id": filter_type_id, "name": filter_type_name}
@@ -37,7 +37,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # study
     def get_study(self, obj):
-            study_id = obj.study
+            study_id = obj.study_id
             study = Study.objects.get(id=study_id)
             study_name = study.name
             data = {"id": study_id, "name": study_name}
@@ -45,9 +45,9 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # sampler name
     def get_sampler_name(self, obj):
-        sampler_name_id = obj.sampler_name
+        sampler_name_id = obj.sampler_name_id
         sampler_name = User.objects.get(id=sampler_name_id)
-        sampler_name_name = sampler_name.name
+        sampler_name_name = sampler_name.username
         data = {"id": sampler_name_id, "name": sampler_name_name}
         return data
 
