@@ -462,7 +462,7 @@ class Extraction(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='extractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
     inhibition = models.ForeignKey('Inhibition', related_name='extractions')
-    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='extractions')
+    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='extractions', null=True)
     dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):

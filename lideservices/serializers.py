@@ -512,7 +512,7 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         reverse_transcription_count = 0
         targets = []
 
-        extractions = obj.extractions.values()
+        extractions = obj.extractionbatches.values()
 
         # extraction count
         extraction_count = len(extractions)
