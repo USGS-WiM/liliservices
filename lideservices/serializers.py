@@ -37,7 +37,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # study
     def get_study(self, obj):
-            study_id = obj.study_type
+            study_id = obj.study
             study = Study.objects.get(id=study_id)
             study_name = study.name
             data = {"id": study_id, "name": study_name}
@@ -56,7 +56,7 @@ class SampleSerializer(serializers.ModelSerializer):
     sample_type = serializers.SerializerMethodField()
     matrix_type = serializers.SerializerMethodField()
     filter_type = serializers.SerializerMethodField()
-    study_type = serializers.SerializerMethodField()
+    study = serializers.SerializerMethodField()
     sampler_name = serializers.SerializerMethodField()
     final_concentrated_sample_volume = serializers.FloatField(
         source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
