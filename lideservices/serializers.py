@@ -521,10 +521,10 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
             extraction_id = val.get('id')
 
             # inhibition count
-            inhibition_count += len(Inhibition.objects.filter(extraction=extraction_id))
+            inhibition_count += len(Inhibition.objects.filter(extractions__in=extraction_id))
 
             # reverse transcription count
-            reverse_transcription_count += len(ReverseTranscription.objects.filter(extraction=extraction_id))
+            reverse_transcription_count += len(ReverseTranscription.objects.filter(extractions__in=extraction_id))
 
             # target count
             replicates = PCRReplicate.objects.filter(extraction=extraction_id)
