@@ -113,21 +113,26 @@ class Sample(HistoryModel):
 
 
 class Aliquot(HistoryModel):
-    """"
+    """
     Aliquot
     """
 
+    def _concat_ids(self):
+        """Returns the concatenated parent ID and child series number of the record"""
+        return '%s-%s' % (self.sample, self.aliquot_number)
+
+    aliquot_string = property(_concat_ids)
     sample = models.ForeignKey('Sample', related_name='aliquots')
     freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
-    aliquot = models.IntegerField()
+    aliquot_number = models.IntegerField()
     frozen = models.BooleanField()
 
     def __str__(self):
-        return str(self.id)
+        return self.aliquot_string
 
     class Meta:
         db_table = "lide_aliquot"
-        unique_together = ("sample", "aliquot")
+        unique_together = ("sample", "aliquot_number")
 
 
 class SampleType(NameModel):
@@ -138,7 +143,7 @@ class SampleType(NameModel):
     code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_sampletype"
@@ -152,7 +157,7 @@ class MatrixType(NameModel):
     code = models.CharField(max_length=128, unique=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_matrixtype"
@@ -166,7 +171,7 @@ class FilterType(NameModel):
     matrix = models.ForeignKey('MatrixType', related_name='filters')
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_filtertype"
@@ -180,7 +185,7 @@ class Study(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
     class Meta:
         db_table = "lide_study"
@@ -194,7 +199,7 @@ class UnitType(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_unittype"
@@ -272,7 +277,7 @@ class ConcentrationType(NameModel):
     """
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_concentrationtype"
@@ -309,7 +314,7 @@ class SampleGroup(NameModel):
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_samplegroup"
@@ -365,7 +370,7 @@ class AnalysisBatchTemplate(NameModel):
     elution_volume = models.FloatField(null=True, blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_analysisbatchtemplate"
@@ -376,13 +381,18 @@ class InhibitionBatch(HistoryModel):
     Inhibition Batch
     """
 
+    def _concat_ids(self):
+        """Returns the concatenated parent ID and child series number of the record"""
+        return '%s-%s' % (self.analysis_batch, self.inhibition_number)
+
+    inhibition_string = property(_concat_ids)
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitionbatches')
     inhibition_number = models.IntegerField()
     type = EnumChoiceField(enum_class=NucleicAcidType)
     inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.inhibition_string
 
     class Meta:
         db_table = "lide_inhibitionbatch"
@@ -411,7 +421,7 @@ class ExtractionMethod(NameModel):
     """
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_extractionmethod"
@@ -422,6 +432,11 @@ class ExtractionBatch(HistoryModel):
     Extraction Batch
     """
 
+    def _concat_ids(self):
+        """Returns the concatenated parent ID and child series number of the record"""
+        return '%s-%s' % (self.analysis_batch, self.extraction_number)
+
+    extraction_string = property(_concat_ids)
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     reextraction = models.ForeignKey('self', related_name='extractionbatches', null=True)
@@ -432,7 +447,7 @@ class ExtractionBatch(HistoryModel):
     extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.extraction_string
 
     class Meta:
         db_table = "lide_extractionbatch"
@@ -486,6 +501,11 @@ class ReverseTranscription(HistoryModel):
     Reverse Transcription
     """
 
+    def _concat_ids(self):
+        """Returns the concatenated parent ID and child series number of the record"""
+        return '%s-%s' % (self.analysis_batch, self.rt_number)
+
+    rt_string = property(_concat_ids)
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='reverse_transcriptions')
     rt_number = models.IntegerField()
     template_volume = models.FloatField(null=True, blank=True)
@@ -494,7 +514,7 @@ class ReverseTranscription(HistoryModel):
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.rt_string
 
     class Meta:
         db_table = "lide_reversetranscription"
@@ -527,7 +547,7 @@ class Target(NameModel):
     type = EnumChoiceField(enum_class=NucleicAcidType)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_target"
@@ -539,7 +559,7 @@ class TargetMedium(NameModel):
     """
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_targetmedium"
@@ -561,7 +581,7 @@ class ControlType(NameModel):
     abbreviation = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
-        return str(self.id)
+        return self.name
 
     class Meta:
         db_table = "lide_controltype"

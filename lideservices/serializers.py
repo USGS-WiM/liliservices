@@ -11,7 +11,53 @@ from enumchoicefield import ChoiceEnum, EnumChoiceField
 
 
 class SampleSerializer(serializers.ModelSerializer):
+    # sample_type
+    def get_sample_type(self, obj):
+        sample_type_id = obj.sample_type
+        sample_type = SampleType.objects.get(id=sample_type_id)
+        sample_type_name = sample_type.name
+        data = {"id": sample_type_id, "name": sample_type_name}
+        return data
 
+    # matrix_type
+    def get_matrix_type(self, obj):
+        matrix_type_id = obj.matrix_type
+        matrix_type = MatrixType.objects.get(id=matrix_type_id)
+        matrix_type_name = matrix_type.name
+        data = {"id": matrix_type_id, "name": matrix_type_name}
+        return data
+
+    # filter type
+    def get_filter_type(self, obj):
+        filter_type_id = obj.filter_type
+        filter_type = FilterType.objects.get(id=filter_type_id)
+        filter_type_name = filter_type.name
+        data = {"id": filter_type_id, "name": filter_type_name}
+        return data
+
+    # study
+    def get_study(self, obj):
+            study_id = obj.study_type
+            study = Study.objects.get(id=study_id)
+            study_name = study.name
+            data = {"id": study_id, "name": study_name}
+            return data
+
+    # sampler name
+    def get_sampler_name(self, obj):
+        sampler_name_id = obj.sampler_name
+        sampler_name = User.objects.get(id=sampler_name_id)
+        sampler_name_name = sampler_name.name
+        data = {"id": sampler_name_id, "name": sampler_name_name}
+        return data
+
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    sample_type = serializers.SerializerMethodField()
+    matrix_type = serializers.SerializerMethodField()
+    filter_type = serializers.SerializerMethodField()
+    study_type = serializers.SerializerMethodField()
+    sampler_name = serializers.SerializerMethodField()
     final_concentrated_sample_volume = serializers.FloatField(
         source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
     final_concentrated_sample_volume_type = serializers.StringRelatedField(
@@ -35,14 +81,18 @@ class SampleSerializer(serializers.ModelSerializer):
 
 
 class AliquotSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Aliquot
-        fields = ('id', 'sample', 'freezer_location', 'aliquot', 'frozen',
+        fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = SampleType
@@ -50,6 +100,8 @@ class SampleTypeSerializer(serializers.ModelSerializer):
 
 
 class MatrixTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = MatrixType
@@ -57,6 +109,8 @@ class MatrixTypeSerializer(serializers.ModelSerializer):
 
 
 class FilterTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = FilterType
@@ -64,6 +118,8 @@ class FilterTypeSerializer(serializers.ModelSerializer):
 
 
 class StudySerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Study
@@ -71,6 +127,8 @@ class StudySerializer(serializers.ModelSerializer):
 
 
 class UnitTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = UnitType
@@ -85,6 +143,8 @@ class UnitTypeSerializer(serializers.ModelSerializer):
 
 
 class FreezerLocationSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = FreezerLocation
@@ -93,6 +153,8 @@ class FreezerLocationSerializer(serializers.ModelSerializer):
 
 
 class FreezerSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Freezer
@@ -108,6 +170,8 @@ class FreezerSerializer(serializers.ModelSerializer):
 
 
 class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = FinalConcentratedSampleVolume
@@ -117,6 +181,8 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = ConcentrationType
@@ -131,6 +197,8 @@ class ConcentrationTypeSerializer(serializers.ModelSerializer):
 
 
 class SampleSampleGroupSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = UnitType
@@ -138,6 +206,8 @@ class SampleSampleGroupSerializer(serializers.ModelSerializer):
 
 
 class SampleGroupSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = UnitType
@@ -152,6 +222,8 @@ class SampleGroupSerializer(serializers.ModelSerializer):
 
 
 class AnalysisBatchSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = AnalysisBatch
@@ -160,6 +232,8 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
 
 class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = AnalysisBatchTemplate
@@ -168,15 +242,19 @@ class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
 
 
 class InhibitionBatchSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
     type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = InhibitionBatch
-        fields = ('id', 'analysis_batch', 'inhibition_number', 'type', 'inhibition_date', 'inhibitions',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'inhibition_string', 'analysis_batch', 'inhibition_number', 'type', 'inhibition_date',
+                  'inhibitions', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class InhibitionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Inhibition
@@ -188,19 +266,23 @@ class ExtractionMethodSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionMethod
-        fields = ('id', 'name',)
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ExtractionBatchSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
-        model = Extraction
-        fields = ('id', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note', 'extraction_number',
-                  'extraction_volume', 'elution_volume', 'extraction_date', 'extractions',
+        model = ExtractionBatch
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
+                  'extraction_number', 'extraction_volume', 'elution_volume', 'extraction_date', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ExtractionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Extraction
@@ -209,6 +291,8 @@ class ExtractionSerializer(serializers.ModelSerializer):
 
 
 class PCRReplicateSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = PCRReplicate
@@ -218,14 +302,18 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
 
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'cq_value', 'rt_date',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'rt_string', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'cq_value',
+                  'rt_date', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class StandardCurveSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = StandardCurve
@@ -233,6 +321,8 @@ class StandardCurveSerializer(serializers.ModelSerializer):
 
 
 class TargetSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
     type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
@@ -241,10 +331,12 @@ class TargetSerializer(serializers.ModelSerializer):
 
 
 class TargetMediumSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = TargetMedium
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -255,6 +347,8 @@ class TargetMediumSerializer(serializers.ModelSerializer):
 
 
 class ControlTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = ControlType
@@ -262,6 +356,8 @@ class ControlTypeSerializer(serializers.ModelSerializer):
 
 
 class ControlSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Control
@@ -277,6 +373,8 @@ class ControlSerializer(serializers.ModelSerializer):
 
 
 class OtherAnalysisSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = OtherAnalysis
@@ -306,21 +404,30 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SimpleSampleSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'sample_description')
+        fields = ('id', 'sample_type', 'sample_description',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleInhibitionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
     inhibitions = InhibitionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'sample_description', 'inhibitions',)
+        fields = ('id', 'sample_type', 'sample_description', 'inhibitions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchExtractionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
     # targets
     def get_targets(self, obj):
         targets = {}
@@ -356,6 +463,9 @@ class AnalysisBatchExtractionSerializer(serializers.ModelSerializer):
 
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
     # studies
     def get_studies(self, obj):
         studies = []
@@ -365,15 +475,13 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
             study = Study.objects.get(id=study_id)
             study_name = study.name
             study_description = study.description
-            data = {'id': study_id, 'name': study_name, 'description': study_description}
+            data = {"id": study_id, "name": study_name, "description": study_description}
             studies.append(data)
         return studies
 
     extractions = AnalysisBatchExtractionSerializer(many=True, read_only=True)
     samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = AnalysisBatch
@@ -382,13 +490,19 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
 
 
 class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
     # studies
     def get_studies(self, obj):
         studies = []
         vals = obj.samples.values()
         for val in vals:
             study_id = val.get('study_id')
-            studies.append(study_id)
+            study = Study.objects.get(id=study_id)
+            study_name = study.name
+            data = {"id": study_id, "name": study_name}
+            studies.append(data)
         return studies
 
     # summary: extraction count, inhibition count, reverse transcription count, target count
@@ -428,18 +542,8 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 
     studies = serializers.SerializerMethodField()
     summary = serializers.SerializerMethodField()
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = AnalysisBatch
         fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'studies', 'summary',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class AnalysisBatchSampleInhibitionSerializer(serializers.ModelSerializer):
-    samples = SampleInhibitionSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = AnalysisBatch
-        fields = ('samples',)

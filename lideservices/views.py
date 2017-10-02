@@ -151,7 +151,6 @@ class AnalysisBatchViewSet(HistoryViewSet):
 
 
 class AnalysisBatchDetailViewSet(HistoryViewSet):
-    queryset = AnalysisBatch.objects.all()
     serializer_class = AnalysisBatchDetailSerializer
 
     # override the default queryset to allow filtering by URL arguments
@@ -168,22 +167,30 @@ class AnalysisBatchSummaryViewSet(HistoryViewSet):
     serializer_class = AnalysisBatchSummarySerializer	
 
 
-class AnalysisBatchSampleInhibitionViewSet(HistoryViewSet):
-    queryset = AnalysisBatch.objects.all()
-    serializer_class = AnalysisBatchSampleInhibitionSerializer		
-
-    # override the default queryset to allow filtering by URL arguments
-    def get_queryset(self):
-        queryset = AnalysisBatch.objects.all()
-        batch = self.request.query_params.get('id', None)
-        if batch is not None:
-            queryset = queryset.filter(id__exact=batch)
-        return queryset
-
 class AnalysisBatchTemplateViewSet(HistoryViewSet):
     queryset = AnalysisBatchTemplate.objects.all()
     serializer_class = AnalysisBatchTemplateSerializer
 
+
+class SampleInhibitionViewSet(HistoryViewSet):
+    serializer_class = SampleInhibitionSerializer
+
+    # override the default queryset to allow filtering by URL arguments
+    # if sample ID is in query, only search by sample ID and ignore other params
+    def get_queryset(self):
+        queryset = Sample.objects.all()
+        # filter by sample IDs, exact list
+        sample = self.request.query_params.get('id', None)
+        if sample is not None:
+            sample_list = sample.split(',')
+            queryset = queryset.filter(id__in=sample_list)
+        # else, search by other params (that don't include sample ID)
+        else:
+            # filter by analysis batch ID, exact
+            analysis_batch = self.request.query_params.get('analysis_batch', None)
+            if analysis_batch is not None:
+                queryset = queryset.filter(analysis_batches__in=analysis_batch)
+        return queryset
 
 class InhibitionBatchViewSet(HistoryViewSet):
     queryset = InhibitionBatch.objects.all()
