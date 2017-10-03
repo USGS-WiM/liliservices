@@ -508,30 +508,36 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
     # summary: extraction count, inhibition count, reverse transcription count, target count
     def get_summary(self, obj):
         summary = {}
+        extraction_count = 0
         inhibition_count = 0
-        reverse_transcription_count = 0
         targets = []
 
-        extractions = obj.extractionbatches.values()
-
         # extraction count
-        extraction_count = len(extractions)
+        extraction_batches = obj.extractionbatches.values()
+        for extraction_batch in extraction_batches:
+            extraction_batch_id = extraction_batch.get('id')
 
-        for val in extractions:
-            extraction_id = val.get('id')
-
-            # inhibition count
-            inhibition_count += len(Inhibition.objects.filter(extractions__in=extraction_id))
-
-            # reverse transcription count
-            reverse_transcription_count += len(ReverseTranscription.objects.filter(extractions__in=extraction_id))
+            extraction_count += len(Extraction.objects.filter(extraction_batch__exact=extraction_batch_id))
 
             # target count
-            replicates = PCRReplicate.objects.filter(extraction=extraction_id)
-            for replicate in replicates:
-                target = replicate.target
-                if target not in targets:
-                    targets.append(replicate.target)
+            for extraction in extraction_batch:
+                extraction_id = extraction.get('id')
+
+                replicates = PCRReplicate.objects.filter(extraction__exact=extraction_id)
+                for replicate in replicates:
+                    target = replicate.target
+                    if target not in targets:
+                        targets.append(replicate.target)
+
+        # inhibition count
+        inhibition_batches = obj.inhibitionbatches.values()
+        for inhibition_batch in inhibition_batches:
+            inhibition_batch_id = inhibition_batch.get('id')
+
+            inhibition_count += len(Inhibition.objects.filter(inhibition_batch__in=inhibition_batch_id))
+
+        # reverse transcription count
+        reverse_transcription_count = len(obj.reversetranscriptions.values())
 
         summary['extraction_count'] = extraction_count
         summary['inhibition_count'] = inhibition_count
