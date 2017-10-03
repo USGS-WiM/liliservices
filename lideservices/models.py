@@ -506,7 +506,7 @@ class ReverseTranscription(HistoryModel):
         return '%s-%s' % (self.analysis_batch, self.rt_number)
 
     rt_string = property(_concat_ids)
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='reverse_transcriptions')
+    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='reversetranscriptions')
     rt_number = models.IntegerField()
     template_volume = models.FloatField(null=True, blank=True)
     reaction_volume = models.FloatField(null=True, blank=True)

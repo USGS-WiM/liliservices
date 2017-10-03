@@ -517,13 +517,12 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         for extraction_batch in extraction_batches:
             extraction_batch_id = extraction_batch.get('id')
 
-            extraction_count += len(Extraction.objects.filter(extraction_batch__exact=extraction_batch_id))
+            extractions = Extraction.objects.filter(extraction_batch__exact=extraction_batch_id)
+            extraction_count += len(extractions)
 
             # target count
-            for extraction in extraction_batch:
-                extraction_id = extraction.get('id')
-
-                replicates = PCRReplicate.objects.filter(extraction__exact=extraction_id)
+            for extraction in extractions:
+                replicates = PCRReplicate.objects.filter(extraction__exact=extraction.id)
                 for replicate in replicates:
                     target = replicate.target
                     if target not in targets:
@@ -534,7 +533,8 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         for inhibition_batch in inhibition_batches:
             inhibition_batch_id = inhibition_batch.get('id')
 
-            inhibition_count += len(Inhibition.objects.filter(inhibition_batch__in=inhibition_batch_id))
+            inhibitions = Inhibition.objects.filter(inhibition_batch__exact=inhibition_batch_id)
+            inhibition_count += len(inhibitions)
 
         # reverse transcription count
         reverse_transcription_count = len(obj.reversetranscriptions.values())
