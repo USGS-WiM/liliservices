@@ -145,6 +145,11 @@ class SampleGroupViewSet(HistoryViewSet):
 ######
 
 
+class SampleAnalysisBatchViewSet(HistoryViewSet):
+    queryset = SampleAnalysisBatch.objects.all()
+    serializer_class = SampleAnalysisBatchSerializer
+
+
 class AnalysisBatchViewSet(HistoryViewSet):
     queryset = AnalysisBatch.objects.all()
     serializer_class = AnalysisBatchSerializer

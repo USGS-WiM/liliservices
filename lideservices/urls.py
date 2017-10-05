@@ -18,6 +18,7 @@ router.register(r'finalconcentratedsamplevolumes', views.FinalConcentratedSample
 router.register(r'concentrationtype', views.ConcentrationTypeViewSet, 'concentrationtype')
 router.register(r'samplegroups', views.SampleGroupViewSet, 'samplegroups')
 router.register(r'sampleinhibitions', views.SampleInhibitionViewSet, 'sampleinhibitions')
+router.register(r'sampleanalysisbatches', views.SampleAnalysisBatchViewSet, 'sampleanalysisbatches')
 router.register(r'analysisbatches', views.AnalysisBatchViewSet, 'analysisbatches')
 router.register(r'analysisbatchdetail', views.AnalysisBatchDetailViewSet, 'analysisbatchdetail')
 router.register(r'analysisbatchsummary', views.AnalysisBatchSummaryViewSet, 'analysisbatchsummary')

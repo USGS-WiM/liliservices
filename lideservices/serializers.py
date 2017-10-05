@@ -221,6 +221,15 @@ class SampleGroupSerializer(serializers.ModelSerializer):
 ######
 
 
+class SampleAnalysisBatchSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = SampleAnalysisBatch
+        fields = ('id', 'sample', 'analysis_batch', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class AnalysisBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -307,8 +316,8 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'rt_string', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'cq_value',
-                  'rt_date', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'rt_string', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'rt_date',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class StandardCurveSerializer(serializers.ModelSerializer):

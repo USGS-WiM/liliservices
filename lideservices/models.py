@@ -510,7 +510,6 @@ class ReverseTranscription(HistoryModel):
     rt_number = models.IntegerField()
     template_volume = models.FloatField(null=True, blank=True)
     reaction_volume = models.FloatField(null=True, blank=True)
-    cq_value = models.FloatField(null=True, blank=True)
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
 
     def __str__(self):
