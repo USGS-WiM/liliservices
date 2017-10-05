@@ -234,6 +234,42 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
+    def create(self, validated_data):
+        # pull out sample ID list from the request
+        samples = validated_data.pop('samples')
+
+        # create the Analysis Batch object
+        analysis_batch = AnalysisBatch.objects.create(**validated_data)
+
+        # create a Sample Analysis Batch object for each sample ID submitted
+        for sample in samples:
+            SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **sample)
+
+        return analysis_batch
+
+    def update(self, instance, validated_data):
+        # get the old (current) sample ID list for this Analysis Batch
+        old_samples = Sample.objects.filter(analysisbatches=instance.id)
+
+        # pull out sample ID list from the request
+        new_samples = validated_data.pop('samples')
+
+        # update the Analysis Batch object
+        analysis_batch = AnalysisBatch.objects.update(**validated_data)
+
+        # identify and delete relates where sample IDs are present in old list but not new list
+        delete_samples = list(set(old_samples) - set(new_samples))
+        for sample in delete_samples:
+            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=analysis_batch, **sample)
+            delete_sample.delete()
+
+        # identify and create relates where sample IDs are present in new list but not old list
+        add_samples = list(set(new_samples) - set(old_samples))
+        for sample in add_samples:
+            SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **sample)
+
+        return analysis_batch
+
     class Meta:
         model = AnalysisBatch
         fields = ('id', 'samples', 'analysis_batch_description', 'analysis_batch_notes',
