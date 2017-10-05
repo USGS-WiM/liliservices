@@ -234,6 +234,7 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
+    # on create, also create child objects (sample-analysisbacth M:M relates)
     def create(self, validated_data):
         # pull out sample ID list from the request
         samples = validated_data.pop('samples')
@@ -247,6 +248,7 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
         return analysis_batch
 
+    # on update, also update child objects (sample-analysisbacth M:M relates), including additions and deletions
     def update(self, instance, validated_data):
         # get the old (current) sample ID list for this Analysis Batch
         old_samples = Sample.objects.filter(analysisbatches=instance.id)
@@ -317,6 +319,50 @@ class ExtractionMethodSerializer(serializers.ModelSerializer):
 class ExtractionBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+
+    # on create, also create child objects (extractions and replicates)
+    def create(self, validated_data):
+        # pull out child extractions list from the request
+        extractions = validated_data.pop('extractions')
+
+        # pull out child replicates list from the request
+        replicates = validated_data.pop('replicates')
+
+        # create the Extraction Batch object
+        extraction_batch = ExtractionBatch.objects.create(**validated_data)
+
+        # create the child extractions
+        for extraction in extractions:
+            new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
+            # create the child replicates
+            for replicate in replicates:
+                for x in range(1, replicate.count):
+                    PCRReplicate.objects.create(extraction=new_extraction, target=replicate.target)
+
+        return extraction_batch
+
+    # on update, any submitted nested objects (extractions, replicates) will be ignored
+    def update(self, instance, validated_data):
+        # remove child extractions list from the request
+        if hasattr(validated_data, 'extractions'):
+            validated_data.remove('extractions')
+
+        # remove child replicates list from the request
+        if hasattr(validated_data, 'replicates'):
+            validated_data.remove('replicates')
+
+        # update the Extraction Batch object
+        extraction_batch = ExtractionBatch.objects.update(**validated_data)
+
+        return extraction_batch
+
+    # extraction_method
+    def get_extraction_method(self, obj):
+        extraction_method_id = obj.extraction_method_id
+        extraction_method = ExtractionMethod.objects.get(id=extraction_method_id)
+        extraction_method_name = extraction_method.name
+        data = {"id": extraction_method_id, "name": extraction_method_name}
+        return data
 
     class Meta:
         model = ExtractionBatch
@@ -469,41 +515,71 @@ class SampleInhibitionSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class AnalysisBatchExtractionSerializer(serializers.ModelSerializer):
+class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
-    # targets
+    def get_inhibitions(self, obj):
+        inhibitions = {}
+        extractions = obj.extractions.values()
+
+        for extraction in extractions:
+            inhibition_id = extraction.get('inhibition_id')
+            inhibition = Inhibition.objects.get(id=inhibition_id)
+            inhibitions[inhibition_id] = inhibition
+
+        return inhibitions.values()
+
+    def get_reverse_transcriptions(self, obj):
+        reverse_transcriptions = {}
+        extractions = obj.extractions.values()
+
+        for extraction in extractions:
+            reverse_transcription_id = extraction.get('reverse_transcription_id')
+            reverse_transcription = ReverseTranscription.objects.get(id=reverse_transcription_id)
+            reverse_transcriptions[reverse_transcription_id] = reverse_transcription
+
+        return reverse_transcriptions.values()
+
     def get_targets(self, obj):
         targets = {}
-        vals = obj.pcrreplicates.values()
+        extractions = obj.extractions.values()
 
-        for val in vals:
-            target_id = val.get('target_id')
-            target = Target.objects.get(id=target_id)
-            target_name = target.name
-            target_abbreviation = target.abbreviation
-            target_type = target.type
+        for extraction in extractions:
+            replicates = extraction.get('pcrreplicates')
+            for replicate in replicates:
+                target_id = replicate.get('target_id')
 
-            # count the number of replicates associated with each target
-            if targets.get(target_id, None) is not None:
-                data = targets[target_id]
-                data['replicates'] += 1
-            else:
-                data = {'id': target_id, 'name': target_name, 'abbrevation': target_abbreviation,
-                        'type': target_type, 'replicates': 1}
-            targets[target_id] = data
+                # count the number of replicates associated with each target
+                if targets.get(target_id, None) is not None:
+                    data = targets[target_id]
+                    data['replicates'] += 1
+                else:
+                    target = Target.objects.get(id=target_id)
+                    data = {'id': target_id, 'name': target.name, 'abbrevation': target.abbreviation,
+                            'type': target.type, 'replicates': 1}
+                targets[target_id] = data
 
         return targets.values()
 
-    inhibitions = InhibitionSerializer(many=True, read_only=True)
-    reverse_transcriptions = ReverseTranscriptionSerializer(many=True, read_only=True)
+    extractions = ExtractionSerializer(many=True, read_only=True)
+    inhibitions = serializers.SerializerMethodField()
+    reverse_transcriptions = serializers.SerializerMethodField()
     targets = serializers.SerializerMethodField()
 
+    # extraction_method
+    def get_extraction_method(self, obj):
+        extraction_method_id = obj.extraction_method_id
+        extraction_method = ExtractionMethod.objects.get(id=extraction_method_id)
+        extraction_method_name = extraction_method.name
+        data = {"id": extraction_method_id, "name": extraction_method_name}
+        return data
+
     class Meta:
-        model = Extraction
-        fields = ('id', 'extraction_number', 'extraction_volume', 'elution_volume', 'extraction_method',
-                  'inhibitions', 'reverse_transcriptions', 'targets', 'extraction_date',
+        model = ExtractionBatch
+        fields = ('id', 'extraction_method', 'reextraction', 'reextraction_note',
+                  'extraction_number', 'extraction_volume', 'elution_volume', 'extraction_date',
+                  'extractions', 'inhibitions', 'reverse_transcriptions', 'targets',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -524,14 +600,14 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
             studies.append(data)
         return studies
 
-    extractions = AnalysisBatchExtractionSerializer(many=True, read_only=True)
+    extraction_batches = AnalysisBatchExtractionBatchSerializer(many=True, read_only=True)
     samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
 
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies', 'extractions',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies',
+                  'extraction_batches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
