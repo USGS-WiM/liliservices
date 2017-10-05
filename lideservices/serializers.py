@@ -225,6 +225,20 @@ class SampleAnalysisBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
+    def validate(self, data):
+        # if the Analysis Batch already exists
+        ab_id = self.initial_data.get('analysis_batch', None)
+        if ab_id is not None:
+            # check if the Analysis Batch has any Extraction Batches
+            ebs = ExtractionBatch.objects.filter(analysis_batch=ab_id)
+            if len(ebs) > 0:
+                # if yes, raise a validation error
+                message = "the samples list of an analysis batch cannot be altered"
+                message += " after the analysis batch has one or more extraction batches"
+                raise serializers.ValidationError(message)
+
+        return data
+
     class Meta:
         model = SampleAnalysisBatch
         fields = ('id', 'sample', 'analysis_batch', 'created_date', 'created_by', 'modified_date', 'modified_by',)
