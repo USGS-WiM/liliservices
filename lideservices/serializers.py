@@ -332,7 +332,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         extraction_batch = ExtractionBatch.objects.create(**validated_data)
 
         # create the child extractions
+        extraction_number = 0
         for extraction in extractions:
+            extraction['extraction_number'] = extraction_number + 1
             new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
             # create the child replicates
             for replicate in replicates:
