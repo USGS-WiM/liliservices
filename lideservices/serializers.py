@@ -76,13 +76,26 @@ class SampleSerializer(serializers.ModelSerializer):
                   'secondary_concentration_flag', 'elution_date', 'elution_notes', 'technician_initials',
                   'air_subsample_volume', 'post_dilution_volume', 'pump_flow_rate', 'analysisbatches',
                   'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
-                  'final_concentrated_sample_volume_notes',
+                  'final_concentrated_sample_volume_notes', 'aliquots'
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AliquotSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+
+    def create(self, validated_data):
+        # create the Aliquot object
+        # but first determine if any aliquots exist for the parent sample
+        prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'])
+        if prev_aliquots:
+            max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
+        else:
+            max_aliquot_number = 0
+        validated_data['aliquot_number'] = max_aliquot_number + 1
+        aliquot = Aliquot.objects.create(**validated_data)
+
+        return aliquot
 
     class Meta:
         model = Aliquot
@@ -307,6 +320,38 @@ class InhibitionBatchSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     type = EnumChoiceField(enum_class=NucleicAcidType)
 
+    # on create, also create child objects (inhibitions)
+    def create(self, validated_data):
+        # pull out child inhibitions list from the request
+        inhibitions = validated_data.pop('inhibitions')
+
+        # create the Inhibition Batch object
+        # but first determine if any inhibition batches exist for the parent analysis batch
+        prev_inhib_batches = InhibitionBatch.objects.filter(analysis_batch=validated_data['analysis_batch'])
+        if prev_inhib_batches:
+            max_inhibition_number = max(prev_inhib_batch.inhibition_number for prev_inhib_batch in prev_inhib_batches)
+        else:
+            max_inhibition_number = 0
+        validated_data['inhibition_number'] = max_inhibition_number + 1
+        inhibition_batch = InhibitionBatch.objects.create(**validated_data)
+
+        # create the child inhibitions
+        for inhibition in inhibitions:
+            Inhibition.objects.create(inhibition_batch=inhibition_batch, **inhibition)
+
+        return inhibition_batch
+
+    # on update, any submitted nested objects (inhibitions) will be ignored
+    def update(self, instance, validated_data):
+        # remove child inhibitions list from the request
+        if hasattr(validated_data, 'inhibitions'):
+            validated_data.remove('inhibitions')
+
+        # update the Inhibition Batch object
+        inhibition_batch = InhibitionBatch.objects.update(**validated_data)
+
+        return inhibition_batch
+
     class Meta:
         model = InhibitionBatch
         fields = ('id', 'inhibition_string', 'analysis_batch', 'inhibition_number', 'type', 'inhibition_date',
@@ -343,12 +388,17 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         replicates = validated_data.pop('replicates')
 
         # create the Extraction Batch object
+        # but first determine if any extraction batches exist for the parent analysis batch
+        prev_extr_batches = ExtractionBatch.objects.filter(analysis_batch=validated_data['analysis_batch'])
+        if prev_extr_batches:
+            max_extraction_number = max(prev_extr_batch.inhibition_number for prev_extr_batch in prev_extr_batches)
+        else:
+            max_extraction_number = 0
+        validated_data['extraction_number'] = max_extraction_number + 1
         extraction_batch = ExtractionBatch.objects.create(**validated_data)
 
         # create the child extractions
-        extraction_number = 0
         for extraction in extractions:
-            extraction['extraction_number'] = extraction_number + 1
             new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
             # create the child replicates
             for replicate in replicates:
@@ -383,7 +433,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExtractionBatch
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
-                  'extraction_number', 'extraction_volume', 'elution_volume', 'extraction_date', 'extractions',
+                  'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
+                  'elution_volume', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -404,13 +455,26 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PCRReplicate
         fields = ('id', 'extraction', 'target', 'cq_value', 'gc_reaction', 'concentration', 'sample_mean_concentration',
-                  'concentration_unit', 'bad_result_flag', 'pcr_date', 'template_volume',
+                  'concentration_unit', 'bad_result_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+
+    def create(self, validated_data):
+        # create the Reverse Transcription object
+        # but first determine if any reverse transcriptions exist for the parent analysis batch
+        prev_rts = ReverseTranscription.objects.filter(analysis_batch=validated_data['analysis_batch'])
+        if prev_rts:
+            max_rt_number = max(prev_rt.inhibition_number for prev_rt in prev_rts)
+        else:
+            max_rt_number = 0
+        validated_data['rt_number'] = max_rt_number + 1
+        extraction_batch = ReverseTranscription.objects.create(**validated_data)
+
+        return extraction_batch
 
     class Meta:
         model = ReverseTranscription

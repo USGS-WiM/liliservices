@@ -443,8 +443,10 @@ class ExtractionBatch(HistoryModel):
     reextraction_note = models.CharField(max_length=255, null=True, blank=True)
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField(null=True, blank=True)
-    elution_volume = models.FloatField(null=True, blank=True)
     extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    template_volume = models.FloatField(null=True, blank=True)
+    elution_volume = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return self.extraction_string
@@ -485,8 +487,6 @@ class PCRReplicate(HistoryModel):
     sample_mean_concentration = models.FloatField(null=True, blank=True)  # QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
     concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
-    pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    template_volume = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return str(self.id)
