@@ -76,7 +76,7 @@ class SampleSerializer(serializers.ModelSerializer):
                   'secondary_concentration_flag', 'elution_date', 'elution_notes', 'technician_initials',
                   'air_subsample_volume', 'post_dilution_volume', 'pump_flow_rate', 'analysisbatches',
                   'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
-                  'final_concentrated_sample_volume_notes', 'aliquots'
+                  'final_concentrated_sample_volume_notes', 'aliquots',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
