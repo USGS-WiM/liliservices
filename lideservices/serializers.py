@@ -434,7 +434,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         model = ExtractionBatch
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
-                  'elution_volume', 'extractions',
+                  'elution_volume', 'dilution_factor', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -444,7 +444,7 @@ class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'reverse_transcription', 'dilution_factor',
+        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'reverse_transcription',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

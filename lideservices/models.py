@@ -447,6 +447,7 @@ class ExtractionBatch(HistoryModel):
     pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     template_volume = models.FloatField(null=True, blank=True)
     elution_volume = models.FloatField(null=True, blank=True)
+    dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.extraction_string
@@ -465,7 +466,6 @@ class Extraction(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
     inhibition = models.ForeignKey('Inhibition', related_name='extractions')
     reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='extractions', null=True)
-    dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return str(self.id)
