@@ -492,9 +492,18 @@ class StandardCurveSerializer(serializers.ModelSerializer):
 
 
 class TargetSerializer(serializers.ModelSerializer):
+    # medium
+    def get_medium(self, obj):
+        medium_id = obj.medium_id
+        medium = TargetMedium.objects.get(id=medium_id)
+        medium_name = medium.name
+        data = {"id": medium_id, "name": medium_name}
+        return data
+
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     type = EnumChoiceField(enum_class=NucleicAcidType)
+    medium = serializers.SerializerMethodField()
 
     class Meta:
         model = Target
