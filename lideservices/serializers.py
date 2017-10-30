@@ -584,12 +584,39 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SimpleSampleSerializer(serializers.ModelSerializer):
+    # sample_type
+    def get_sample_type(self, obj):
+        sample_type_id = obj.sample_type_id
+        sample_type = SampleType.objects.get(id=sample_type_id)
+        sample_type_name = sample_type.name
+        data = {"id": sample_type_id, "name": sample_type_name}
+        return data
+
+    # matrix_type
+    def get_matrix_type(self, obj):
+        matrix_type_id = obj.matrix_type_id
+        matrix_type = MatrixType.objects.get(id=matrix_type_id)
+        matrix_type_name = matrix_type.name
+        data = {"id": matrix_type_id, "name": matrix_type_name}
+        return data
+
+    # study
+    def get_study(self, obj):
+        study_id = obj.study_id
+        study = Study.objects.get(id=study_id)
+        study_name = study.name
+        data = {"id": study_id, "name": study_name}
+        return data
+
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+    sample_type = serializers.SerializerMethodField()
+    matrix_type = serializers.SerializerMethodField()
+    study = serializers.SerializerMethodField()
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'sample_description',
+        fields = ('id', 'sample_type', 'matrix_type', 'study', 'collaborator_sample_id', 'sample_description',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
