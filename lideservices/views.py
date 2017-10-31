@@ -82,9 +82,9 @@ class StudyViewSet(HistoryViewSet):
     serializer_class = StudySerializer
 
 
-class UnitTypeViewSet(HistoryViewSet):
-    queryset = UnitType.objects.all()
-    serializer_class = UnitTypeSerializer
+class UnitViewSet(HistoryViewSet):
+    queryset = Unit.objects.all()
+    serializer_class = UnitSerializer
 
 
 ######
@@ -242,11 +242,17 @@ class TargetViewSet(HistoryViewSet):
     serializer_class = TargetSerializer
 
 
-class TargetMediumViewSet(HistoryViewSet):
-    queryset = TargetMedium.objects.all()
-    serializer_class = TargetMediumSerializer
+######
+#
+#  Results
+#
+######
 
 
+class ResultViewSet(HistoryViewSet):
+    queryset = Result.objects.all()
+    serializer_class = ResultSerializer	
+	
 ######
 #
 #  Controls
@@ -257,11 +263,6 @@ class TargetMediumViewSet(HistoryViewSet):
 class ControlTypeViewSet(HistoryViewSet):
     queryset = ControlType.objects.all()
     serializer_class = ControlTypeSerializer
-
-
-class ControlViewSet(HistoryViewSet):
-    queryset = Control.objects.all()
-    serializer_class = ControlSerializer
 
 
 ######

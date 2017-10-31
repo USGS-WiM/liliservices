@@ -52,6 +52,10 @@ class NameModel(HistoryModel):
 class NucleicAcidType(ChoiceEnum):
     DNA = "DNA"
     RNA = "RNA"
+	
+class ReplicateType(ChoiceEnum):
+    CONTROL = "CONTROL"
+    DATA = "DATA"	
 
 
 # TODO: assign proper field types and properties to each model field
@@ -85,24 +89,23 @@ class Sample(HistoryModel):
     collection_end_time = models.TimeField(null=True, blank=True)
     meter_reading_initial = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     meter_reading_final = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    meter_reading_unit = models.ForeignKey('UnitType', null=True, related_name='samples_meter_units')  # QUESTION: This should probably be required, yes?  # COMMENT: this field doesn't belong here, it should go in a related table dedicated to this matrix type
+    meter_reading_unit = models.ForeignKey('Unit', null=True, related_name='samples_meter_units')  # QUESTION: This should probably be required, yes?  # COMMENT: this field doesn't belong here, it should go in a related table dedicated to this matrix type
     total_volume_sampled_initial = models.FloatField(null=True, blank=True)
-    total_volume_sampled_unit_initial = models.ForeignKey('UnitType', null=True, related_name='samples_tvs_units')  # QUESTION: This should probably be required, yes?
-    total_volume_sampled = models.FloatField(null=True, blank=True)
+    total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')  # QUESTION: This should probably be required, yes?
+    total_volume_or_mass_sampled = models.FloatField(null=True, blank=True)
     sample_volume_initial = models.FloatField(null=True, blank=True)
     sample_volume_filtered = models.FloatField(null=True, blank=True)
     filter_born_on_date = models.DateField(null=True, blank=True)  # COMMENT: Are these throw-away filters? Or do they need/want to keep track of them for later analysis? If the latter, it would need a dedicated table, yes?
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
-    elution_date = models.DateField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     elution_notes = models.TextField(blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     technician_initials = models.CharField(max_length=4, null=True, blank=True)  # COMMENT: this field could be replaced by the created_by/edited_by fields
-    air_subsample_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    dissolution_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     post_dilution_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    pump_flow_rate = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
+    peg_neg= models.ForeignKey('self', related_name='samples', null=True)
 
     def __str__(self):
         return str(self.id)
@@ -191,7 +194,7 @@ class Study(NameModel):
         db_table = "lide_study"
 
 
-class UnitType(NameModel):
+class Unit(NameModel):
     """
     Defined units of measurement for data values.
     """
@@ -202,7 +205,7 @@ class UnitType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_unittype"
+        db_table = "lide_units"
 
 
 ######
@@ -407,6 +410,9 @@ class Inhibition(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='inhibitions')
     inhibition_batch = models.ForeignKey('InhibitionBatch', related_name='inhibitions')
     dilution_factor = models.IntegerField(null=True, blank=True)
+    type = EnumChoiceField(enum_class=NucleicAcidType)
+    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitions')	
 
     def __str__(self):
         return str(self.id)
@@ -447,7 +453,8 @@ class ExtractionBatch(HistoryModel):
     pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     template_volume = models.FloatField(null=True, blank=True)
     elution_volume = models.FloatField(null=True, blank=True)
-    dilution_factor = models.IntegerField(null=True, blank=True)
+    sample_dilution_factor = models.IntegerField(null=True, blank=True)
+    reaction_volume = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return self.extraction_string
@@ -483,10 +490,13 @@ class PCRReplicate(HistoryModel):
     target = models.ForeignKey('Target', related_name='pcrreplicates')
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.FloatField(null=True, blank=True)
-    concentration = models.FloatField(null=True, blank=True)
+    replicate_concentration = models.FloatField(null=True, blank=True)
     sample_mean_concentration = models.FloatField(null=True, blank=True)  # QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
-    concentration_unit = models.ForeignKey('UnitType', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
+    concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
+    control_type = models.IntegerField()
+    re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)
+    replicate_type  = EnumChoiceField(enum_class=ReplicateType)
 
     def __str__(self):
         return str(self.id)
@@ -511,6 +521,7 @@ class ReverseTranscription(HistoryModel):
     template_volume = models.FloatField(null=True, blank=True)
     reaction_volume = models.FloatField(null=True, blank=True)
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    re_rt = models.ForeignKey('self', related_name='reversetranscriptions', null=True)	
 
     def __str__(self):
         return self.rt_string
@@ -528,40 +539,14 @@ class StandardCurve(HistoryModel):
     r_value = models.FloatField(null=True, blank=True)
     slope = models.FloatField(null=True, blank=True)
     efficiency = models.FloatField(null=True, blank=True)
+    pos_ctrl_cq = models.FloatField(null=True, blank=True)
+    pos_ctrl_cq_range = models.FloatField(null=True, blank=True)	
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_standardcurve"
-
-
-class Target(NameModel):
-    """
-    Target
-    """
-
-    medium = models.ForeignKey('TargetMedium', related_name='targets')
-    code = models.CharField(max_length=128, null=True, blank=True)
-    type = EnumChoiceField(enum_class=NucleicAcidType)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = "lide_target"
-
-
-class TargetMedium(NameModel):
-    """
-    Medium
-    """
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = "lide_targetmedium"
 
 
 ######
@@ -583,26 +568,39 @@ class ControlType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_controltype"
-
-
-class Control(HistoryModel):
+        db_table = "lide_controltype"		
+		
+class Target(NameModel):
     """
-    Control
+    Target
     """
 
-    type = models.ForeignKey('ControlType', related_name='controls')
-    extraction = models.ForeignKey('Extraction', related_name='controls')
-    target = models.ForeignKey('Target', related_name='controls')
-    qc_value = models.FloatField(null=True, blank=True)
-    qc_flag = models.BooleanField(default=False)
+    code = models.CharField(max_length=128, null=True, blank=True)
+    type = EnumChoiceField(enum_class=NucleicAcidType)
+    notes = models.CharField(max_length=128, null=True, blank=True)
+    control_type = models.ForeignKey('ControlType', related_name='targets')	
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lide_target"
+		
+		
+class Result(HistoryModel):
+    """
+    Result
+    """
+	
+    sample_mean_concentration = models.FloatField(null=True, blank=True)
+    sample = models.ForeignKey('Sample', related_name='results')
+    target = models.ForeignKey('Target', related_name='results')	
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_control"
-        # TODO: 'unique together' fields
+        db_table = "lide_result"	
 
 
 ######
