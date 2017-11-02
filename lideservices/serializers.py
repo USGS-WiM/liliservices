@@ -706,12 +706,8 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                         targets.append(replicate.target)
 
         # inhibition count
-        inhibition_batches = obj.inhibitionbatches.values()
-        for inhibition_batch in inhibition_batches:
-            inhibition_batch_id = inhibition_batch.get('id')
-
-            inhibitions = Inhibition.objects.filter(inhibition_batch__exact=inhibition_batch_id)
-            inhibition_count += len(inhibitions)
+        inhibitions = obj.inhibitions.values()
+        inhibition_count += len(inhibitions)
 
         # reverse transcription count
         reverse_transcription_count = len(obj.reversetranscriptions.values())
