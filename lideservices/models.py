@@ -470,7 +470,7 @@ class PCRReplicate(HistoryModel):
     replicate_concentration = models.FloatField(null=True, blank=True)
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
-    control_type = models.ForeignKey('ControlType', related_name='pcrreplicates')
+    control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
     re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)
     replicate_type  = EnumChoiceField(enum_class=ReplicateType)
 
