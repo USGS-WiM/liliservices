@@ -182,6 +182,12 @@ class FreezerSerializer(serializers.ModelSerializer):
 ######
 
 
+class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
+    def create(self, validated_data):
+        fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
+        return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
+
+
 class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -191,6 +197,7 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
         fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
                   'final_concentrated_sample_volume_notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = FinalConcentratedSampleVolumeListSerializer
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
