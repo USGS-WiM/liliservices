@@ -205,7 +205,7 @@ class Unit(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_units"
+        db_table = "lide_unit"
 
 
 ######
