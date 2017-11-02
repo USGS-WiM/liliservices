@@ -391,7 +391,6 @@ class Inhibition(HistoryModel):
     dilution_factor = models.IntegerField(null=True, blank=True)
 
 
-
     def __str__(self):
         return str(self.id)
 
@@ -469,10 +468,9 @@ class PCRReplicate(HistoryModel):
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.FloatField(null=True, blank=True)
     replicate_concentration = models.FloatField(null=True, blank=True)
-    sample_mean_concentration = models.FloatField(null=True, blank=True)  # QUESTION: does this belong here? seems like a "mean" value should be above (i.e., the one in 1:N) the table of the values producing the mean.
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
-    control_type = models.IntegerField()
+    control_type = models.ForeignKey('ControlType', related_name='pcrreplicates')
     re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)
     replicate_type  = EnumChoiceField(enum_class=ReplicateType)
 
@@ -482,6 +480,22 @@ class PCRReplicate(HistoryModel):
     class Meta:
         db_table = "lide_pcrreplicate"
         # TODO: 'unique together' fields
+
+
+class Result(HistoryModel):
+    """
+    Result
+    """
+
+    sample_mean_concentration = models.FloatField(null=True, blank=True)
+    sample = models.ForeignKey('Sample', related_name='results')
+    target = models.ForeignKey('Target', related_name='results')
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_result"
 
 
 class ReverseTranscription(HistoryModel):
@@ -547,7 +561,8 @@ class ControlType(NameModel):
 
     class Meta:
         db_table = "lide_controltype"		
-		
+
+
 class Target(NameModel):
     """
     Target
@@ -562,22 +577,6 @@ class Target(NameModel):
 
     class Meta:
         db_table = "lide_target"
-		
-		
-class Result(HistoryModel):
-    """
-    Result
-    """
-	
-    sample_mean_concentration = models.FloatField(null=True, blank=True)
-    sample = models.ForeignKey('Sample', related_name='results')
-    target = models.ForeignKey('Target', related_name='results')	
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_result"	
 
 
 ######

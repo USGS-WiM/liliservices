@@ -412,8 +412,18 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PCRReplicate
         fields = ('id', 'extraction', 'target', 'cq_value', 'gc_reaction', 'replicate_concentration',
-                  'sample_mean_concentration', 'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr',
-                  'replicate_type', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr', 'replicate_type',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class ResultSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = Result
+        fields = ('id', 'sample_mean_concentration', 'sample', 'target',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
@@ -457,23 +467,6 @@ class TargetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Target
         fields = ('id', 'name', 'code', 'type', 'notes', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-######
-#
-#  Results
-#
-######		
-		
-		
-class ResultSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = Result
-        fields = ('id', 'sample_mean_concentration', 'sample', 'target',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
