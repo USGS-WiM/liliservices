@@ -73,8 +73,9 @@ class SampleSerializer(serializers.ModelSerializer):
                   'collection_end_time', 'meter_reading_initial', 'meter_reading_final', 'meter_reading_unit',
                   'total_volume_sampled_initial', 'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled',
                   'sample_volume_initial', 'sample_volume_filtered', 'filter_born_on_date', 'filter_flag',
-                  'secondary_concentration_flag', 'elution_notes', 'technician_initials',
-                  'dissolution_volume', 'post_dilution_volume', 'analysisbatches', 'samplegroups', 'peg_neg', 'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
+                  'secondary_concentration_flag', 'elution_notes', 'technician_initials', 'dissolution_volume',
+                  'post_dilution_volume', 'analysisbatches', 'samplegroups', 'peg_neg',
+                  'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
                   'final_concentrated_sample_volume_notes', 'aliquots',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
@@ -314,56 +315,14 @@ class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class InhibitionBatchSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-    type = EnumChoiceField(enum_class=NucleicAcidType)
-
-    # on create, also create child objects (inhibitions)
-    def create(self, validated_data):
-        # pull out child inhibitions list from the request
-        inhibitions = validated_data.pop('inhibitions')
-
-        # create the Inhibition Batch object
-        # but first determine if any inhibition batches exist for the parent analysis batch
-        prev_inhib_batches = InhibitionBatch.objects.filter(analysis_batch=validated_data['analysis_batch'])
-        if prev_inhib_batches:
-            max_inhibition_number = max(prev_inhib_batch.inhibition_number for prev_inhib_batch in prev_inhib_batches)
-        else:
-            max_inhibition_number = 0
-        validated_data['inhibition_number'] = max_inhibition_number + 1
-        inhibition_batch = InhibitionBatch.objects.create(**validated_data)
-
-        # create the child inhibitions
-        for inhibition in inhibitions:
-            Inhibition.objects.create(inhibition_batch=inhibition_batch, **inhibition)
-
-        return inhibition_batch
-
-    # on update, any submitted nested objects (inhibitions) will be ignored
-    def update(self, instance, validated_data):
-        # remove child inhibitions list from the request
-        if hasattr(validated_data, 'inhibitions'):
-            validated_data.remove('inhibitions')
-
-        # update the Inhibition Batch object
-        inhibition_batch = InhibitionBatch.objects.update(**validated_data)
-
-        return inhibition_batch
-
-    class Meta:
-        model = InhibitionBatch
-        fields = ('id', 'inhibition_string', 'analysis_batch', 'inhibition_number', 'type', 'inhibition_date',
-                  'inhibitions', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
 class InhibitionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'sample', 'inhibition_batch', 'dilution_factor', 'type', 'inhibition_date', 'analysis_batch', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'type', 'dilution_factor',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ExtractionMethodSerializer(serializers.ModelSerializer):
@@ -452,9 +411,9 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'target', 'cq_value', 'gc_reaction', 'replicate_concentration', 'sample_mean_concentration',
-                  'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr', 'replicate_type',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'extraction', 'target', 'cq_value', 'gc_reaction', 'replicate_concentration',
+                  'sample_mean_concentration', 'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr',
+                  'replicate_type', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
@@ -476,7 +435,8 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'rt_string', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'rt_string', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'rt_date',
+                  're_rt', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class StandardCurveSerializer(serializers.ModelSerializer):
@@ -485,7 +445,8 @@ class StandardCurveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StandardCurve
-        fields = ('id', 'r_value', 'slope', 'efficiency', 'pos_ctrl_cq', 'pos_ctrl_cq_range', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'r_value', 'slope', 'efficiency', 'pos_ctrl_cq', 'pos_ctrl_cq_range', 'created_date',
+                  'created_by', 'modified_date', 'modified_by',)
 
 
 class TargetSerializer(serializers.ModelSerializer):
@@ -511,7 +472,8 @@ class ResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Result
-        fields = ('id', 'sample_mean_concentration', 'sample', 'target', 'created_date', 'created_by', 'modified_date', 'modified_by',)		
+        fields = ('id', 'sample_mean_concentration', 'sample', 'target',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######

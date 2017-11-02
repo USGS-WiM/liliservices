@@ -379,40 +379,18 @@ class AnalysisBatchTemplate(NameModel):
         db_table = "lide_analysisbatchtemplate"
 
 
-class InhibitionBatch(HistoryModel):
-    """
-    Inhibition Batch
-    """
-
-    def _concat_ids(self):
-        """Returns the concatenated parent ID and child series number of the record"""
-        return '%s-%s' % (self.analysis_batch, self.inhibition_number)
-
-    inhibition_string = property(_concat_ids)
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitionbatches')
-    inhibition_number = models.IntegerField()
-    type = EnumChoiceField(enum_class=NucleicAcidType)
-    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-
-    def __str__(self):
-        return self.inhibition_string
-
-    class Meta:
-        db_table = "lide_inhibitionbatch"
-        unique_together = ("analysis_batch", "inhibition_number")
-
-
 class Inhibition(HistoryModel):
     """
     Inhibition
     """
 
     sample = models.ForeignKey('Sample', related_name='inhibitions')
-    inhibition_batch = models.ForeignKey('InhibitionBatch', related_name='inhibitions')
-    dilution_factor = models.IntegerField(null=True, blank=True)
-    type = EnumChoiceField(enum_class=NucleicAcidType)
+    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitions')
     inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitions')	
+    type = EnumChoiceField(enum_class=NucleicAcidType)
+    dilution_factor = models.IntegerField(null=True, blank=True)
+
+
 
     def __str__(self):
         return str(self.id)

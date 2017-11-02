@@ -197,10 +197,6 @@ class SampleInhibitionViewSet(HistoryViewSet):
                 queryset = queryset.filter(analysis_batches__in=analysis_batch)
         return queryset
 
-class InhibitionBatchViewSet(HistoryViewSet):
-    queryset = InhibitionBatch.objects.all()
-    serializer_class = InhibitionBatchSerializer
-
 
 class InhibitionViewSet(HistoryViewSet):
     queryset = Inhibition.objects.all()
