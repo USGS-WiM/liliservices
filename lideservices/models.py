@@ -578,7 +578,6 @@ class Target(NameModel):
     code = models.CharField(max_length=128, null=True, blank=True)
     type = EnumChoiceField(enum_class=NucleicAcidType)
     notes = models.CharField(max_length=128, null=True, blank=True)
-    control_type = models.ForeignKey('ControlType', related_name='targets')	
 
     def __str__(self):
         return self.name

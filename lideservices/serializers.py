@@ -495,7 +495,7 @@ class TargetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Target
-        fields = ('id', 'name', 'code', 'type', 'notes', 'control_type', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'name', 'code', 'type', 'notes', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
