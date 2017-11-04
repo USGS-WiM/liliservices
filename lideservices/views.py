@@ -115,6 +115,16 @@ class FinalConcentratedSampleVolumeViewSet(HistoryViewSet):
     queryset = FinalConcentratedSampleVolume.objects.all()
     serializer_class = FinalConcentratedSampleVolumeSerializer
 
+    def get_serializer(self, *args, **kwargs):
+        if "data" in kwargs:
+            data = kwargs["data"]
+
+            # check if many is required
+            if isinstance(data, list):
+                kwargs["many"] = True
+
+        return super(FinalConcentratedSampleVolumeViewSet, self).get_serializer(*args, **kwargs)
+
 
 class ConcentrationTypeViewSet(HistoryViewSet):
     queryset = ConcentrationType.objects.all()

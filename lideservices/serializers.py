@@ -10,6 +10,29 @@ from enumchoicefield import ChoiceEnum, EnumChoiceField
 ######
 
 
+class AliquotSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    def create(self, validated_data):
+        # create the Aliquot object
+        # but first determine if any aliquots exist for the parent sample
+        prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'])
+        if prev_aliquots:
+            max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
+        else:
+            max_aliquot_number = 0
+        validated_data['aliquot_number'] = max_aliquot_number + 1
+        aliquot = Aliquot.objects.create(**validated_data)
+
+        return aliquot
+
+    class Meta:
+        model = Aliquot
+        fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class SampleSerializer(serializers.ModelSerializer):
     # sample_type
     def get_sample_type(self, obj):
@@ -58,6 +81,7 @@ class SampleSerializer(serializers.ModelSerializer):
     filter_type = serializers.SerializerMethodField()
     study = serializers.SerializerMethodField()
     sampler_name = serializers.SerializerMethodField()
+    aliquots = AliquotSerializer(many=True, read_only=True)
     final_concentrated_sample_volume = serializers.FloatField(
         source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
     final_concentrated_sample_volume_type = serializers.StringRelatedField(
@@ -77,29 +101,6 @@ class SampleSerializer(serializers.ModelSerializer):
                   'post_dilution_volume', 'analysisbatches', 'samplegroups', 'peg_neg',
                   'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
                   'final_concentrated_sample_volume_notes', 'aliquots',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class AliquotSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    def create(self, validated_data):
-        # create the Aliquot object
-        # but first determine if any aliquots exist for the parent sample
-        prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'])
-        if prev_aliquots:
-            max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
-        else:
-            max_aliquot_number = 0
-        validated_data['aliquot_number'] = max_aliquot_number + 1
-        aliquot = Aliquot.objects.create(**validated_data)
-
-        return aliquot
-
-    class Meta:
-        model = Aliquot
-        fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -182,10 +183,22 @@ class FreezerSerializer(serializers.ModelSerializer):
 ######
 
 
-# class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
-#     def create(self, validated_data):
-#         fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
-#         return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
+class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    def create(self, validated_data):
+        fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
+        return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
+
+    def update(self, instance, validated_data):
+        return instance
+
+    class Meta:
+        model = FinalConcentratedSampleVolume
+        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
+                  'final_concentrated_sample_volume_notes',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
@@ -197,7 +210,7 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
         fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
                   'final_concentrated_sample_volume_notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
-        # list_serializer_class = FinalConcentratedSampleVolumeListSerializer
+        list_serializer_class = FinalConcentratedSampleVolumeListSerializer
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
