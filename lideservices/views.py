@@ -113,7 +113,7 @@ class FreezerViewSet(HistoryViewSet):
 
 class FinalConcentratedSampleVolumeViewSet(HistoryViewSet):
     queryset = FinalConcentratedSampleVolume.objects.all()
-    serializer_class = FinalConcentratedSampleVolumeSerializer(many=True)
+    serializer_class = FinalConcentratedSampleVolumeSerializer
 
 
 class ConcentrationTypeViewSet(HistoryViewSet):
@@ -248,7 +248,8 @@ class TargetViewSet(HistoryViewSet):
 class ResultViewSet(HistoryViewSet):
     queryset = Result.objects.all()
     serializer_class = ResultSerializer	
-	
+
+
 ######
 #
 #  Controls

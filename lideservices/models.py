@@ -52,7 +52,8 @@ class NameModel(HistoryModel):
 class NucleicAcidType(ChoiceEnum):
     DNA = "DNA"
     RNA = "RNA"
-	
+
+
 class ReplicateType(ChoiceEnum):
     CONTROL = "CONTROL"
     DATA = "DATA"	
@@ -390,7 +391,6 @@ class Inhibition(HistoryModel):
     type = EnumChoiceField(enum_class=NucleicAcidType)
     dilution_factor = models.IntegerField(null=True, blank=True)
 
-
     def __str__(self):
         return str(self.id)
 
@@ -472,7 +472,7 @@ class PCRReplicate(HistoryModel):
     bad_result_flag = models.BooleanField(default=False)
     control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
     re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)
-    replicate_type  = EnumChoiceField(enum_class=ReplicateType)
+    replicate_type = EnumChoiceField(enum_class=ReplicateType)
 
     def __str__(self):
         return str(self.id)

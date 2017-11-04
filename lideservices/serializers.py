@@ -182,10 +182,10 @@ class FreezerSerializer(serializers.ModelSerializer):
 ######
 
 
-class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
-    def create(self, validated_data):
-        fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
-        return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
+# class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
+#     def create(self, validated_data):
+#         fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
+#         return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
 
 
 class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
@@ -197,7 +197,7 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
         fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
                   'final_concentrated_sample_volume_notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
-        list_serializer_class = FinalConcentratedSampleVolumeListSerializer
+        # list_serializer_class = FinalConcentratedSampleVolumeListSerializer
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
@@ -271,14 +271,18 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
     # on create, also create child objects (sample-analysisbacth M:M relates)
     def create(self, validated_data):
         # pull out sample ID list from the request
-        samples = validated_data.pop('samples')
+        if 'samples' in validated_data:
+            samples = validated_data.pop('samples')
+        else:
+            samples = []
 
         # create the Analysis Batch object
         analysis_batch = AnalysisBatch.objects.create(**validated_data)
 
         # create a Sample Analysis Batch object for each sample ID submitted
-        for sample in samples:
-            SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **sample)
+        if samples:
+            for sample in samples:
+                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **sample)
 
         return analysis_batch
 
@@ -288,23 +292,30 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         old_samples = Sample.objects.filter(analysisbatches=instance.id)
 
         # pull out sample ID list from the request
-        new_samples = validated_data.pop('samples')
+        if 'samples' in self.initial_data:
+            new_sample_ids = self.initial_data['samples']
+            new_samples = Sample.objects.filter(id__in=new_sample_ids)
+        else:
+            new_samples = []
 
         # update the Analysis Batch object
-        analysis_batch = AnalysisBatch.objects.update(**validated_data)
+        instance.analysis_batch_description = validated_data.get('analysis_batch_description',
+                                                                 instance.analysis_batch_description)
+        instance.analysis_batch_notes = validated_data.get('analysis_batch_notes', instance.analysis_batch_notes)
+        instance.save()
 
         # identify and delete relates where sample IDs are present in old list but not new list
         delete_samples = list(set(old_samples) - set(new_samples))
-        for sample in delete_samples:
-            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=analysis_batch, **sample)
+        for sample_id in delete_samples:
+            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=instance, sample=sample_id)
             delete_sample.delete()
 
         # identify and create relates where sample IDs are present in new list but not old list
         add_samples = list(set(new_samples) - set(old_samples))
-        for sample in add_samples:
-            SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **sample)
+        for sample_id in add_samples:
+            SampleAnalysisBatch.objects.create(analysis_batch=instance, sample=sample_id)
 
-        return analysis_batch
+        return instance
 
     class Meta:
         model = AnalysisBatch
@@ -398,7 +409,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         model = ExtractionBatch
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
-                  'elution_volume', 'sample_dilution_factor','reaction_volume', 'extractions',
+                  'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
