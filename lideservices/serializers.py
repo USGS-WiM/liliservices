@@ -687,14 +687,14 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
             studies.append(data)
         return studies
 
-    extraction_batches = AnalysisBatchExtractionBatchSerializer(many=True, read_only=True)
+    extractionbatches = AnalysisBatchExtractionBatchSerializer(many=True, read_only=True)
     samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
 
     class Meta:
         model = AnalysisBatch
         fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies',
-                  'extraction_batches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'extractionbatches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
