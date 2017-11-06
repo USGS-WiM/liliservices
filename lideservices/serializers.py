@@ -386,12 +386,14 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         extraction_batch = ExtractionBatch.objects.create(**validated_data)
 
         # create the child extractions
-        for extraction in extractions:
-            new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
-            # create the child replicates
-            for replicate in replicates:
-                for x in range(1, replicate.count):
-                    PCRReplicate.objects.create(extraction=new_extraction, target=replicate.target)
+        if extractions is not None:
+            for extraction in extractions:
+                new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
+                # create the child replicates
+                if replicates is not None:
+                    for replicate in replicates:
+                        for x in range(1, replicate.count):
+                            PCRReplicate.objects.create(extraction=new_extraction, target=replicate.target)
 
         return extraction_batch
 
@@ -432,7 +434,7 @@ class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'reverse_transcription',
+        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'reverse_transcription', 'pcrreplicates',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -610,10 +612,15 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
         inhibitions = {}
         extractions = obj.extractions.values()
 
-        for extraction in extractions:
-            inhibition_id = extraction.get('inhibition_id')
-            inhibition = Inhibition.objects.get(id=inhibition_id)
-            inhibitions[inhibition_id] = inhibition
+        if extractions is not None:
+            for extraction in extractions:
+                inhibition_id = extraction.get('inhibition_id')
+                inhibition = Inhibition.objects.get(id=inhibition_id)
+                data = {'id': inhibition_id, 'sample': inhibition.sample.id, 'analysis_batch': inhibition.analysis_batch.id,
+                        'inhibition_date': inhibition.inhibition_date, 'type': str(inhibition.type),
+                        'dilution_factor': inhibition.dilution_factor, 'created_date': inhibition.created_date,
+                        'created_by': inhibition.created_by.username, 'modified_date': inhibition.modified_date, 'modified_by': inhibition.modified_by.username}
+                inhibitions[inhibition_id] = data
 
         return inhibitions.values()
 
@@ -621,10 +628,16 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
         reverse_transcriptions = {}
         extractions = obj.extractions.values()
 
-        for extraction in extractions:
-            reverse_transcription_id = extraction.get('reverse_transcription_id')
-            reverse_transcription = ReverseTranscription.objects.get(id=reverse_transcription_id)
-            reverse_transcriptions[reverse_transcription_id] = reverse_transcription
+        if extractions is not None:
+            for extraction in extractions:
+                reverse_transcription_id = extraction.get('reverse_transcription_id')
+                rt = ReverseTranscription.objects.get(id=reverse_transcription_id)
+                data = {'id': reverse_transcription_id, 'rt_string': rt.rt_string, 'analysis_batch': rt.analysis_batch.id,
+                        'rt_number': rt.rt_number, 'template_volume': rt.template_volume,
+                        'reaction_volume': rt.reaction_volume, 'rt_date': rt.rt_date, 're_rt': rt.re_rt,
+                        'created_date': rt.created_date, 'created_by': rt.created_by.username,
+                        'modified_date': rt.modified_date, 'modified_by': rt.modified_by.username}
+                reverse_transcriptions[reverse_transcription_id] = data
 
         return reverse_transcriptions.values()
 
@@ -632,20 +645,22 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
         targets = {}
         extractions = obj.extractions.values()
 
-        for extraction in extractions:
-            replicates = extraction.get('pcrreplicates')
-            for replicate in replicates:
-                target_id = replicate.get('target_id')
+        if extractions is not None:
+            for extraction in extractions:
+                replicates = extraction.get('pcrreplicates')
+                if replicates is not None:
+                    for replicate in replicates:
+                        target_id = replicate.get('target_id')
 
-                # count the number of replicates associated with each target
-                if targets.get(target_id, None) is not None:
-                    data = targets[target_id]
-                    data['replicates'] += 1
-                else:
-                    target = Target.objects.get(id=target_id)
-                    data = {'id': target_id, 'name': target.name, 'abbrevation': target.abbreviation,
-                            'type': target.type, 'replicates': 1}
-                targets[target_id] = data
+                        # count the number of replicates associated with each target
+                        if targets.get(target_id, None) is not None:
+                            data = targets[target_id]
+                            data['replicates'] += 1
+                        else:
+                            target = Target.objects.get(id=target_id)
+                            data = {'id': target_id, 'name': target.name, 'abbrevation': target.abbreviation,
+                                    'type': target.type, 'replicates': 1}
+                        targets[target_id] = data
 
         return targets.values()
 
@@ -678,13 +693,14 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
     def get_studies(self, obj):
         studies = []
         vals = obj.samples.values()
-        for val in vals:
-            study_id = val.get('study_id')
-            study = Study.objects.get(id=study_id)
-            study_name = study.name
-            study_description = study.description
-            data = {"id": study_id, "name": study_name, "description": study_description}
-            studies.append(data)
+        if vals is not None:
+            for val in vals:
+                study_id = val.get('study_id')
+                study = Study.objects.get(id=study_id)
+                study_name = study.name
+                study_description = study.description
+                data = {"id": study_id, "name": study_name, "description": study_description}
+                studies.append(data)
         return studies
 
     extractionbatches = AnalysisBatchExtractionBatchSerializer(many=True, read_only=True)
@@ -705,12 +721,13 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
     def get_studies(self, obj):
         studies = []
         vals = obj.samples.values()
-        for val in vals:
-            study_id = val.get('study_id')
-            study = Study.objects.get(id=study_id)
-            study_name = study.name
-            data = {"id": study_id, "name": study_name}
-            studies.append(data)
+        if vals is not None:
+            for val in vals:
+                study_id = val.get('study_id')
+                study = Study.objects.get(id=study_id)
+                study_name = study.name
+                data = {"id": study_id, "name": study_name}
+                studies.append(data)
         return studies
 
     # summary: extraction count, inhibition count, reverse transcription count, target count
@@ -722,19 +739,22 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 
         # extraction count
         extraction_batches = obj.extractionbatches.values()
-        for extraction_batch in extraction_batches:
-            extraction_batch_id = extraction_batch.get('id')
+        if extraction_batches is not None:
+            for extraction_batch in extraction_batches:
+                extraction_batch_id = extraction_batch.get('id')
 
-            extractions = Extraction.objects.filter(extraction_batch__exact=extraction_batch_id)
-            extraction_count += len(extractions)
+                extractions = Extraction.objects.filter(extraction_batch__exact=extraction_batch_id)
+                extraction_count += len(extractions)
 
-            # target count
-            for extraction in extractions:
-                replicates = PCRReplicate.objects.filter(extraction__exact=extraction.id)
-                for replicate in replicates:
-                    target = replicate.target
-                    if target not in targets:
-                        targets.append(replicate.target)
+                # target count
+                if extractions is not None:
+                    for extraction in extractions:
+                        replicates = PCRReplicate.objects.filter(extraction__exact=extraction.id)
+                        if replicates is not None:
+                            for replicate in replicates:
+                                target = replicate.target
+                                if target not in targets:
+                                    targets.append(replicate.target)
 
         # inhibition count
         inhibitions = obj.inhibitions.values()
