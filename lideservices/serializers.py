@@ -664,11 +664,6 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
 
         return targets.values()
 
-    extractions = ExtractionSerializer(many=True, read_only=True)
-    inhibitions = serializers.SerializerMethodField()
-    reverse_transcriptions = serializers.SerializerMethodField()
-    targets = serializers.SerializerMethodField()
-
     # extraction_method
     def get_extraction_method(self, obj):
         extraction_method_id = obj.extraction_method_id
@@ -676,6 +671,12 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
         extraction_method_name = extraction_method.name
         data = {"id": extraction_method_id, "name": extraction_method_name}
         return data
+
+    extractions = ExtractionSerializer(many=True, read_only=True)
+    inhibitions = serializers.SerializerMethodField()
+    reverse_transcriptions = serializers.SerializerMethodField()
+    targets = serializers.SerializerMethodField()
+    extraction_method = serializers.SerializerMethodField()
 
     class Meta:
         model = ExtractionBatch
