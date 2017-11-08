@@ -14,18 +14,51 @@ class AliquotSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
+    # bulk create
     def create(self, validated_data):
-        # create the Aliquot object
-        # but first determine if any aliquots exist for the parent sample
-        prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'])
-        if prev_aliquots:
-            max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
-        else:
-            max_aliquot_number = 0
-        validated_data['aliquot_number'] = max_aliquot_number + 1
-        aliquot = Aliquot.objects.create(**validated_data)
+        # aliquots = [Aliquot(**item) for item in validated_data]
+        # return Aliquot.objects.bulk_create(aliquots)
 
-        return aliquot
+        # pull out the freezer location fields from the request
+        freezer = validated_data.pop('freezer')
+        rack = validated_data.pop('rack')
+        box = validated_data.pop('box')
+        row = validated_data.pop('row')
+        spot = validated_data.pop('spot')
+
+        # pull out sample ID list from the request
+        if 'aliquot_count' in validated_data:
+            aliquot_count = validated_data.pop('aliquot_count')
+        else:
+            aliquot_count = 1
+
+        aliquots = []
+        for count_num in range(0, aliquot_count):
+            # first determine if any aliquots exist for the parent sample
+            prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'])
+            if prev_aliquots:
+                max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
+            else:
+                max_aliquot_number = 0
+            validated_data['aliquot_number'] = max_aliquot_number + 1
+
+            # then create the freezer location for this aliquot to use
+            # TODO: this needs to be properly implemented in conjunction with the Freezer Location serializer
+            freezer_location = FreezerLocation.objects.create(
+                freezer=freezer, rack=rack, box=box, row=row, spot=(spot+max_aliquot_number-1))
+            validated_data['freezer_location'] = freezer_location
+
+            aliquot = Aliquot.objects.create(**validated_data)
+            aliquots.append(aliquot)
+
+        if aliquot_count == 1:
+            return aliquots[0]
+        else:
+            return aliquots
+
+    # ordinary update
+    def update(self, instance, validated_data):
+        return instance
 
     class Meta:
         model = Aliquot

@@ -128,8 +128,8 @@ class Aliquot(HistoryModel):
     aliquot_string = property(_concat_ids)
     sample = models.ForeignKey('Sample', related_name='aliquots')
     freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
-    aliquot_number = models.IntegerField()
-    frozen = models.BooleanField()
+    aliquot_number = models.IntegerField(null=True, blank=True)
+    frozen = models.BooleanField(default=True)
 
     def __str__(self):
         return self.aliquot_string
