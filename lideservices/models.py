@@ -441,6 +441,25 @@ class ExtractionBatch(HistoryModel):
         unique_together = ("analysis_batch", "extraction_number")
 
 
+class ReverseTranscription(HistoryModel):
+    """
+    Reverse Transcription
+    """
+
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
+    template_volume = models.FloatField(null=True, blank=True)
+    reaction_volume = models.FloatField(null=True, blank=True)
+    rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    re_rt = models.ForeignKey('self', related_name='reversetranscriptions', null=True)
+    re_rt_note = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_reversetranscription"
+
+
 class Extraction(HistoryModel):
     """
     Extraction
@@ -471,7 +490,7 @@ class PCRReplicate(HistoryModel):
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
-    re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)
+    re_pcr = models.BooleanField(default=False)
     replicate_type = EnumChoiceField(enum_class=ReplicateType)
 
     def __str__(self):
@@ -496,31 +515,6 @@ class Result(HistoryModel):
 
     class Meta:
         db_table = "lide_result"
-
-
-class ReverseTranscription(HistoryModel):
-    """
-    Reverse Transcription
-    """
-
-    def _concat_ids(self):
-        """Returns the concatenated parent ID and child series number of the record"""
-        return '%s-%s' % (self.analysis_batch, self.rt_number)
-
-    rt_string = property(_concat_ids)
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='reversetranscriptions')
-    rt_number = models.IntegerField()
-    template_volume = models.FloatField(null=True, blank=True)
-    reaction_volume = models.FloatField(null=True, blank=True)
-    rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    re_rt = models.ForeignKey('self', related_name='reversetranscriptions', null=True)	
-
-    def __str__(self):
-        return self.rt_string
-
-    class Meta:
-        db_table = "lide_reversetranscription"
-        unique_together = ("analysis_batch", "rt_number")
 
 
 class StandardCurve(HistoryModel):

@@ -402,6 +402,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
     # on create, also create child objects (extractions and replicates)
     def create(self, validated_data):
+        # pull out child reverse transcription definition from the request
+        rt = validated_data.pop('rt')
+
         # pull out child extractions list from the request
         extractions = validated_data.pop('extractions')
 
@@ -428,10 +431,18 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         for x in range(1, replicate.count):
                             PCRReplicate.objects.create(extraction=new_extraction, target=replicate.target)
 
+        # create the child reverse transcription if present
+        if rt is not None:
+            ReverseTranscription.objects.create(extraction_batch=extraction_batch, **rt)
+
         return extraction_batch
 
     # on update, any submitted nested objects (extractions, replicates) will be ignored
     def update(self, instance, validated_data):
+        # remove child reverse transcription definition from the request
+        if hasattr(validated_data, 'rt'):
+            validated_data.remove('rt')
+
         # remove child extractions list from the request
         if hasattr(validated_data, 'extractions'):
             validated_data.remove('extractions')
@@ -458,6 +469,16 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
                   'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class ReverseTranscriptionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = ReverseTranscription
+        fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_note',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -492,29 +513,6 @@ class ResultSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class ReverseTranscriptionSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    def create(self, validated_data):
-        # create the Reverse Transcription object
-        # but first determine if any reverse transcriptions exist for the parent analysis batch
-        prev_rts = ReverseTranscription.objects.filter(analysis_batch=validated_data['analysis_batch'])
-        if prev_rts:
-            max_rt_number = max(prev_rt.inhibition_number for prev_rt in prev_rts)
-        else:
-            max_rt_number = 0
-        validated_data['rt_number'] = max_rt_number + 1
-        extraction_batch = ReverseTranscription.objects.create(**validated_data)
-
-        return extraction_batch
-
-    class Meta:
-        model = ReverseTranscription
-        fields = ('id', 'rt_string', 'analysis_batch', 'rt_number', 'template_volume', 'reaction_volume', 'rt_date',
-                  're_rt', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
 class StandardCurveSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -523,16 +521,6 @@ class StandardCurveSerializer(serializers.ModelSerializer):
         model = StandardCurve
         fields = ('id', 'r_value', 'slope', 'efficiency', 'pos_ctrl_cq', 'pos_ctrl_cq_range', 'created_date',
                   'created_by', 'modified_date', 'modified_by',)
-
-
-class TargetSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-    type = EnumChoiceField(enum_class=NucleicAcidType)
-
-    class Meta:
-        model = Target
-        fields = ('id', 'name', 'code', 'type', 'notes', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -549,6 +537,16 @@ class ControlTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ControlType
         fields = ('id', 'name', 'abbreviation', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class TargetSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    type = EnumChoiceField(enum_class=NucleicAcidType)
+
+    class Meta:
+        model = Target
+        fields = ('id', 'name', 'code', 'type', 'notes', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -649,10 +647,11 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
             for extraction in extractions:
                 inhibition_id = extraction.get('inhibition_id')
                 inhibition = Inhibition.objects.get(id=inhibition_id)
-                data = {'id': inhibition_id, 'sample': inhibition.sample.id, 'analysis_batch': inhibition.analysis_batch.id,
-                        'inhibition_date': inhibition.inhibition_date, 'type': str(inhibition.type),
-                        'dilution_factor': inhibition.dilution_factor, 'created_date': inhibition.created_date,
-                        'created_by': inhibition.created_by.username, 'modified_date': inhibition.modified_date, 'modified_by': inhibition.modified_by.username}
+                data = {'id': inhibition_id, 'sample': inhibition.sample.id,
+                        'analysis_batch': inhibition.analysis_batch.id, 'inhibition_date': inhibition.inhibition_date,
+                        'type': str(inhibition.type), 'dilution_factor': inhibition.dilution_factor,
+                        'created_date': inhibition.created_date, 'created_by': inhibition.created_by.username,
+                        'modified_date': inhibition.modified_date, 'modified_by': inhibition.modified_by.username}
                 inhibitions[inhibition_id] = data
 
         return inhibitions.values()
@@ -665,11 +664,12 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
             for extraction in extractions:
                 reverse_transcription_id = extraction.get('reverse_transcription_id')
                 rt = ReverseTranscription.objects.get(id=reverse_transcription_id)
-                data = {'id': reverse_transcription_id, 'rt_string': rt.rt_string, 'analysis_batch': rt.analysis_batch.id,
-                        'rt_number': rt.rt_number, 'template_volume': rt.template_volume,
-                        'reaction_volume': rt.reaction_volume, 'rt_date': rt.rt_date, 're_rt': rt.re_rt,
-                        'created_date': rt.created_date, 'created_by': rt.created_by.username,
-                        'modified_date': rt.modified_date, 'modified_by': rt.modified_by.username}
+                data = {'id': reverse_transcription_id, 'rt_string': rt.rt_string,
+                        'analysis_batch': rt.analysis_batch.id, 'rt_number': rt.rt_number,
+                        'template_volume': rt.template_volume, 'reaction_volume': rt.reaction_volume,
+                        'rt_date': rt.rt_date, 're_rt': rt.re_rt, 'created_date': rt.created_date,
+                        'created_by': rt.created_by.username, 'modified_date': rt.modified_date,
+                        'modified_by': rt.modified_by.username}
                 reverse_transcriptions[reverse_transcription_id] = data
 
         return reverse_transcriptions.values()
