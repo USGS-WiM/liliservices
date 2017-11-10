@@ -468,7 +468,6 @@ class Extraction(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='extractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
     inhibition = models.ForeignKey('Inhibition', related_name='extractions')
-    reverse_transcription = models.ForeignKey('ReverseTranscription', related_name='extractions', null=True)
 
     def __str__(self):
         return str(self.id)
@@ -490,7 +489,8 @@ class PCRReplicate(HistoryModel):
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
-    re_pcr = models.BooleanField(default=False)
+    re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)  # TODO: change this to BooleanField
+    # re_pcr = models.BooleanField(default=False)
     replicate_type = EnumChoiceField(enum_class=ReplicateType)
 
     def __str__(self):

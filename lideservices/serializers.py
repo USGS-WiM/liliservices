@@ -488,7 +488,7 @@ class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'reverse_transcription', 'pcrreplicates',
+        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'pcrreplicates',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
