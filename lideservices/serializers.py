@@ -662,10 +662,9 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
 
         if reversetranscriptions is not None:
             for reversetranscription in reversetranscriptions:
-                reverse_transcription_id = reversetranscription.get('reverse_transcription_id')
+                reverse_transcription_id = reversetranscription.get('id')
                 rt = ReverseTranscription.objects.get(id=reverse_transcription_id)
-                data = {'id': reverse_transcription_id, 'rt_string': rt.rt_string,
-                        'extraction_batch': rt.extraction_batch.id, 'rt_number': rt.rt_number,
+                data = {'id': reverse_transcription_id, 'extraction_batch': rt.extraction_batch.id,
                         'template_volume': rt.template_volume, 'reaction_volume': rt.reaction_volume,
                         'rt_date': rt.rt_date, 're_rt': rt.re_rt, 'created_date': rt.created_date,
                         'created_by': rt.created_by.username, 'modified_date': rt.modified_date,
