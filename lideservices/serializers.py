@@ -658,14 +658,14 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
 
     def get_reverse_transcriptions(self, obj):
         reverse_transcriptions = {}
-        extractions = obj.extractions.values()
+        reversetranscriptions = obj.reversetranscriptions.values()
 
-        if extractions is not None:
-            for extraction in extractions:
-                reverse_transcription_id = extraction.get('reverse_transcription_id')
+        if reversetranscriptions is not None:
+            for reversetranscription in reversetranscriptions:
+                reverse_transcription_id = reversetranscription.get('reverse_transcription_id')
                 rt = ReverseTranscription.objects.get(id=reverse_transcription_id)
                 data = {'id': reverse_transcription_id, 'rt_string': rt.rt_string,
-                        'analysis_batch': rt.analysis_batch.id, 'rt_number': rt.rt_number,
+                        'extraction_batch': rt.extraction_batch.id, 'rt_number': rt.rt_number,
                         'template_volume': rt.template_volume, 'reaction_volume': rt.reaction_volume,
                         'rt_date': rt.rt_date, 're_rt': rt.re_rt, 'created_date': rt.created_date,
                         'created_by': rt.created_by.username, 'modified_date': rt.modified_date,
@@ -769,9 +769,10 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         summary = {}
         extraction_count = 0
         inhibition_count = 0
+        reverse_transcription_count = 0
         targets = []
 
-        # extraction count
+        # extraction and reverse_transcription count
         extraction_batches = obj.extractionbatches.values()
         if extraction_batches is not None:
             for extraction_batch in extraction_batches:
@@ -779,6 +780,9 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 
                 extractions = Extraction.objects.filter(extraction_batch__exact=extraction_batch_id)
                 extraction_count += len(extractions)
+
+                reversetranscriptions = ReverseTranscription.objects.filter(extraction_batch__exact=extraction_batch_id)
+                reverse_transcription_count += len(reversetranscriptions)
 
                 # target count
                 if extractions is not None:
@@ -793,9 +797,6 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         # inhibition count
         inhibitions = obj.inhibitions.values()
         inhibition_count += len(inhibitions)
-
-        # reverse transcription count
-        reverse_transcription_count = len(obj.reversetranscriptions.values())
 
         summary['extraction_count'] = extraction_count
         summary['inhibition_count'] = inhibition_count
