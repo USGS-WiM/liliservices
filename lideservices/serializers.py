@@ -109,21 +109,25 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # peg_neg_targets_extracted
     def get_peg_neg_targets_extracted(self, obj):
-        peg_neg_id = obj.peg_neg_id
-        peg_neg = Sample.objects.get(id=peg_neg_id)
         targets_extracted = []
-        extractions = peg_neg.extractions.values()
+        peg_neg = obj.peg_neg
+        if peg_neg is not None:
+            peg_neg_id = peg_neg.id
+            extractions = peg_neg.extractions.values()
 
-        if extractions is not None:
-            for extraction in extractions:
-                replicates = extraction.get('pcrreplicates')
-                if replicates is not None:
-                    for replicate in replicates:
-                        target_id = replicate.get('target_id')
+            if extractions is not None:
+                for extraction in extractions:
+                    replicates = extraction.get('pcrreplicates')
+                    if replicates is not None:
+                        for replicate in replicates:
+                            target_id = replicate.get('target_id')
 
-                        # get the unique target IDs for this peg neg
-                        if target_id not in targets_extracted:
-                            targets_extracted.append(target_id)
+                            # get the unique target IDs for this peg neg
+                            if target_id not in targets_extracted:
+                                targets_extracted.append(target_id)
+
+        else:
+            peg_neg_id = None
 
         data = {"id": peg_neg_id, "targets_extracted": targets_extracted}
         return data
@@ -675,7 +679,8 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                 inhibition = Inhibition.objects.get(id=inhibition_id)
                 data = {'id': inhibition_id, 'sample': inhibition.sample.id,
                         'analysis_batch': inhibition.analysis_batch.id, 'inhibition_date': inhibition.inhibition_date,
-                        'type': str(inhibition.type), 'dilution_factor': inhibition.dilution_factor,
+                        'nucleic_acid_type': str(inhibition.nucleic_acid_type),
+                        'dilution_factor': inhibition.dilution_factor,
                         'created_date': inhibition.created_date, 'created_by': inhibition.created_by.username,
                         'modified_date': inhibition.modified_date, 'modified_by': inhibition.modified_by.username}
                 inhibitions[inhibition_id] = data

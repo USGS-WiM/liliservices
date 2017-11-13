@@ -490,7 +490,7 @@ class PCRReplicate(HistoryModel):
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
-    # re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)  # TODO: change this to BooleanField
+    re_pcr = models.BooleanField(default=False)
     record_type = EnumChoiceField(enum_class=RecordType)
 
     def __str__(self):
