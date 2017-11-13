@@ -54,7 +54,7 @@ class NucleicAcidType(ChoiceEnum):
     RNA = "RNA"
 
 
-class ReplicateType(ChoiceEnum):
+class RecordType(ChoiceEnum):
     CONTROL = "CONTROL"
     DATA = "DATA"	
 
@@ -107,6 +107,7 @@ class Sample(HistoryModel):
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
     peg_neg= models.ForeignKey('self', related_name='samples', null=True)
+    record_type = EnumChoiceField(enum_class=RecordType)
 
     def __str__(self):
         return str(self.id)
@@ -388,7 +389,7 @@ class Inhibition(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='inhibitions')
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitions')
     inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    type = EnumChoiceField(enum_class=NucleicAcidType)
+    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
     dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
@@ -489,9 +490,8 @@ class PCRReplicate(HistoryModel):
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
-    re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)  # TODO: change this to BooleanField
-    # re_pcr = models.BooleanField(default=False)
-    replicate_type = EnumChoiceField(enum_class=ReplicateType)
+    # re_pcr = models.ForeignKey('self', related_name='pcrreplicates', null=True)  # TODO: change this to BooleanField
+    record_type = EnumChoiceField(enum_class=RecordType)
 
     def __str__(self):
         return str(self.id)
@@ -563,7 +563,7 @@ class Target(NameModel):
     """
 
     code = models.CharField(max_length=128, null=True, blank=True)
-    type = EnumChoiceField(enum_class=NucleicAcidType)
+    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
     notes = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):

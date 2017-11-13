@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from lideservices.models import *
-from enumchoicefield import ChoiceEnum, EnumChoiceField
+from enumchoicefield import EnumChoiceField
 
 
 ######
@@ -107,6 +107,27 @@ class SampleSerializer(serializers.ModelSerializer):
         data = {"id": sampler_name_id, "name": sampler_name_name}
         return data
 
+    # peg_neg_targets_extracted
+    def get_peg_neg_targets_extracted(self, obj):
+        peg_neg_id = obj.peg_neg_id
+        peg_neg = Sample.objects.get(id=peg_neg_id)
+        targets_extracted = []
+        extractions = peg_neg.extractions.values()
+
+        if extractions is not None:
+            for extraction in extractions:
+                replicates = extraction.get('pcrreplicates')
+                if replicates is not None:
+                    for replicate in replicates:
+                        target_id = replicate.get('target_id')
+
+                        # get the unique target IDs for this peg neg
+                        if target_id not in targets_extracted:
+                            targets_extracted.append(target_id)
+
+        data = {"id": peg_neg_id, "targets_extracted": targets_extracted}
+        return data
+
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     sample_type = serializers.SerializerMethodField()
@@ -115,6 +136,8 @@ class SampleSerializer(serializers.ModelSerializer):
     study = serializers.SerializerMethodField()
     sampler_name = serializers.SerializerMethodField()
     aliquots = AliquotSerializer(many=True, read_only=True)
+    record_type = EnumChoiceField(enum_class=RecordType)
+    peg_neg_targets_extracted = serializers.SerializerMethodField()
     final_concentrated_sample_volume = serializers.FloatField(
         source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
     final_concentrated_sample_volume_type = serializers.StringRelatedField(
@@ -131,7 +154,7 @@ class SampleSerializer(serializers.ModelSerializer):
                   'total_volume_sampled_initial', 'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled',
                   'sample_volume_initial', 'sample_volume_filtered', 'filter_born_on_date', 'filter_flag',
                   'secondary_concentration_flag', 'elution_notes', 'technician_initials', 'dissolution_volume',
-                  'post_dilution_volume', 'analysisbatches', 'samplegroups', 'peg_neg',
+                  'post_dilution_volume', 'analysisbatches', 'samplegroups', 'peg_neg', 'peg_neg_targets_extracted',
                   'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
                   'final_concentrated_sample_volume_notes', 'aliquots',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
@@ -382,10 +405,11 @@ class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
 class InhibitionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'type', 'dilution_factor',
+        fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -495,11 +519,12 @@ class ExtractionSerializer(serializers.ModelSerializer):
 class PCRReplicateSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+    record_type = EnumChoiceField(enum_class=RecordType)
 
     class Meta:
         model = PCRReplicate
         fields = ('id', 'extraction', 'target', 'cq_value', 'gc_reaction', 'replicate_concentration',
-                  'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr', 'replicate_type',
+                  'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr', 'record_type',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -542,11 +567,12 @@ class ControlTypeSerializer(serializers.ModelSerializer):
 class TargetSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    type = EnumChoiceField(enum_class=NucleicAcidType)
+    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = Target
-        fields = ('id', 'name', 'code', 'type', 'notes', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'name', 'code', 'nucleic_acid_type', 'notes',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
