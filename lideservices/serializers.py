@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from lideservices.models import *
 from enumchoicefield import EnumChoiceField
+from django.db.models import Max
 
 
 ######

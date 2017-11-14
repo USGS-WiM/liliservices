@@ -95,9 +95,32 @@ class UnitViewSet(HistoryViewSet):
 
 
 class FreezerLocationViewSet(HistoryViewSet):
-    queryset = FreezerLocation.objects.all()
     serializer_class = FreezerLocationSerializer
 
+    # get the last occupied location
+    def get_last_occupied_id(self):
+        max_freezer = FreezerLocation.objects.aggregate(Max('freezer'))
+        max_rack = FreezerLocation.objects.filter(freezer__exact=max_freezer['freezer__max']).aggregate(Max('rack'))
+        max_box = FreezerLocation.objects.filter(
+            freezer__exact=max_freezer['freezer__max'], rack__exact=max_rack['rack__max']).aggregate(Max('box'))
+        max_row = FreezerLocation.objects.filter(
+            freezer__exact=max_freezer['freezer__max'], rack__exact=max_rack['rack__max'],
+            box__exact=max_box['box__max']).aggregate(Max('row'))
+        max_spot = FreezerLocation.objects.filter(
+            freezer__exact=max_freezer['freezer__max'], rack__exact=max_rack['rack__max'],
+            box__exact=max_box['box__max'], row__exact=max_row['row__max']).aggregate(Max('spot'))
+        last_occupied = FreezerLocation.objects.filter(
+            freezer__exact=max_freezer['freezer__max'], rack__exact=max_rack['rack__max'],
+            box__exact=max_box['box__max'], row__exact=max_row['row__max'], spot__exact=max_spot['spot__max'])
+        return last_occupied[0].id
+
+    def get_queryset(self):
+        queryset = FreezerLocation.objects.all()
+        last_occupied = self.request.query_params.get('last_occupied', None)
+        if last_occupied is not None:
+            if last_occupied == 'True' or last_occupied == 'true':
+                queryset = queryset.filter(id__exact=self.get_last_occupied_id())
+        return queryset
 
 class FreezerViewSet(HistoryViewSet):
     queryset = Freezer.objects.all()
