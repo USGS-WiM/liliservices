@@ -33,6 +33,7 @@ router.register(r'standardcurves', views.StandardCurveViewSet, 'standardcurves')
 router.register(r'targets', views.TargetViewSet, 'targets')
 router.register(r'results', views.ResultViewSet, 'results')
 router.register(r'controltypes', views.ControlTypeViewSet, 'controltypes')
+router.register(r'fieldunits', views.FieldUnitViewSet, 'fieldunits')
 router.register(r'otheranalyses', views.OtherAnalysisViewSet, 'otheranalyses')
 router.register(r'users', views.UserViewSet, 'users')
 

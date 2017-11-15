@@ -302,6 +302,11 @@ class ControlTypeViewSet(HistoryViewSet):
 ######
 
 
+class FieldUnitViewSet(HistoryViewSet):
+    queryset = FieldUnit.objects.all()
+    serializer_class = FieldUnitSerializer
+
+
 class OtherAnalysisViewSet(HistoryViewSet):
     queryset = OtherAnalysis.objects.all()
     serializer_class = OtherAnalysisSerializer

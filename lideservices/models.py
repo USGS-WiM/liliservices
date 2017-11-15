@@ -580,6 +580,22 @@ class Target(NameModel):
 ######
 
 
+class FieldUnit(HistoryModel):
+    """
+    Defined units for particular fields
+    """
+
+    table = models.CharField(max_length=64)
+    field = models.CharField(max_length=64)
+    unit = models.ForeignKey('Unit', related_name='fieldunits')
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_fieldunit"
+
+
 class OtherAnalysis(HistoryModel):
     """
     Other Analysis

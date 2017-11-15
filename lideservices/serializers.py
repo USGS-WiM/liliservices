@@ -587,6 +587,15 @@ class TargetSerializer(serializers.ModelSerializer):
 ######
 
 
+class FieldUnitSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = OtherAnalysis
+        fields = ('id', 'table', 'field', 'unit', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class OtherAnalysisSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
