@@ -592,7 +592,7 @@ class FieldUnitSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
 
     class Meta:
-        model = OtherAnalysis
+        model = FieldUnit
         fields = ('id', 'table', 'field', 'unit', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
