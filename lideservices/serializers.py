@@ -2,6 +2,7 @@ from rest_framework import serializers
 from lideservices.models import *
 from enumchoicefield import EnumChoiceField
 from django.db.models import Max
+import json
 
 
 ######
@@ -517,7 +518,7 @@ class ExtractionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Extraction
-        fields = ('id', 'sample', 'extraction_batch', 'inhibition', 'pcrreplicates',
+        fields = ('id', 'sample', 'extraction_batch', 'pcrreplicates',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -685,15 +686,22 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
 
         if extractions is not None:
             for extraction in extractions:
-                inhibition_id = extraction.get('inhibition_id')
-                inhibition = Inhibition.objects.get(id=inhibition_id)
-                data = {'id': inhibition_id, 'sample': inhibition.sample.id,
-                        'analysis_batch': inhibition.analysis_batch.id, 'inhibition_date': inhibition.inhibition_date,
-                        'nucleic_acid_type': str(inhibition.nucleic_acid_type),
-                        'dilution_factor': inhibition.dilution_factor,
-                        'created_date': inhibition.created_date, 'created_by': inhibition.created_by.username,
-                        'modified_date': inhibition.modified_date, 'modified_by': inhibition.modified_by.username}
-                inhibitions[inhibition_id] = data
+                sample_id = extraction.get('sample_id')
+                if sample_id is not None:
+                    sample = Sample.objects.get(id=sample_id)
+                    sample_inhibitions = sample.inhibitions.values()
+                    print(sample_inhibitions)
+                    if sample_inhibitions is not None:
+                        for inhibition in sample_inhibitions:
+                            creator = User.objects.get(id=inhibition['created_by_id'])
+                            modifier = User.objects.get(id=inhibition['modified_by_id'])
+                            data = {'id': inhibition['id'], 'sample': inhibition['sample_id'],
+                                    'analysis_batch': inhibition['analysis_batch_id'], 'inhibition_date': inhibition['inhibition_date'],
+                                    'nucleic_acid_type': str(inhibition['nucleic_acid_type']),
+                                    'dilution_factor': inhibition['dilution_factor'],
+                                    'created_date': inhibition['created_date'], 'created_by': creator.username,
+                                    'modified_date': inhibition['modified_date'], 'modified_by': modifier.username}
+                            inhibitions[inhibition['id']] = data
 
         return inhibitions.values()
 
