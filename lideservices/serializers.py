@@ -412,6 +412,13 @@ class InhibitionSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
 
+    def create(self, validated_data):
+        inhibitions = [Inhibition(**item) for item in validated_data]
+        return Inhibition.objects.bulk_create(inhibitions)
+
+    def update(self, instance, validated_data):
+        return instance
+
     class Meta:
         model = Inhibition
         fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
@@ -434,9 +441,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # pull out child reverse transcription definition from the request
         rt = validated_data.pop('rt')
 
-        # pull out child extractions list from the request
-        extractions = validated_data.pop('extractions')
-
         # pull out child replicates list from the request
         replicates = validated_data.pop('replicates')
 
@@ -444,16 +448,16 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # but first determine if any extraction batches exist for the parent analysis batch
         prev_extr_batches = ExtractionBatch.objects.filter(analysis_batch=validated_data['analysis_batch'])
         if prev_extr_batches:
-            max_extraction_number = max(prev_extr_batch.inhibition_number for prev_extr_batch in prev_extr_batches)
+            max_extraction_number = max(prev_extr_batch.extraction_number for prev_extr_batch in prev_extr_batches)
         else:
             max_extraction_number = 0
         validated_data['extraction_number'] = max_extraction_number + 1
         extraction_batch = ExtractionBatch.objects.create(**validated_data)
 
         # create the child extractions
-        if extractions is not None:
-            for extraction in extractions:
-                new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
+        if extraction_batch.analysis_batch is not None:
+            for sample in extraction_batch.analysis_batch.samples:
+                new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, sample=sample)
                 # create the child replicates
                 if replicates is not None:
                     for replicate in replicates:
@@ -471,10 +475,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # remove child reverse transcription definition from the request
         if hasattr(validated_data, 'rt'):
             validated_data.remove('rt')
-
-        # remove child extractions list from the request
-        if hasattr(validated_data, 'extractions'):
-            validated_data.remove('extractions')
 
         # remove child replicates list from the request
         if hasattr(validated_data, 'replicates'):

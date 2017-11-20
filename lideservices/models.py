@@ -468,7 +468,6 @@ class Extraction(HistoryModel):
 
     sample = models.ForeignKey('Sample', related_name='extractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
-    inhibition = models.ForeignKey('Inhibition', related_name='extractions')
 
     def __str__(self):
         return str(self.id)
