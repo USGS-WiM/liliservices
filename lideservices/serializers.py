@@ -442,7 +442,7 @@ class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class InhibitionSerializer(serializers.ModelSerializer):
+class InhibitionListSerializer(serializers.ListSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
@@ -451,13 +451,38 @@ class InhibitionSerializer(serializers.ModelSerializer):
         inhibitions = [Inhibition(**item) for item in validated_data]
         return Inhibition.objects.bulk_create(inhibitions)
 
+        # if isinstance(validated_data, list):
+        #     print("is list")
+        #     inhibitions = []
+        #     for item in validated_data:
+        #         print(item)
+        #         print(type(item))
+        #         inhibition = Inhibition.objects.create(**item)
+        #         inhibitions.append(inhibition)
+        #     return inhibitions
+        # else:
+        #     return Inhibition.objects.create(**validated_data)
+
     def update(self, instance, validated_data):
         return instance
+
+    class Meta:
+        class Meta:
+            model = Inhibition
+            fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
+                      'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class InhibitionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
 
     class Meta:
         model = Inhibition
         fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = InhibitionListSerializer
 
 
 class ExtractionMethodSerializer(serializers.ModelSerializer):

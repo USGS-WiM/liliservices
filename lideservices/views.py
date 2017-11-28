@@ -235,6 +235,15 @@ class InhibitionViewSet(HistoryViewSet):
     queryset = Inhibition.objects.all()
     serializer_class = InhibitionSerializer
 
+    def get_serializer(self, *args, **kwargs):
+        if "data" in kwargs:
+            data = kwargs["data"]
+
+            # check if many is required
+            if isinstance(data, list):
+                kwargs["many"] = True
+
+        return super(InhibitionViewSet, self).get_serializer(*args, **kwargs)
 
 class ExtractionMethodViewSet(HistoryViewSet):
     queryset = ExtractionMethod.objects.all()
