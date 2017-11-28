@@ -20,8 +20,7 @@ class AliquotSerializer(serializers.ModelSerializer):
                     and 'spot' not in data:
                 message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required."
                 raise serializers.ValidationError(message)
-        else:
-            return data
+        return data
 
     # bulk create
     def create(self, validated_data):
