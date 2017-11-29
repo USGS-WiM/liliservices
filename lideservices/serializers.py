@@ -12,18 +12,20 @@ import json
 ######
 
 
-class AliquotSerializer(serializers.ModelSerializer):
+class AliquotListSerializer(serializers.ListSerializer):
 
     def validate(self, data):
-        if 'freezer_location' not in data:
-            if 'freezer' not in data and 'rack' not in data and 'box' not in data and 'row' not in data\
-                    and 'spot' not in data:
+        d = data[0]
+        if 'freezer_location' not in d:
+            if 'freezer' not in d or 'rack' not in d or 'box' not in d or 'row' not in d or 'spot' not in d:
+                print('validation failed')
                 message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required."
                 raise serializers.ValidationError(message)
         return data
 
     # bulk create
     def create(self, validated_data):
+        validated_data = validated_data[0]
 
         # pull out the freezer location fields from the request
         if 'freezer_location' in validated_data:
@@ -40,7 +42,7 @@ class AliquotSerializer(serializers.ModelSerializer):
             row = validated_data.pop('row')
             spot = validated_data.pop('spot')
 
-        # pull out sample ID list from the request
+        # pull out aliquot count from the request
         if 'aliquot_count' in validated_data:
             aliquot_count = validated_data.pop('aliquot_count')
         else:
@@ -49,7 +51,7 @@ class AliquotSerializer(serializers.ModelSerializer):
         aliquots = []
         for count_num in range(0, aliquot_count):
             # first determine if any aliquots exist for the parent sample
-            prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'])
+            prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'].id)
             if prev_aliquots:
                 max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
             else:
@@ -72,10 +74,7 @@ class AliquotSerializer(serializers.ModelSerializer):
             aliquot = Aliquot.objects.create(**validated_data)
             aliquots.append(aliquot)
 
-        if aliquot_count == 1:
-            return aliquots[0]
-        else:
-            return aliquots
+        return aliquots
 
     # ordinary update
     def update(self, instance, validated_data):
@@ -99,6 +98,38 @@ class AliquotSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'freezer_location': {'required': False}
         }
+
+
+class AliquotCustomSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    aliquot_number = serializers.IntegerField(read_only=True, default=0)
+    aliquot_count = serializers.IntegerField(write_only=True, required=False)
+    freezer = serializers.IntegerField(write_only=True, required=False)
+    rack = serializers.IntegerField(write_only=True, required=False)
+    box = serializers.IntegerField(write_only=True, required=False)
+    row = serializers.IntegerField(write_only=True, required=False)
+    spot = serializers.IntegerField(write_only=True, required=False)
+
+    class Meta:
+        model = Aliquot
+        fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',
+                  'aliquot_count', 'freezer', 'rack', 'box', 'row', 'spot',)
+        extra_kwargs = {
+            'freezer_location': {'required': False}
+        }
+        list_serializer_class = AliquotListSerializer
+
+
+class AliquotSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = Aliquot
+        fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleSerializer(serializers.ModelSerializer):
