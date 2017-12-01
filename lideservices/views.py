@@ -77,9 +77,6 @@ class AliquotViewSet(HistoryViewSet):
             if isinstance(data, list) and "aliquot_count" in data[0]:
                 kwargs["many"] = True
 
-        else:
-            kwargs["many"] = False
-
         return super(AliquotViewSet, self).get_serializer(*args, **kwargs)
 
 

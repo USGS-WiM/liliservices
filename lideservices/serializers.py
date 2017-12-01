@@ -27,7 +27,7 @@ class AliquotListSerializer(serializers.ListSerializer):
         # pull out the freezer location fields from the request
         if 'freezer_location' in validated_data:
             freezer_location = FreezerLocation.objects.get(id=validated_data['freezer_location'].id)
-            freezer = freezer_location.freezer
+            freezer = freezer_location.freezer.id
             rack = freezer_location.rack
             box = freezer_location.box
             row = freezer_location.row
