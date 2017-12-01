@@ -1,5 +1,6 @@
 from django.contrib import admin
 from lideservices.models import *
+from simple_history.admin import SimpleHistoryAdmin
 
 
 admin.site.register(Sample, SimpleHistoryAdmin)

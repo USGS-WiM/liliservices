@@ -1,6 +1,5 @@
-Django==1.11.2
+django==1.11.2
 django-cors-headers==2.1.0
-django-enumchoicefield==0.9.0
 django-simple-history==1.8.2
 djangorestframework==3.6.3
 psycopg2==2.7.1

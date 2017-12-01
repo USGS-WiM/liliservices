@@ -3,8 +3,6 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
 from simple_history.models import HistoricalRecords
-from simple_history.admin import SimpleHistoryAdmin
-from enumchoicefield import ChoiceEnum, EnumChoiceField
 
 
 # Users will be stored in the core User model instead of a custom model.
@@ -47,16 +45,6 @@ class NameModel(HistoryModel):
 
     class Meta:
         abstract = True
-
-
-class NucleicAcidType(ChoiceEnum):
-    DNA = "DNA"
-    RNA = "RNA"
-
-
-class RecordType(ChoiceEnum):
-    CONTROL = "CONTROL"
-    DATA = "DATA"	
 
 
 # TODO: assign proper field types and properties to each model field
@@ -106,8 +94,8 @@ class Sample(HistoryModel):
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
-    peg_neg= models.ForeignKey('self', related_name='samples', null=True)
-    record_type = EnumChoiceField(enum_class=RecordType)
+    peg_neg = models.ForeignKey('self', related_name='samples', null=True)
+    record_type = models.ForeignKey('RecordType', default=1)
 
     def __str__(self):
         return str(self.id)
@@ -389,7 +377,7 @@ class Inhibition(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='inhibitions')
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitions')
     inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
+    nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
     dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
@@ -468,6 +456,8 @@ class Extraction(HistoryModel):
 
     sample = models.ForeignKey('Sample', related_name='extractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
+    inhibition_dna = models.ForeignKey('Inhibition', related_name='extractions_dna')
+    inhibition_rna = models.ForeignKey('Inhibition', related_name='extractions_rna')
 
     def __str__(self):
         return str(self.id)
@@ -490,7 +480,7 @@ class PCRReplicate(HistoryModel):
     bad_result_flag = models.BooleanField(default=False)
     control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
     re_pcr = models.BooleanField(default=False)
-    record_type = EnumChoiceField(enum_class=RecordType)
+    record_type = models.ForeignKey('RecordType', default=1)
 
     def __str__(self):
         return str(self.id)
@@ -562,7 +552,7 @@ class Target(NameModel):
     """
 
     code = models.CharField(max_length=128, null=True, blank=True)
-    nucleic_acid_type = EnumChoiceField(enum_class=NucleicAcidType)
+    nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
     notes = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
@@ -593,6 +583,32 @@ class FieldUnit(HistoryModel):
 
     class Meta:
         db_table = "lide_fieldunit"
+
+
+
+
+class NucleicAcidType(NameModel):
+    """
+    Nucleic Acid Type (DNA or RNA)
+    """
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lide_nucleicacidtype"
+
+
+class RecordType(NameModel):
+    """
+    Record Type (DATA or CONTROL)
+    """
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lide_recordtype"
 
 
 class OtherAnalysis(HistoryModel):

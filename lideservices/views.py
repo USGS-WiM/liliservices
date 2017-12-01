@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from lideservices.serializers import *
 from lideservices.models import *
 from lideservices.permissions import *
+from django.db.models import Max
 
 
 ########################################################################################################################
@@ -141,6 +142,7 @@ class FreezerLocationViewSet(HistoryViewSet):
             if last_occupied == 'True' or last_occupied == 'true':
                 queryset = queryset.filter(id__exact=self.get_last_occupied_id())
         return queryset
+
 
 class FreezerViewSet(HistoryViewSet):
     queryset = Freezer.objects.all()
