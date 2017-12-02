@@ -833,7 +833,7 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                             data = {'id': inhibition['id'], 'sample': inhibition['sample_id'],
                                     'analysis_batch': inhibition['analysis_batch_id'],
                                     'inhibition_date': inhibition['inhibition_date'],
-                                    'nucleic_acid_type': str(inhibition['nucleic_acid_type']),
+                                    'nucleic_acid_type_id': inhibition['nucleic_acid_type_id'],
                                     'dilution_factor': inhibition['dilution_factor'],
                                     'created_date': inhibition['created_date'], 'created_by': creator.username,
                                     'modified_date': inhibition['modified_date'], 'modified_by': modifier.username}
