@@ -4,6 +4,33 @@ from lideservices.models import *
 
 ######
 #
+#  Freezer Locations
+#
+######
+
+
+class FreezerLocationSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = FreezerLocation
+        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class FreezerSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = Freezer
+        fields = ('id', 'racks', 'boxes', 'rows', 'spots',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+######
+#
 #  Samples
 #
 ######
@@ -100,6 +127,7 @@ class AliquotListSerializer(serializers.ListSerializer):
 class AliquotCustomSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+    freezer_location = FreezerLocationSerializer()
     aliquot_number = serializers.IntegerField(read_only=True, default=0)
     aliquot_count = serializers.IntegerField(write_only=True, required=False)
     freezer = serializers.IntegerField(write_only=True, required=False)
@@ -122,6 +150,7 @@ class AliquotCustomSerializer(serializers.ModelSerializer):
 class AliquotSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+    freezer_location = FreezerLocationSerializer()
 
     class Meta:
         model = Aliquot
@@ -269,33 +298,6 @@ class UnitSerializer(serializers.ModelSerializer):
     class Meta:
         model = Unit
         fields = ('id', 'name', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-######
-#
-#  Freezer Locations
-#
-######
-
-
-class FreezerLocationSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = FreezerLocation
-        fields = ('id', 'freezer', 'rack', 'box', 'row', 'spot',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class FreezerSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = Freezer
-        fields = ('id', 'racks', 'boxes', 'rows', 'spots',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
