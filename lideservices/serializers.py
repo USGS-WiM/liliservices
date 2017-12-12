@@ -193,10 +193,13 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # sampler name
     def get_sampler_name(self, obj):
-        sampler_name_id = obj.sampler_name_id
-        sampler_name = User.objects.get(id=sampler_name_id)
-        sampler_name_name = sampler_name.username
-        data = {"id": sampler_name_id, "name": sampler_name_name}
+        if obj.sampler_name_id is not None:
+            sampler_name_id = obj.sampler_name_id
+            sampler_name = User.objects.get(id=sampler_name_id)
+            sampler_name_name = sampler_name.username if sampler_name is not None else 'Does Not Exist'
+            data = {"id": sampler_name_id, "name": sampler_name_name}
+        else:
+            data = None
         return data
 
     # peg_neg_targets_extracted
@@ -830,15 +833,17 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                     sample_inhibitions = sample.inhibitions.values()
                     if sample_inhibitions is not None:
                         for inhibition in sample_inhibitions:
-                            creator = User.objects.get(id=inhibition['created_by_id'])
-                            modifier = User.objects.get(id=inhibition['modified_by_id'])
+                            creator = User.objects.get(id=inhibition['created_by_id']).first()
+                            modifier = User.objects.get(id=inhibition['modified_by_id']).first()
                             data = {'id': inhibition['id'], 'sample': inhibition['sample_id'],
                                     'analysis_batch': inhibition['analysis_batch_id'],
                                     'inhibition_date': inhibition['inhibition_date'],
                                     'nucleic_acid_type_id': inhibition['nucleic_acid_type_id'],
                                     'dilution_factor': inhibition['dilution_factor'],
-                                    'created_date': inhibition['created_date'], 'created_by': creator.username,
-                                    'modified_date': inhibition['modified_date'], 'modified_by': modifier.username}
+                                    'created_date': inhibition['created_date'],
+                                    'created_by': creator.username if creator is not None else None,
+                                    'modified_date': inhibition['modified_date'],
+                                    'modified_by': modifier.username if modifier is not None else None}
                             inhibitions[inhibition['id']] = data
 
         return inhibitions.values()
@@ -854,8 +859,9 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                 data = {'id': reverse_transcription_id, 'extraction_batch': rt.extraction_batch.id,
                         'template_volume': rt.template_volume, 'reaction_volume': rt.reaction_volume,
                         'rt_date': rt.rt_date, 're_rt': rt.re_rt, 'created_date': rt.created_date,
-                        'created_by': rt.created_by.username, 'modified_date': rt.modified_date,
-                        'modified_by': rt.modified_by.username}
+                        'created_by': rt.created_by.username if rt.created_by is not None else None,
+                        'modified_date': rt.modified_date,
+                        'modified_by': rt.modified_by.username if rt.modified_by is not None else None}
                 reverse_transcriptions[reverse_transcription_id] = data
 
         return reverse_transcriptions.values()
