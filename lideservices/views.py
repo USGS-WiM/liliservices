@@ -1,6 +1,9 @@
+import json
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from rest_framework import views, viewsets, generics, permissions, authentication, status
 from rest_framework.response import Response
+from rest_framework.parsers import JSONParser
 from lideservices.serializers import *
 from lideservices.models import *
 from lideservices.permissions import *
@@ -229,6 +232,63 @@ class AnalysisBatchTemplateViewSet(HistoryViewSet):
     serializer_class = AnalysisBatchTemplateSerializer
 
 
+######
+#
+#  Extractions
+#
+######
+
+
+class ExtractionMethodViewSet(HistoryViewSet):
+    queryset = ExtractionMethod.objects.all()
+    serializer_class = ExtractionMethodSerializer
+
+
+class ExtractionBatchViewSet(HistoryViewSet):
+    queryset = ExtractionBatch.objects.all()
+    serializer_class = ExtractionBatchSerializer
+
+
+class ReverseTranscriptionViewSet(HistoryViewSet):
+    queryset = ReverseTranscription.objects.all()
+    serializer_class = ReverseTranscriptionSerializer
+
+
+class ExtractionViewSet(HistoryViewSet):
+    queryset = Extraction.objects.all()
+    serializer_class = ExtractionSerializer
+
+
+class PCRReplicateViewSet(HistoryViewSet):
+    queryset = PCRReplicate.objects.all()
+    serializer_class = PCRReplicateSerializer
+
+
+class ResultViewSet(HistoryViewSet):
+    queryset = Result.objects.all()
+    serializer_class = ResultSerializer
+
+
+class StandardCurveViewSet(HistoryViewSet):
+    queryset = StandardCurve.objects.all()
+    serializer_class = StandardCurveSerializer
+
+
+class InhibitionViewSet(HistoryViewSet):
+    queryset = Inhibition.objects.all()
+    serializer_class = InhibitionSerializer
+
+    def get_serializer(self, *args, **kwargs):
+        if "data" in kwargs:
+            data = kwargs["data"]
+
+            # check if many is required
+            if isinstance(data, list):
+                kwargs["many"] = True
+
+        return super(InhibitionViewSet, self).get_serializer(*args, **kwargs)
+
+
 class SampleInhibitionViewSet(HistoryViewSet):
     serializer_class = SampleInhibitionSerializer
 
@@ -250,72 +310,36 @@ class SampleInhibitionViewSet(HistoryViewSet):
         return queryset
 
 
-class InhibitionViewSet(HistoryViewSet):
-    queryset = Inhibition.objects.all()
-    serializer_class = InhibitionSerializer
+class InhibitionCalculateDilutionFactorViewSet(views.APIView):
+    permission_classes = (permissions.IsAuthenticated,)
 
-    def get_serializer(self, *args, **kwargs):
-        if "data" in kwargs:
-            data = kwargs["data"]
-
-            # check if many is required
-            if isinstance(data, list):
-                kwargs["many"] = True
-
-        return super(InhibitionViewSet, self).get_serializer(*args, **kwargs)
-
-class ExtractionMethodViewSet(HistoryViewSet):
-    queryset = ExtractionMethod.objects.all()
-    serializer_class = ExtractionMethodSerializer
-
-
-class ExtractionBatchViewSet(HistoryViewSet):
-    queryset = ExtractionBatch.objects.all()
-    serializer_class = ExtractionBatchSerializer
-
-
-class ExtractionViewSet(HistoryViewSet):
-    queryset = Extraction.objects.all()
-    serializer_class = ExtractionSerializer
-
-
-class PCRReplicateViewSet(HistoryViewSet):
-    queryset = PCRReplicate.objects.all()
-    serializer_class = PCRReplicateSerializer
-
-
-class ReverseTranscriptionViewSet(HistoryViewSet):
-    queryset = ReverseTranscription.objects.all()
-    serializer_class = ReverseTranscriptionSerializer
-
-
-class StandardCurveViewSet(HistoryViewSet):
-    queryset = StandardCurve.objects.all()
-    serializer_class = StandardCurveSerializer
+    def post(self, request):
+        response_data = []
+        request_data = JSONParser().parse(request)
+        serializer = InhibitionCalculateDilutionFactorSerializer(data=request_data)
+        if serializer.is_valid():
+            pos = request_data['inhibition_positive_control_cq_value']
+            inhibitions = request_data['inhibitions']
+            for inhibition in inhibitions:
+                cq = inhibition['cq_value']
+                suggested_dilution_factor = None
+                if 0 < pos - cq < 1:
+                    suggested_dilution_factor = 1
+                if cq > pos and cq - pos < 2:
+                    suggested_dilution_factor = 1
+                if cq - pos >= 2 and cq <= 36:
+                    suggested_dilution_factor = 5
+                if cq > 36 or cq is None:
+                    suggested_dilution_factor = 10
+                new_data = {"sample": inhibition['sample'], "suggested_dilution_factor": suggested_dilution_factor}
+                response_data.append(new_data)
+            return JsonResponse(serializer.data, status=200)
+        return JsonResponse(serializer.errors, status=400)
 
 
 class TargetViewSet(HistoryViewSet):
     queryset = Target.objects.all()
     serializer_class = TargetSerializer
-
-
-######
-#
-#  Results
-#
-######
-
-
-class ResultViewSet(HistoryViewSet):
-    queryset = Result.objects.all()
-    serializer_class = ResultSerializer	
-
-
-######
-#
-#  Controls
-#
-######
 
 
 class ControlTypeViewSet(HistoryViewSet):

@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework import serializers
 from lideservices.models import *
 
@@ -475,47 +476,11 @@ class AnalysisBatchTemplateSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class InhibitionListSerializer(serializers.ListSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    # bulk create
-    def create(self, validated_data):
-        inhibitions = [Inhibition(**item) for item in validated_data]
-        return Inhibition.objects.bulk_create(inhibitions)
-
-        # if isinstance(validated_data, list):
-        #     print("is list")
-        #     inhibitions = []
-        #     for item in validated_data:
-        #         print(item)
-        #         print(type(item))
-        #         inhibition = Inhibition.objects.create(**item)
-        #         inhibitions.append(inhibition)
-        #     return inhibitions
-        # else:
-        #     return Inhibition.objects.create(**validated_data)
-
-    # ignore submitted data in the case of an update
-    def update(self, instance, validated_data):
-        return instance
-
-    class Meta:
-        class Meta:
-            model = Inhibition
-            fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
-                      'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class InhibitionSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = Inhibition
-        fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-        list_serializer_class = InhibitionListSerializer
+######
+#
+#  Extractions
+#
+######
 
 
 class ExtractionMethodSerializer(serializers.ModelSerializer):
@@ -537,14 +502,20 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if self.context['request'].method == 'POST':
             if 'new_rt' not in data:
-                message = 'new_rt is a required field'
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError('new_rt is a required field')
             if 'new_extractions' not in data:
-                message = 'new_extractions is a required field'
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError('new_extractions is a required field')
             if 'new_replicates' not in data:
-                message = 'new_replicates is a required field'
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError('new_replicates is a required field')
+            if 'new_extractions' in data:
+                if 'inhibition_dna' not in data['new_extractions'] and 'inhibition_rna' not in data['new_extractions']:
+                    message = 'inhibition_dna or inhibition_rna is a required field within new_extractions'
+                    raise serializers.ValidationError(message)
+            if 'new_replicates' in data:
+                if 'count' not in data['new_replicates']:
+                    raise serializers.ValidationError('count is a required field within new_replicates')
+                if 'target' not in data['new_replicates']:
+                    raise serializers.ValidationError('target is a required field within new_replicates')
         if self.context['request'].method == 'PUT':
             if 'extraction_number' not in data or data['extraction_number'] == 0:
                 message = 'extraction_number is a required field'
@@ -576,8 +547,46 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if extractions is not None:
             for extraction in extractions:
                 extraction['sample'] = Sample.objects.get(id=extraction['sample'])
-                extraction['inhibition_dna'] = Inhibition.objects.get(id=extraction['inhibition_dna'])
-                extraction['inhibition_rna'] = Inhibition.objects.get(id=extraction['inhibition_rna'])
+                if 'inhibition_dna' in extraction:
+                    inhib_dna = extraction['inhibition_dna']
+                    # if inhib_dna is an integer, assume it is an existing Inhibition ID
+                    if isinstance(inhib_dna, int):
+                        extraction['inhibition_dna'] = Inhibition.objects.get(id=inhib_dna)
+                    else:
+                        # otherwise assume inhib_dna is a date string
+                        try:
+                            datetime.strptime(inhib_dna, '%Y-%m-%d')
+                            extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
+                                                                                     sample=extraction['sample'],
+                                                                                     inhibition_date=inhib_dna,
+                                                                                     nucleic_acid_type=1)
+                        # if inhib_dna is not a date string, assign it today's date
+                        except ValueError:
+                            today = datetime.today().strftime('%Y-%m-%d')
+                            extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
+                                                                                     sample=extraction['sample'],
+                                                                                     inhibition_date=today,
+                                                                                     nucleic_acid_type=1)
+                if 'inhibition_rna' in extraction:
+                    inhib_rna = extraction['inhibition_rna']
+                    # if inhib_rna is an integer, assume it is an existing Inhibition ID
+                    if isinstance(inhib_rna, int):
+                        extraction['inhibition_rna'] = Inhibition.objects.get(id=inhib_rna)
+                    else:
+                        # otherwise assume inhib_rna is a date string
+                        try:
+                            datetime.strptime(inhib_rna, '%Y-%m-%d')
+                            extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
+                                                                                     sample=extraction['sample'],
+                                                                                     inhibition_date=inhib_rna,
+                                                                                     nucleic_acid_type=2)
+                        # if inhib_rna is not a date string, assign it today's date
+                        except ValueError:
+                            today = datetime.today().strftime('%Y-%m-%d')
+                            extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
+                                                                                     sample=extraction['sample'],
+                                                                                     inhibition_date=today,
+                                                                                     nucleic_acid_type=2)
                 new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
                 # create the child replicates
                 if replicates is not None:
@@ -640,7 +649,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         model = ExtractionBatch
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
-                  'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions',
+                  'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions', 'inhibitions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',
                   'new_rt', 'new_replicates', 'new_extractions')
 
@@ -696,11 +705,121 @@ class StandardCurveSerializer(serializers.ModelSerializer):
                   'created_by', 'modified_date', 'modified_by',)
 
 
-######
-#
-#  Controls
-#
-######
+class InhibitionListSerializer(serializers.ListSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    def validate_dilution_factor(self, value):
+        """
+        Ensure dilution factor is only ever 1, 5, or 10 (or null)
+        """
+        if value not in (1, 5, 10, None):
+            raise serializers.ValidationError("dilution_factor can only have a value of 1, 5, 10, or null")
+        return value
+
+    # bulk create
+    def create(self, validated_data):
+        inhibitions = [Inhibition(**item) for item in validated_data]
+        return Inhibition.objects.bulk_create(inhibitions)
+
+        # if isinstance(validated_data, list):
+        #     print("is list")
+        #     inhibitions = []
+        #     for item in validated_data:
+        #         print(item)
+        #         print(type(item))
+        #         inhibition = Inhibition.objects.create(**item)
+        #         inhibitions.append(inhibition)
+        #     return inhibitions
+        # else:
+        #     return Inhibition.objects.create(**validated_data)
+
+    # ignore submitted data in the case of an update
+    def update(self, instance, validated_data):
+        return instance
+
+    class Meta:
+        class Meta:
+            model = Inhibition
+            fields = ('id', 'sample', 'extraction_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
+                      'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class InhibitionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    def validate_dilution_factor(self, value):
+        """
+        Ensure dilution factor is only ever 1, 5, or 10 (or null)
+        """
+        if value not in (1, 5, 10, None):
+            raise serializers.ValidationError("dilution_factor can only have a value of 1, 5, 10, or null")
+        return value
+
+    class Meta:
+        model = Inhibition
+        fields = ('id', 'sample', 'extraction_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = InhibitionListSerializer
+
+
+class SampleInhibitionSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    inhibitions = InhibitionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Sample
+        fields = ('id', 'sample_type', 'sample_description', 'inhibitions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
+
+    def validate(self, data):
+        """
+        Ensure inhibition_positive_control_cq_value and inhibitions are included in request data.
+        """
+        if 'inhibition_positive_control_cq_value' not in data:
+            raise serializers.ValidationError("inhibition_positive_control_cq_value is required.")
+        if 'inhibitions' not in data:
+            raise serializers.ValidationError("inhibitions is required.")
+        ab = data['analysis_batch']
+        en = data['extraction_number']
+        na = data['nucleic_acid_type']
+        eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en)
+        is_valid = True
+        details = []
+        for inhibition in data['inhibitions']:
+            sample = inhibition['sample']
+            inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na)
+            if len(inhib) == 0:
+                message = 'An inhibition with analysis_batch_id of (' + ab + ') '
+                message += 'and sample_id of (' + sample + ') '
+                message += 'and nucleic_acid_type of (' + na + ') does not exist in the database.'
+                details.append(message)
+            elif inhib['nucleic_acid_type'] != na:
+                is_valid = False
+                message = 'Sample ' + sample + ': '
+                message += 'The submitted nucleic_acid_type (' + inhib['nucleic_acid_type'] + ') '
+                message += 'does not match the existing value (' + na + ') in the database.'
+                details.append(message)
+        if not is_valid:
+            raise serializers.ValidationError(details)
+        return data
+
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    inhibition_positive_control_cq_value = serializers.IntegerField(write_only=True)
+    inhibitions = serializers.ListField(write_only=True)
+    suggested_dilution_factor = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Inhibition
+        fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
+                  'inhibition_positive_control_cq_value', 'inhibitions', 'suggested_dilution_factor',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ControlTypeSerializer(serializers.ModelSerializer):
@@ -806,17 +925,6 @@ class SimpleSampleSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class SampleInhibitionSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-    inhibitions = InhibitionSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Sample
-        fields = ('id', 'sample_type', 'sample_description', 'inhibitions',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
 class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -833,10 +941,10 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                     sample_inhibitions = sample.inhibitions.values()
                     if sample_inhibitions is not None:
                         for inhibition in sample_inhibitions:
-                            creator = User.objects.get(id=inhibition['created_by_id']).first()
-                            modifier = User.objects.get(id=inhibition['modified_by_id']).first()
+                            creator = User.objects.get(id=inhibition['created_by_id'])
+                            modifier = User.objects.get(id=inhibition['modified_by_id'])
                             data = {'id': inhibition['id'], 'sample': inhibition['sample_id'],
-                                    'analysis_batch': inhibition['analysis_batch_id'],
+                                    'extraction_batch': inhibition['extraction_batch_id'],
                                     'inhibition_date': inhibition['inhibition_date'],
                                     'nucleic_acid_type_id': inhibition['nucleic_acid_type_id'],
                                     'dilution_factor': inhibition['dilution_factor'],

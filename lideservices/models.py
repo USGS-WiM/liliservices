@@ -369,22 +369,11 @@ class AnalysisBatchTemplate(NameModel):
         db_table = "lide_analysisbatchtemplate"
 
 
-class Inhibition(HistoryModel):
-    """
-    Inhibition
-    """
-
-    sample = models.ForeignKey('Sample', related_name='inhibitions')
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='inhibitions')
-    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
-    dilution_factor = models.IntegerField(null=True, blank=True)
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_inhibition"
+######
+#
+#  Extractions
+#
+######
 
 
 class ExtractionMethod(NameModel):
@@ -456,8 +445,8 @@ class Extraction(HistoryModel):
 
     sample = models.ForeignKey('Sample', related_name='extractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
-    inhibition_dna = models.ForeignKey('Inhibition', related_name='extractions_dna')
-    inhibition_rna = models.ForeignKey('Inhibition', related_name='extractions_rna')
+    inhibition_dna = models.ForeignKey('Inhibition', related_name='extractions_dna', null=True)
+    inhibition_rna = models.ForeignKey('Inhibition', related_name='extractions_rna', null=True)
 
     def __str__(self):
         return str(self.id)
@@ -524,26 +513,22 @@ class StandardCurve(HistoryModel):
         db_table = "lide_standardcurve"
 
 
-######
-#
-#  Controls
-#
-######
-# QUESTION: for completeness/explicitness sake, should these be named "Quality Controls" instead?
-
-
-class ControlType(NameModel):
+class Inhibition(HistoryModel):
     """
-    Control Type
+    Inhibition
     """
 
-    abbreviation = models.CharField(max_length=128, null=True, blank=True)
+    sample = models.ForeignKey('Sample', related_name='inhibitions')
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='inhibitions')
+    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
+    dilution_factor = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     class Meta:
-        db_table = "lide_controltype"		
+        db_table = "lide_inhibition"
 
 
 class Target(NameModel):
@@ -560,6 +545,20 @@ class Target(NameModel):
 
     class Meta:
         db_table = "lide_target"
+
+
+class ControlType(NameModel):
+    """
+    Control Type
+    """
+
+    abbreviation = models.CharField(max_length=128, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lide_controltype"
 
 
 ######
@@ -583,8 +582,6 @@ class FieldUnit(HistoryModel):
 
     class Meta:
         db_table = "lide_fieldunit"
-
-
 
 
 class NucleicAcidType(NameModel):
