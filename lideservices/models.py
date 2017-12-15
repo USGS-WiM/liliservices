@@ -221,6 +221,7 @@ class FreezerLocation(HistoryModel):
 
     class Meta:
         db_table = "lide_freezer_location"
+        # QUESTION: should there be unique freezer locations?
 
 
 class Freezer(HistoryModel):
@@ -262,6 +263,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
 
     class Meta:
         db_table = "lide_finalconcentratedsamplevolume"
+        # QUESTION: should there be unique final concentrated sample volumes?
 
 
 class ConcentrationType(NameModel):
@@ -436,6 +438,7 @@ class ReverseTranscription(HistoryModel):
 
     class Meta:
         db_table = "lide_reversetranscription"
+        # QUESTION: can there be more than one RT per EB? if so, we should probably have a RT_number field to ensure uniqueness among RTs within one EB
 
 
 class Extraction(HistoryModel):
@@ -453,6 +456,7 @@ class Extraction(HistoryModel):
 
     class Meta:
         db_table = "lide_extraction"
+        unique_together = ("sample", "extraction_batch")
 
 
 class PCRReplicate(HistoryModel):
@@ -462,6 +466,7 @@ class PCRReplicate(HistoryModel):
 
     extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
     target = models.ForeignKey('Target', related_name='pcrreplicates')
+    replicate_number = models.FloatField(null=True, blank=True)
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.FloatField(null=True, blank=True)
     replicate_concentration = models.FloatField(null=True, blank=True)
@@ -476,7 +481,7 @@ class PCRReplicate(HistoryModel):
 
     class Meta:
         db_table = "lide_pcrreplicate"
-        # TODO: 'unique together' fields
+        unique_together = ("extraction", "target", "replicate_number")
 
 
 class Result(HistoryModel):
@@ -493,6 +498,7 @@ class Result(HistoryModel):
 
     class Meta:
         db_table = "lide_result"
+        # QUESTION: should sample and target be unique_together?
 
 
 class StandardCurve(HistoryModel):
@@ -504,7 +510,8 @@ class StandardCurve(HistoryModel):
     slope = models.FloatField(null=True, blank=True)
     efficiency = models.FloatField(null=True, blank=True)
     pos_ctrl_cq = models.FloatField(null=True, blank=True)
-    pos_ctrl_cq_range = models.FloatField(null=True, blank=True)	
+    pos_ctrl_cq_range = models.FloatField(null=True, blank=True)
+    # QUESTION: should there be an active or inactive/superseded field?
 
     def __str__(self):
         return str(self.id)
@@ -529,6 +536,7 @@ class Inhibition(HistoryModel):
 
     class Meta:
         db_table = "lide_inhibition"
+        # QUESTION: can there be more than one inhibition per EB? if so, we should probably have an inhibition_number field to ensure uniqueness among inhibitions within one EB
 
 
 class Target(NameModel):

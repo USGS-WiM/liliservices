@@ -491,6 +491,7 @@ class ExtractionMethodSerializer(serializers.ModelSerializer):
 
 
 class ExtractionBatchSerializer(serializers.ModelSerializer):
+    # TODO: implement control records creation (ext_pos_dna, ext_pos_rna, ext_neg, rt_pos, rt_neg, pcr_pos, pcr_neg)
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     extraction_number = serializers.IntegerField(read_only=True, default=0)
@@ -593,7 +594,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                     for replicate in replicates:
                         for x in range(1, replicate['count']):
                             target = Target.objects.get(id=replicate['target'])
-                            PCRReplicate.objects.create(extraction=new_extraction, target=target)
+                            PCRReplicate.objects.create(extraction=new_extraction, target=target, replicate_number=x)
 
         # create the child reverse transcription if present
         if rt is not None:
@@ -680,8 +681,8 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'target', 'cq_value', 'gc_reaction', 'replicate_concentration',
-                  'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr', 'record_type',
+        fields = ('id', 'extraction', 'target', 'replicate_number', 'record_type', 'cq_value', 'gc_reaction',
+                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
