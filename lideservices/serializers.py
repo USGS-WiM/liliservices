@@ -1085,6 +1085,9 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                 reversetranscriptions = ReverseTranscription.objects.filter(extraction_batch__exact=extraction_batch_id)
                 reverse_transcription_count += len(reversetranscriptions)
 
+                inhibitions = Inhibition.objects.filter(extraction_batch__exact=extraction_batch_id)
+                inhibition_count += len(inhibitions)
+
                 # target count
                 if extractions is not None:
                     for extraction in extractions:
@@ -1094,10 +1097,6 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                                 target = replicate.target
                                 if target not in targets:
                                     targets.append(replicate.target)
-
-        # inhibition count
-        inhibitions = obj.inhibitions.values()
-        inhibition_count += len(inhibitions)
 
         summary['extraction_count'] = extraction_count
         summary['inhibition_count'] = inhibition_count
