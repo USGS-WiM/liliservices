@@ -515,16 +515,25 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 for item in data['new_extractions']:
                     if 'inhibition_dna' not in item and 'inhibition_rna' not in item:
                         is_valid = False
-                        message = 'new extraction with sample_id ' + item['sample'] + ' is missing an inhibition; '
+                        message = ''
+                        if 'sample' in item:
+                            message += 'new extraction with sample_id ' + item['sample'] + ' is missing an inhibition; '
                         message += 'inhibition_dna or inhibition_rna is a required field within new_extractions'
                         details.append(message)
                 if not is_valid:
                     raise serializers.ValidationError(details)
             if 'new_replicates' in data:
-                if 'count' not in data['new_replicates']:
-                    raise serializers.ValidationError('count is a required field within new_replicates')
-                if 'target' not in data['new_replicates']:
-                    raise serializers.ValidationError('target is a required field within new_replicates')
+                is_valid = True
+                details = []
+                for item in data['new_replicates']:
+                    if 'count' not in item:
+                        message = 'count is a required field within new_replicates'
+                        details.append(message)
+                    if 'target' not in item:
+                        message = 'target is a required field within new_replicates'
+                        details.append(message)
+                if not is_valid:
+                    raise serializers.ValidationError(details)
         if self.context['request'].method == 'PUT':
             if 'extraction_number' not in data or data['extraction_number'] == 0:
                 message = 'extraction_number is a required field'
