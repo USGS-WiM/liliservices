@@ -496,6 +496,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     extraction_number = serializers.IntegerField(read_only=True, default=0)
     extractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     new_rt = serializers.JSONField(write_only=True)
     new_replicates = serializers.ListField(write_only=True)
     new_extractions = serializers.ListField(write_only=True)
@@ -509,9 +510,16 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
             if 'new_replicates' not in data:
                 raise serializers.ValidationError('new_replicates is a required field')
             if 'new_extractions' in data:
-                if 'inhibition_dna' not in data['new_extractions'] and 'inhibition_rna' not in data['new_extractions']:
-                    message = 'inhibition_dna or inhibition_rna is a required field within new_extractions'
-                    raise serializers.ValidationError(message)
+                is_valid = True
+                details = []
+                for item in data['new_extractions']:
+                    if 'inhibition_dna' not in item and 'inhibition_rna' not in item:
+                        is_valid = False
+                        message = 'new extraction with sample_id ' + item['sample'] + ' is missing an inhibition; '
+                        message += 'inhibition_dna or inhibition_rna is a required field within new_extractions'
+                        details.append(message)
+                if not is_valid:
+                    raise serializers.ValidationError(details)
             if 'new_replicates' in data:
                 if 'count' not in data['new_replicates']:
                     raise serializers.ValidationError('count is a required field within new_replicates')
@@ -548,6 +556,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if extractions is not None:
             for extraction in extractions:
                 extraction['sample'] = Sample.objects.get(id=extraction['sample'])
+                sample = extraction['sample']
                 if 'inhibition_dna' in extraction:
                     inhib_dna = extraction['inhibition_dna']
                     # if inhib_dna is an integer, assume it is an existing Inhibition ID
@@ -558,14 +567,14 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         try:
                             datetime.strptime(inhib_dna, '%Y-%m-%d')
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=extraction['sample'],
+                                                                                     sample=sample,
                                                                                      inhibition_date=inhib_dna,
                                                                                      nucleic_acid_type=1)
                         # if inhib_dna is not a date string, assign it today's date
                         except ValueError:
                             today = datetime.today().strftime('%Y-%m-%d')
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=extraction['sample'],
+                                                                                     sample=sample,
                                                                                      inhibition_date=today,
                                                                                      nucleic_acid_type=1)
                 if 'inhibition_rna' in extraction:
@@ -578,14 +587,14 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         try:
                             datetime.strptime(inhib_rna, '%Y-%m-%d')
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=extraction['sample'],
+                                                                                     sample=sample,
                                                                                      inhibition_date=inhib_rna,
                                                                                      nucleic_acid_type=2)
                         # if inhib_rna is not a date string, assign it today's date
                         except ValueError:
                             today = datetime.today().strftime('%Y-%m-%d')
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=extraction['sample'],
+                                                                                     sample=sample,
                                                                                      inhibition_date=today,
                                                                                      nucleic_acid_type=2)
                 new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
@@ -796,6 +805,7 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
             sample = inhibition['sample']
             inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na)
             if len(inhib) == 0:
+                is_valid = False
                 message = 'An inhibition with analysis_batch_id of (' + ab + ') '
                 message += 'and sample_id of (' + sample + ') '
                 message += 'and nucleic_acid_type of (' + na + ') does not exist in the database.'
