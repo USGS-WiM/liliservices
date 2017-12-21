@@ -287,6 +287,48 @@ class InhibitionViewSet(HistoryViewSet):
 
         return super(InhibitionViewSet, self).get_serializer(*args, **kwargs)
 
+    # override the default PATCH method to allow bulk processing
+    def patch(self, request, pk=None):
+        request_data = JSONParser().parse(request)
+        # if there is no pk, assume this is a bulk request
+        if not pk:
+            is_valid = True
+            response_data = []
+            valid_data = []
+            response_errors = []
+            for item in request_data:
+                # ensure the id field is present, otherwise nothing can be updated
+                if not item.get('id'):
+                    is_valid = False
+                    response_errors.append({"id":"This field is required."})
+                else:
+                    inhibition = Inhibition.objects.get(id=item.pop('id'))
+                    serializer = self.serializer_class(inhibition, data=item, partial=True)
+                    # if this item is valid, temporarily hold it until all items are proven valid, then save them all
+                    # if even one item is invalid, none will be saved, and the user will be returned the error(s)
+                    if serializer.is_valid():
+                        valid_data.append(serializer)
+                    else:
+                        is_valid = False
+                        response_errors.append(serializer.errors)
+            if is_valid:
+                # now that all items are proven valid, save and return them to the user
+                for item in valid_data:
+                    item.save()
+                    response_data.append(item.data)
+                return JsonResponse(response_data, safe=False, status=200)
+            else:
+                return JsonResponse(response_errors, safe=False, status=400)
+        # otherwise, if there is a pk, update the instance indicated by the pk
+        else:
+            inhibition = Inhibition.objects.get(id=pk)
+            serializer = self.serializer_class(inhibition, data=request_data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=200)
+            else:
+                return Response(serializer.errors, status=400)
+
 
 class SampleInhibitionViewSet(HistoryViewSet):
     serializer_class = SampleInhibitionSerializer
@@ -315,12 +357,18 @@ class InhibitionCalculateDilutionFactorViewSet(views.APIView):
     def post(self, request):
         response_data = []
         request_data = JSONParser().parse(request)
+        ab = request_data['analysis_batch']
+        en = request_data['extraction_number']
+        na = request_data['nucleic_acid_type']
+        eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en)
         serializer = InhibitionCalculateDilutionFactorSerializer(data=request_data)
         if serializer.is_valid():
             pos = request_data['inhibition_positive_control_cq_value']
             inhibitions = request_data['inhibitions']
             for inhibition in inhibitions:
                 cq = inhibition['cq_value']
+                sample = inhibition['sample']
+                inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na).first()
                 suggested_dilution_factor = None
                 if 0 < pos - cq < 1:
                     suggested_dilution_factor = 1
@@ -330,10 +378,10 @@ class InhibitionCalculateDilutionFactorViewSet(views.APIView):
                     suggested_dilution_factor = 5
                 if cq > 36 or cq is None:
                     suggested_dilution_factor = 10
-                new_data = {"sample": inhibition['sample'], "suggested_dilution_factor": suggested_dilution_factor}
+                new_data = {"id": inhib.id, "sample": sample, "suggested_dilution_factor": suggested_dilution_factor}
                 response_data.append(new_data)
-            return JsonResponse(serializer.data, status=200)
-        return JsonResponse(serializer.errors, status=400)
+            return JsonResponse(response_data, safe=False, status=200)
+        return Response(serializer.errors, status=400)
 
 
 class TargetViewSet(HistoryViewSet):

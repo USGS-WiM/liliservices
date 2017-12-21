@@ -14,7 +14,8 @@ router.register(r'studies', views.StudyViewSet, 'studies')
 router.register(r'units', views.UnitViewSet, 'units')
 router.register(r'freezerlocations', views.FreezerLocationViewSet, 'freezerlocations')
 router.register(r'freezers', views.FreezerViewSet, 'freezers')
-router.register(r'finalconcentratedsamplevolumes', views.FinalConcentratedSampleVolumeViewSet, 'finalconcentratedsamplevolumes')
+router.register(r'finalconcentratedsamplevolumes', views.FinalConcentratedSampleVolumeViewSet,
+                'finalconcentratedsamplevolumes')
 router.register(r'concentrationtype', views.ConcentrationTypeViewSet, 'concentrationtype')
 router.register(r'samplegroups', views.SampleGroupViewSet, 'samplegroups')
 router.register(r'sampleinhibitions', views.SampleInhibitionViewSet, 'sampleinhibitions')
@@ -40,5 +41,7 @@ router.register(r'users', views.UserViewSet, 'users')
 urlpatterns = [
     url(r'^', include(router.urls)),
     url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-    url(r'^auth/$', views.AuthView.as_view(), name='authenticate')
+    url(r'^auth/$', views.AuthView.as_view(), name='authenticate'),
+    url(r'^inhibitionscalculatedilutionfactor/$', views.InhibitionCalculateDilutionFactorViewSet.as_view(),
+        name='inhibitionscalculatedilutionfactor')
 ]

@@ -809,22 +809,22 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
         ab = data['analysis_batch']
         en = data['extraction_number']
         na = data['nucleic_acid_type']
-        eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en)
+        eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
         is_valid = True
         details = []
         for inhibition in data['inhibitions']:
             sample = inhibition['sample']
-            inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na)
-            if len(inhib) == 0:
+            inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb.id, nucleic_acid_type=na.id).first()
+            if not inhib:
                 is_valid = False
                 message = 'An inhibition with analysis_batch_id of (' + ab + ') '
                 message += 'and sample_id of (' + sample + ') '
                 message += 'and nucleic_acid_type of (' + na + ') does not exist in the database.'
                 details.append(message)
-            elif inhib['nucleic_acid_type'] != na:
+            elif inhib.nucleic_acid_type != na:
                 is_valid = False
                 message = 'Sample ' + sample + ': '
-                message += 'The submitted nucleic_acid_type (' + inhib['nucleic_acid_type'] + ') '
+                message += 'The submitted nucleic_acid_type (' + inhib.nucleic_acid_type + ') '
                 message += 'does not match the existing value (' + na + ') in the database.'
                 details.append(message)
         if not is_valid:
@@ -833,13 +833,16 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    inhibition_positive_control_cq_value = serializers.IntegerField(write_only=True)
+    analysis_batch = serializers.IntegerField(write_only=True)
+    extraction_number = serializers.IntegerField(write_only=True)
+    inhibition_positive_control_cq_value = serializers.FloatField(write_only=True)
     inhibitions = serializers.ListField(write_only=True)
+    sample = serializers.IntegerField(read_only=True)
     suggested_dilution_factor = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'sample', 'analysis_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
+        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
                   'inhibition_positive_control_cq_value', 'inhibitions', 'suggested_dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
