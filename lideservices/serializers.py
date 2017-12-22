@@ -577,7 +577,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         dna = NucleicAcidType.objects.get(id=1)
                         try:
                             datetime.strptime(inhib_dna, '%Y-%m-%d')
-
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
                                                                                      sample=sample,
                                                                                      inhibition_date=inhib_dna,
@@ -600,7 +599,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         extraction['inhibition_rna'] = Inhibition.objects.get(id=inhib_rna)
                     else:
                         # otherwise assume inhib_rna is a date string
-                        rna = NucleicAcidType.objects.get(id=1)
+                        rna = NucleicAcidType.objects.get(id=2)
                         try:
                             datetime.strptime(inhib_rna, '%Y-%m-%d')
                             extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
