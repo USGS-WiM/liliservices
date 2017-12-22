@@ -763,6 +763,50 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
+
+    def validate(self, data):
+        """
+        Ensure target organism results file fields are included in request data.
+        """
+        return data
+
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    extraction = serializers.IntegerField(read_only=True)
+    target = serializers.IntegerField()
+    replicate_number = serializers.IntegerField()
+    record_type = serializers.IntegerField(read_only=True)
+    cq_value = serializers.FloatField(read_only=True)
+    gc_reaction = serializers.FloatField(read_only=True)
+    replicate_concentration = serializers.FloatField(read_only=True)
+    concentration_unit = serializers.IntegerField(read_only=True)
+    bad_result_flag = serializers.BooleanField(read_only=True)
+    control_type = serializers.IntegerField(read_only=True)
+    re_pcr = serializers.IntegerField(read_only=True)
+    analysis_batch = serializers.IntegerField(write_only=True)
+    extraction_number = serializers.IntegerField(write_only=True)
+    extraction_positive_control_cq_value = serializers.FloatField(write_only=True)
+    extraction_positive_control_concentration = serializers.FloatField(write_only=True)
+    extraction_negative_control_cq_value = serializers.FloatField(write_only=True)
+    extraction_negative_control_concentration = serializers.FloatField(write_only=True)
+    pcrreplicate_positive_control_cq_value = serializers.FloatField(write_only=True)
+    pcrreplicate_positive_control_concentration = serializers.FloatField(write_only=True)
+    pcrreplicate_negative_control_cq_value = serializers.FloatField(write_only=True)
+    pcrreplicate_negative_control_concentration = serializers.FloatField(write_only=True)
+    pcrreplicates = serializers.ListField(write_only=True)
+
+    class Meta:
+        model = PCRReplicate
+        fields = ('id', 'extraction', 'target', 'replicate_number', 'record_type', 'cq_value', 'gc_reaction',
+                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr',
+                  'analysis_batch', 'extraction_number',
+                  'extraction_positive_control_cq_value', 'extraction_positive_control_concentration',
+                  'extraction_negative_control_cq_value', 'extraction_negative_control_concentration',
+                  'pcrreplicate_positive_control_cq_value', 'pcrreplicate_positive_control_concentration',
+                  'pcrreplicate_negative_control_cq_value', 'pcrreplicate_negative_control_concentration',
+                  'pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
 class ResultSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
