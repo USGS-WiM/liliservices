@@ -41,11 +41,28 @@ class AliquotListSerializer(serializers.ListSerializer):
 
     # ensure either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is included in request data
     def validate(self, data):
-        d = data[0]
-        if 'freezer_location' not in d:
-            if 'freezer' not in d or 'rack' not in d or 'box' not in d or 'row' not in d or 'spot' not in d:
-                message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required."
-                raise serializers.ValidationError(message)
+        if self.context['request'].method == 'POST':
+            d = data[0]
+            if 'freezer_location' not in d:
+                if 'freezer' not in d or 'rack' not in d or 'box' not in d or 'row' not in d or 'spot' not in d:
+                    message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required"
+                    raise serializers.ValidationError(message)
+        elif self.context['request'].method == 'PUT':
+            is_valid = True
+            details = []
+            for item in data:
+                if 'freezer_location' not in item:
+                    is_valid = False
+                    details.append("freezer_location is a required field")
+                if 'rack' in item or 'box' in item or 'row' in item or 'spot' in item:
+                    is_valid = False
+                    message = "coordinates (freezer, rack, box, row, spot) is not allowed in updates; "
+                    message += "use freezer_location instead"
+                    details.append(message)
+                if 'aliquot_number' not in item or item['aliquot_number'] == 0:
+                    details.append("aliquot_number is a required field")
+            if not is_valid:
+                raise serializers.ValidationError(details)
         return data
 
     # bulk create
@@ -101,9 +118,24 @@ class AliquotListSerializer(serializers.ListSerializer):
 
         return aliquots
 
-    # ignore submitted data in the case of an update
+    # bulk update
     def update(self, instance, validated_data):
-        return instance
+        # Maps for id->instance and id->data item.
+        aliquot_mapping = {aliquot.id: aliquot for aliquot in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+        user = self.context['request'].user
+
+        # Perform updates but ignore insertions
+        ret = []
+        for aliquot_id, data in data_mapping.items():
+            aliquot = aliquot_mapping.get(aliquot_id, None)
+            if aliquot is not None:
+                data['modified_by'] = user
+                ret.append(self.child.update(aliquot, data))
+            # else:
+                # data['created_by'] = user
+                # data['modified_by'] = user
+                # ret.append(self.child.create(data))
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -320,9 +352,24 @@ class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
         fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
         return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
 
-    # ignore submitted data in the case of an update
+    # bulk update
     def update(self, instance, validated_data):
-        return instance
+        # Maps for id->instance and id->data item.
+        fcsv_mapping = {fcsv.id: fcsv for fcsv in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+        user = self.context['request'].user
+
+        # Perform updates but ignore insertions
+        ret = []
+        for fcsv_id, data in data_mapping.items():
+            fcsv = fcsv_mapping.get(fcsv_id, None)
+            if fcsv is not None:
+                data['modified_by'] = user
+                ret.append(self.child.update(fcsv, data))
+            # else:
+                # data['created_by'] = user
+                # data['modified_by'] = user
+                # ret.append(self.child.create(data))
 
     class Meta:
         model = FinalConcentratedSampleVolume
@@ -504,21 +551,21 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if self.context['request'].method == 'POST':
             if 'new_rt' not in data:
-                raise serializers.ValidationError('new_rt is a required field')
+                raise serializers.ValidationError("new_rt is a required field")
             if 'new_extractions' not in data:
-                raise serializers.ValidationError('new_extractions is a required field')
+                raise serializers.ValidationError("new_extractions is a required field")
             if 'new_replicates' not in data:
-                raise serializers.ValidationError('new_replicates is a required field')
+                raise serializers.ValidationError("new_replicates is a required field")
             if 'new_extractions' in data:
                 is_valid = True
                 details = []
                 for item in data['new_extractions']:
                     if 'inhibition_dna' not in item and 'inhibition_rna' not in item:
                         is_valid = False
-                        message = ''
+                        message = ""
                         if 'sample' in item:
-                            message += 'new extraction with sample_id ' + item['sample'] + ' is missing an inhibition; '
-                        message += 'inhibition_dna or inhibition_rna is a required field within new_extractions'
+                            message += "new extraction with sample_id " + item['sample'] + " is missing an inhibition; "
+                        message += "inhibition_dna or inhibition_rna is a required field within new_extractions"
                         details.append(message)
                 if not is_valid:
                     raise serializers.ValidationError(details)
@@ -527,16 +574,16 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 details = []
                 for item in data['new_replicates']:
                     if 'count' not in item:
-                        message = 'count is a required field within new_replicates'
+                        message = "count is a required field within new_replicates"
                         details.append(message)
                     if 'target' not in item:
-                        message = 'target is a required field within new_replicates'
+                        message = "target is a required field within new_replicates"
                         details.append(message)
                 if not is_valid:
                     raise serializers.ValidationError(details)
-        if self.context['request'].method == 'PUT':
+        elif self.context['request'].method == 'PUT':
             if 'extraction_number' not in data or data['extraction_number'] == 0:
-                message = 'extraction_number is a required field'
+                message = "extraction_number is a required field"
                 raise serializers.ValidationError(message)
         return data
 
@@ -651,7 +698,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
             validated_data['extraction_number'] = instance.extraction_number
 
         # update the Extraction Batch object
-        # extraction_batch = ExtractionBatch.objects.update(**validated_data)
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
         instance.extraction_method = validated_data.get('extraction_method', instance.extraction_method)
         instance.reextraction = validated_data.get('reextraction', instance.reextraction)
@@ -664,6 +710,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.elution_volume = validated_data.get('elution_volume', instance.elution_volume)
         instance.sample_dilution_factor = validated_data.get('sample_dilution_factor', instance.sample_dilution_factor)
         instance.reaction_volume = validated_data.get('reaction_volume', instance.reaction_volume)
+        instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
 
         return instance
@@ -753,21 +800,24 @@ class InhibitionListSerializer(serializers.ListSerializer):
         inhibitions = [Inhibition(**item) for item in validated_data]
         return Inhibition.objects.bulk_create(inhibitions)
 
-        # if isinstance(validated_data, list):
-        #     print("is list")
-        #     inhibitions = []
-        #     for item in validated_data:
-        #         print(item)
-        #         print(type(item))
-        #         inhibition = Inhibition.objects.create(**item)
-        #         inhibitions.append(inhibition)
-        #     return inhibitions
-        # else:
-        #     return Inhibition.objects.create(**validated_data)
-
-    # ignore submitted data in the case of an update
+    # bulk update
     def update(self, instance, validated_data):
-        return instance
+        # Maps for id->instance and id->data item.
+        inhibition_mapping = {inhibition.id: inhibition for inhibition in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+        user = self.context['request'].user
+
+        # Perform updates but ignore insertions
+        ret = []
+        for inhibition_id, data in data_mapping.items():
+            inhibition = inhibition_mapping.get(inhibition_id, None)
+            if inhibition is not None:
+                data['modified_by'] = user
+                ret.append(self.child.update(inhibition, data))
+            # else:
+                # data['created_by'] = user
+                # data['modified_by'] = user
+                # ret.append(self.child.create(data))
 
     class Meta:
         class Meta:
@@ -813,9 +863,9 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
         Ensure inhibition_positive_control_cq_value and inhibitions are included in request data.
         """
         if 'inhibition_positive_control_cq_value' not in data:
-            raise serializers.ValidationError("inhibition_positive_control_cq_value is required.")
+            raise serializers.ValidationError("inhibition_positive_control_cq_value is required")
         if 'inhibitions' not in data:
-            raise serializers.ValidationError("inhibitions is required.")
+            raise serializers.ValidationError("inhibitions is required")
         ab = data['analysis_batch']
         en = data['extraction_number']
         na = data['nucleic_acid_type']
@@ -827,15 +877,15 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
             inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb.id, nucleic_acid_type=na.id).first()
             if not inhib:
                 is_valid = False
-                message = 'An inhibition with analysis_batch_id of (' + ab + ') '
-                message += 'and sample_id of (' + sample + ') '
-                message += 'and nucleic_acid_type of (' + na + ') does not exist in the database.'
+                message = "An inhibition with analysis_batch_id of (' + ab + ') "
+                message += "and sample_id of (" + sample + ") "
+                message += "and nucleic_acid_type of (" + na + ") does not exist in the database"
                 details.append(message)
             elif inhib.nucleic_acid_type != na:
                 is_valid = False
-                message = 'Sample ' + sample + ': '
-                message += 'The submitted nucleic_acid_type (' + inhib.nucleic_acid_type + ') '
-                message += 'does not match the existing value (' + na + ') in the database.'
+                message = "Sample " + sample + ": "
+                message += "The submitted nucleic_acid_type (" + inhib.nucleic_acid_type + ") "
+                message += "does not match the existing value (" + na + ") in the database"
                 details.append(message)
         if not is_valid:
             raise serializers.ValidationError(details)
@@ -978,15 +1028,15 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                         for inhibition in sample_inhibitions:
                             creator = User.objects.get(id=inhibition['created_by_id'])
                             modifier = User.objects.get(id=inhibition['modified_by_id'])
-                            data = {'id': inhibition['id'], 'sample': inhibition['sample_id'],
-                                    'extraction_batch': inhibition['extraction_batch_id'],
-                                    'inhibition_date': inhibition['inhibition_date'],
-                                    'nucleic_acid_type_id': inhibition['nucleic_acid_type_id'],
-                                    'dilution_factor': inhibition['dilution_factor'],
-                                    'created_date': inhibition['created_date'],
-                                    'created_by': creator.username if creator is not None else None,
-                                    'modified_date': inhibition['modified_date'],
-                                    'modified_by': modifier.username if modifier is not None else None}
+                            data = {"id": inhibition['id'], "sample": inhibition['sample_id'],
+                                    "extraction_batch": inhibition['extraction_batch_id'],
+                                    "inhibition_date": inhibition['inhibition_date'],
+                                    "nucleic_acid_type_id": inhibition['nucleic_acid_type_id'],
+                                    "dilution_factor": inhibition['dilution_factor'],
+                                    "created_date": inhibition['created_date'],
+                                    "created_by": creator.username if creator is not None else None,
+                                    "modified_date": inhibition['modified_date'],
+                                    "modified_by": modifier.username if modifier is not None else None}
                             inhibitions[inhibition['id']] = data
 
         return inhibitions.values()
@@ -999,12 +1049,12 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
             for reversetranscription in reversetranscriptions:
                 reverse_transcription_id = reversetranscription.get('id')
                 rt = ReverseTranscription.objects.get(id=reverse_transcription_id)
-                data = {'id': reverse_transcription_id, 'extraction_batch': rt.extraction_batch.id,
-                        'template_volume': rt.template_volume, 'reaction_volume': rt.reaction_volume,
-                        'rt_date': rt.rt_date, 're_rt': rt.re_rt, 'created_date': rt.created_date,
-                        'created_by': rt.created_by.username if rt.created_by is not None else None,
-                        'modified_date': rt.modified_date,
-                        'modified_by': rt.modified_by.username if rt.modified_by is not None else None}
+                data = {"id": reverse_transcription_id, "extraction_batch": rt.extraction_batch.id,
+                        "template_volume": rt.template_volume, "reaction_volume": rt.reaction_volume,
+                        "rt_date": rt.rt_date, "re_rt": rt.re_rt, "created_date": rt.created_date,
+                        "created_by": rt.created_by.username if rt.created_by is not None else None,
+                        "modified_date": rt.modified_date,
+                        "modified_by": rt.modified_by.username if rt.modified_by is not None else None}
                 reverse_transcriptions[reverse_transcription_id] = data
 
         return reverse_transcriptions.values()
@@ -1026,8 +1076,8 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
                             data['replicates'] += 1
                         else:
                             target = Target.objects.get(id=target_id)
-                            data = {'id': target_id, 'name': target.name, 'abbrevation': target.abbreviation,
-                                    'type': target.type, 'replicates': 1}
+                            data = {"id": target_id, "name": target.name, "abbrevation": target.abbreviation,
+                                    "type": target.type, "replicates": 1}
                         targets[target_id] = data
 
         return targets.values()

@@ -72,12 +72,12 @@ class AliquotViewSet(HistoryViewSet):
     #         return AliquotSerializer
 
     def get_serializer(self, *args, **kwargs):
-        if "data" in kwargs:
-            data = kwargs["data"]
+        if 'data' in kwargs:
+            data = kwargs['data']
 
             # check if many is required
-            if isinstance(data, list) and "aliquot_count" in data[0]:
-                kwargs["many"] = True
+            if isinstance(data, list) and 'aliquot_count' in data[0]:
+                kwargs['many'] = True
 
         return super(AliquotViewSet, self).get_serializer(*args, **kwargs)
 
@@ -160,12 +160,12 @@ class FinalConcentratedSampleVolumeViewSet(HistoryViewSet):
     serializer_class = FinalConcentratedSampleVolumeSerializer
 
     def get_serializer(self, *args, **kwargs):
-        if "data" in kwargs:
-            data = kwargs["data"]
+        if 'data' in kwargs:
+            data = kwargs['data']
 
             # check if many is required
             if isinstance(data, list):
-                kwargs["many"] = True
+                kwargs['many'] = True
 
         return super(FinalConcentratedSampleVolumeViewSet, self).get_serializer(*args, **kwargs)
 
@@ -278,12 +278,12 @@ class InhibitionViewSet(HistoryViewSet):
     serializer_class = InhibitionSerializer
 
     def get_serializer(self, *args, **kwargs):
-        if "data" in kwargs:
-            data = kwargs["data"]
+        if 'data' in kwargs:
+            data = kwargs['data']
 
             # check if many is required
             if isinstance(data, list):
-                kwargs["many"] = True
+                kwargs['many'] = True
 
         return super(InhibitionViewSet, self).get_serializer(*args, **kwargs)
 
