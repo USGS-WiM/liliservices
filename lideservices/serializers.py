@@ -568,6 +568,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 sample = extraction['sample']
                 if 'inhibition_dna' in extraction:
                     inhib_dna = extraction['inhibition_dna']
+                    user = self.context['request'].user
                     # if inhib_dna is an integer, assume it is an existing Inhibition ID
                     if isinstance(inhib_dna, int):
                         extraction['inhibition_dna'] = Inhibition.objects.get(id=inhib_dna)
@@ -576,17 +577,22 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         dna = NucleicAcidType.objects.get(id=1)
                         try:
                             datetime.strptime(inhib_dna, '%Y-%m-%d')
+
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
                                                                                      sample=sample,
                                                                                      inhibition_date=inhib_dna,
-                                                                                     nucleic_acid_type=dna)
+                                                                                     nucleic_acid_type=dna,
+                                                                                     created_by=user,
+                                                                                     modified_by=user)
                         # if inhib_dna is not a date string, assign it today's date
                         except ValueError:
                             today = datetime.today().strftime('%Y-%m-%d')
                             extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
                                                                                      sample=sample,
                                                                                      inhibition_date=today,
-                                                                                     nucleic_acid_type=dna)
+                                                                                     nucleic_acid_type=dna,
+                                                                                     created_by=user,
+                                                                                     modified_by=user)
                 if 'inhibition_rna' in extraction:
                     inhib_rna = extraction['inhibition_rna']
                     # if inhib_rna is an integer, assume it is an existing Inhibition ID
@@ -600,14 +606,19 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
                                                                                      sample=sample,
                                                                                      inhibition_date=inhib_rna,
-                                                                                     nucleic_acid_type=rna)
+                                                                                     nucleic_acid_type=rna,
+                                                                                     created_by=user,
+                                                                                     modified_by=user)
                         # if inhib_rna is not a date string, assign it today's date
                         except ValueError:
                             today = datetime.today().strftime('%Y-%m-%d')
                             extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
                                                                                      sample=sample,
                                                                                      inhibition_date=today,
-                                                                                     nucleic_acid_type=rna)
+                                                                                     nucleic_acid_type=rna,
+                                                                                     created_by=user,
+                                                                                     modified_by=user)
+
                 new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
                 # create the child replicates
                 if replicates is not None:
