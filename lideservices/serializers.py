@@ -71,12 +71,16 @@ class AliquotListSerializer(serializers.ListSerializer):
 
         # pull out the freezer location fields from the request
         if 'freezer_location' in validated_data:
-            freezer_location = FreezerLocation.objects.get(id=validated_data['freezer_location'].id)
-            freezer = freezer_location.freezer.id
-            rack = freezer_location.rack
-            box = freezer_location.box
-            row = freezer_location.row
-            spot = freezer_location.spot
+            freezer_location_id = validated_data['freezer_location'].id
+            freezer_location = FreezerLocation.objects.filter(id=freezer_location_id).first()
+            if freezer_location:
+                freezer = freezer_location.freezer.id
+                rack = freezer_location.rack
+                box = freezer_location.box
+                row = freezer_location.row
+                spot = freezer_location.spot
+            else:
+                raise serializers.ValidationError("No Freezer Location exists with ID: " + str(freezer_location_id))
         else:
             freezer = validated_data.pop('freezer')
             rack = validated_data.pop('rack')
@@ -108,10 +112,13 @@ class AliquotListSerializer(serializers.ListSerializer):
             # otherwise create a new freezer location for all other aliquots
             # TODO: this needs to be properly implemented in conjunction with the Freezer Location serializer to ensure that locations are real (i.e., no spot 10 when there can only be 9 spots)
             else:
-                freezer_object = Freezer.objects.get(id=freezer)
-                freezer_location = FreezerLocation.objects.create(
-                    freezer=freezer_object, rack=rack, box=box, row=row, spot=(spot+max_aliquot_number-1))
-                validated_data['freezer_location'] = freezer_location
+                freezer_object = Freezer.objects.filter(id=freezer).first()
+                if freezer_object:
+                    freezer_location = FreezerLocation.objects.create(
+                        freezer=freezer_object, rack=rack, box=box, row=row, spot=(spot+max_aliquot_number-1))
+                    validated_data['freezer_location'] = freezer_location
+                else:
+                    raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
 
             aliquot = Aliquot.objects.create(**validated_data)
             aliquots.append(aliquot)
@@ -560,6 +567,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 is_valid = True
                 details = []
                 for item in data['new_extractions']:
+                    if 'sample' not in item:
+                        is_valid = False
+                        details.append("sample is a required field within new_extractions")
                     if 'inhibition_dna' not in item and 'inhibition_rna' not in item:
                         is_valid = False
                         message = ""
@@ -606,78 +616,95 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         else:
             max_extraction_number = 0
         validated_data['extraction_number'] = max_extraction_number + 1
-        extraction_batch = ExtractionBatch.objects.create(**validated_data)
+        extr_batch = ExtractionBatch.objects.create(**validated_data)
 
         # create the child extractions
         if extractions is not None:
             for extraction in extractions:
-                extraction['sample'] = Sample.objects.get(id=extraction['sample'])
                 sample = extraction['sample']
-                if 'inhibition_dna' in extraction:
-                    inhib_dna = extraction['inhibition_dna']
+                extraction['sample'] = Sample.objects.filter(id=sample).first()
+                if extraction:
                     user = self.context['request'].user
-                    # if inhib_dna is an integer, assume it is an existing Inhibition ID
-                    if isinstance(inhib_dna, int):
-                        extraction['inhibition_dna'] = Inhibition.objects.get(id=inhib_dna)
-                    else:
-                        # otherwise assume inhib_dna is a date string
-                        dna = NucleicAcidType.objects.get(id=1)
-                        try:
-                            datetime.strptime(inhib_dna, '%Y-%m-%d')
-                            extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=sample,
-                                                                                     inhibition_date=inhib_dna,
-                                                                                     nucleic_acid_type=dna,
-                                                                                     created_by=user,
-                                                                                     modified_by=user)
-                        # if inhib_dna is not a date string, assign it today's date
-                        except ValueError:
-                            today = datetime.today().strftime('%Y-%m-%d')
-                            extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=sample,
-                                                                                     inhibition_date=today,
-                                                                                     nucleic_acid_type=dna,
-                                                                                     created_by=user,
-                                                                                     modified_by=user)
-                if 'inhibition_rna' in extraction:
-                    inhib_rna = extraction['inhibition_rna']
-                    # if inhib_rna is an integer, assume it is an existing Inhibition ID
-                    if isinstance(inhib_rna, int):
-                        extraction['inhibition_rna'] = Inhibition.objects.get(id=inhib_rna)
-                    else:
-                        # otherwise assume inhib_rna is a date string
-                        rna = NucleicAcidType.objects.get(id=2)
-                        try:
-                            datetime.strptime(inhib_rna, '%Y-%m-%d')
-                            extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=sample,
-                                                                                     inhibition_date=inhib_rna,
-                                                                                     nucleic_acid_type=rna,
-                                                                                     created_by=user,
-                                                                                     modified_by=user)
-                        # if inhib_rna is not a date string, assign it today's date
-                        except ValueError:
-                            today = datetime.today().strftime('%Y-%m-%d')
-                            extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extraction_batch,
-                                                                                     sample=sample,
-                                                                                     inhibition_date=today,
-                                                                                     nucleic_acid_type=rna,
-                                                                                     created_by=user,
-                                                                                     modified_by=user)
+                    extraction['created_by'] = user
+                    extraction['modified_by'] = user
+                    if 'inhibition_dna' in extraction:
+                        inhib_dna = extraction['inhibition_dna']
+                        # if inhib_dna is an integer, assume it is an existing Inhibition ID
+                        if isinstance(inhib_dna, int):
+                            inhib = Inhibition.objects.filter(id=inhib_dna).first()
+                            if inhib:
+                                extraction['inhibition_dna'] = inhib
+                            else:
+                                raise serializers.ValidationError("No Inhibition exists with ID: " + str(inhib_dna))
+                        else:
+                            # otherwise assume inhib_dna is a date string
+                            dna = NucleicAcidType.objects.get(name="DNA")
+                            try:
+                                datetime.strptime(inhib_dna, '%Y-%m-%d')
+                                extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extr_batch,
+                                                                                         sample=sample,
+                                                                                         inhibition_date=inhib_dna,
+                                                                                         nucleic_acid_type=dna,
+                                                                                         created_by=user,
+                                                                                         modified_by=user)
+                            # if inhib_dna is not a date string, assign it today's date
+                            except ValueError:
+                                today = datetime.today().strftime('%Y-%m-%d')
+                                extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extr_batch,
+                                                                                         sample=sample,
+                                                                                         inhibition_date=today,
+                                                                                         nucleic_acid_type=dna,
+                                                                                         created_by=user,
+                                                                                         modified_by=user)
+                    if 'inhibition_rna' in extraction:
+                        inhib_rna = extraction['inhibition_rna']
+                        # if inhib_rna is an integer, assume it is an existing Inhibition ID
+                        if isinstance(inhib_rna, int):
+                            inhib = Inhibition.objects.filter(id=inhib_rna).first()
+                            if inhib:
+                                extraction['inhibition_rna'] = inhib
+                            else:
+                                raise serializers.ValidationError("No Inhibition exists with ID: " + str(inhib_rna))
+                        else:
+                            # otherwise assume inhib_rna is a date string
+                            rna = NucleicAcidType.objects.get(name="RNA")
+                            try:
+                                datetime.strptime(inhib_rna, '%Y-%m-%d')
+                                extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extr_batch,
+                                                                                         sample=sample,
+                                                                                         inhibition_date=inhib_rna,
+                                                                                         nucleic_acid_type=rna,
+                                                                                         created_by=user,
+                                                                                         modified_by=user)
+                            # if inhib_rna is not a date string, assign it today's date
+                            except ValueError:
+                                today = datetime.today().strftime('%Y-%m-%d')
+                                extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extr_batch,
+                                                                                         sample=sample,
+                                                                                         inhibition_date=today,
+                                                                                         nucleic_acid_type=rna,
+                                                                                         created_by=user,
+                                                                                         modified_by=user)
 
-                new_extraction = Extraction.objects.create(extraction_batch=extraction_batch, **extraction)
-                # create the child replicates
-                if replicates is not None:
-                    for replicate in replicates:
-                        for x in range(1, replicate['count']):
-                            target = Target.objects.get(id=replicate['target'])
-                            PCRReplicate.objects.create(extraction=new_extraction, target=target, replicate_number=x)
+                    new_extr = Extraction.objects.create(extraction_batch=extr_batch, **extraction)
+                    # create the child replicates
+                    if replicates is not None:
+                        for replicate in replicates:
+                            for x in range(1, replicate['count']):
+                                target_id = replicate['target']
+                                target = Target.objects.filter(id=target_id).first()
+                                if target:
+                                    PCRReplicate.objects.create(extraction=new_extr, target=target, replicate_number=x)
+                                else:
+                                    raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
+                else:
+                    raise serializers.ValidationError("Extraction with Sample ID: " + sample + "does not exist")
 
         # create the child reverse transcription if present
         if rt is not None:
-            ReverseTranscription.objects.create(extraction_batch=extraction_batch, **rt)
+            ReverseTranscription.objects.create(extraction_batch=extr_batch, **rt)
 
-        return extraction_batch
+        return extr_batch
 
     # on update, any submitted nested objects (extractions, replicates) will be ignored
     def update(self, instance, validated_data):
@@ -769,6 +796,38 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
         """
         Ensure target organism results file fields are included in request data.
         """
+        if 'target' not in data:
+            raise serializers.ValidationError("target is required")
+        if 'analysi_batch' not in data:
+            raise serializers.ValidationError("analysis_batch is required")
+        if 'extraction_number' not in data:
+            raise serializers.ValidationError("extraction_number is required")
+        if 'replicate_number' not in data:
+            raise serializers.ValidationError("replicate_number is required")
+        if 'standard_curve' not in data:
+            raise serializers.ValidationError("standard_curve is required")
+        if 'extraction_negative_control_cq_value' not in data:
+            raise serializers.ValidationError("extraction_negative_control_cq_value is required")
+        if 'pcrreplicate_negative_control_cq_value' not in data:
+            raise serializers.ValidationError("pcrreplicate_negative_control_cq_value is required")
+        if 'pcrreplicates' not in data:
+            raise serializers.ValidationError("pcrreplicates is required")
+        else:
+            is_valid = True
+            details = []
+            pcrreplicates = data.get('pcrreplicates')
+            for rep in pcrreplicates:
+                if 'sample' not in rep:
+                    is_valid = False
+                    details.append("sample is required")
+                if 'cq_value' not in rep:
+                    is_valid = False
+                    details.append("cq_value is required")
+                if 'gc_reaction' not in rep:
+                    is_valid = False
+                    details.append("gc_reaction is required")
+            if not is_valid:
+                raise serializers.ValidationError(details)
         return data
 
     created_by = serializers.StringRelatedField()

@@ -267,51 +267,68 @@ class PCRReplicateResultsUploadView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request):
-        response_data = []
         request_data = JSONParser().parse(request)
-        target = request_data['target']
-        ab = request_data['analysis_batch']
-        en = request_data['extraction_number']
-        rn = request_data['replicate_number']
-        sc = request_data['standard_curve']
-        extpos_cq = request_data.get('extraction_positive_control_cq_value', None)
-        extpos_conc = request_data.get('extraction_positive_control_concentration', None)
-        extneg_cq = request_data.get('extraction_negative_control_cq_value', None)
-        extneg_conc = request_data.get('extraction_negative_control_concentration', None)
-        rtneg_cq = request_data.get('rt_negative_control_cq_value', None)
-        rtneg_conc = request_data.get('rt_negative_control_concentration', None)
-        pcrpos_cq = request_data.get('pcrreplicate_positive_control_cq_value', None)
-        pcrpos_conc = request_data.get('pcrreplicate_positive_control_concentration', None)
-        pcrneg_cq = request_data.get('pcrreplicate_negative_control_cq_value', None)
-        pcrneg_conc = request_data.get('pcrreplicate_negative_control_concentration', None)
         serializer = PCRReplicateResultsUploadSerializer(data=request_data)
         if serializer.is_valid():
             is_valid = True
             response_data = []
             valid_data = []
             response_errors = []
+            target = request_data.get('target', None)
+            ab = request_data.get('analysis_batch', None)
+            en = request_data.get('extraction_number', None)
+            rn = request_data.get('replicate_number', None)
+            sc = request_data.get('standard_curve', None)
+            extpos_cq = request_data.get('extraction_positive_control_cq_value', None)
+            extpos_conc = request_data.get('extraction_positive_control_concentration', None)
+            extneg_cq = request_data.get('extraction_negative_control_cq_value', None)
+            extneg_conc = request_data.get('extraction_negative_control_concentration', None)
+            rtneg_cq = request_data.get('rt_negative_control_cq_value', None)
+            rtneg_conc = request_data.get('rt_negative_control_concentration', None)
+            pcrpos_cq = request_data.get('pcrreplicate_positive_control_cq_value', None)
+            pcrpos_conc = request_data.get('pcrreplicate_positive_control_concentration', None)
+            pcrneg_cq = request_data.get('pcrreplicate_negative_control_cq_value', None)
+            pcrneg_conc = request_data.get('pcrreplicate_negative_control_concentration', None)
             pcrreplicates = request_data.get('pcrreplicates', None)
             for pcrreplicate in pcrreplicates:
                 sample = pcrreplicate.get('sample', None)
                 eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
-                extraction = Extraction.objects.filter(extraction_batch=eb.id, sample=sample).first()
-                cq_value = pcrreplicate.get('cq_value', None)
-                gc_reaction = pcrreplicate.get('gene_copies_per_reaction', None)
-                pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target, replicate_number=rn).first()
-                bad_result_flag = False
-                if rtneg_cq is not None:
-                    if extneg_cq > 0 or rtneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
-                        bad_result_flag = True
-                else:
-                    if extneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
-                        bad_result_flag = True
-                new_data = {'cq_value': cq_value, 'gc_reaction': gc_reaction, 'bad_result_flag': bad_result_flag}
-                serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
-                if serializer.is_valid():
-                    valid_data.append(serializer)
+                if eb:
+                    extraction = Extraction.objects.filter(extraction_batch=eb.id, sample=sample).first()
+                    if extraction:
+                        cq_value = pcrreplicate.get('cq_value', 0)
+                        gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
+                        pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target, replicate_number=rn).first()
+                        if pcrrep:
+                            bad_result_flag = False
+                            if rtneg_cq is not None:
+                                if extneg_cq > 0 or rtneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
+                                    bad_result_flag = True
+                            else:
+                                if extneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
+                                    bad_result_flag = True
+                            new_data = {'cq_value': cq_value, 'gc_reaction': gc_reaction, 'bad_result_flag': bad_result_flag}
+                            serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
+                            if serializer.is_valid():
+                                valid_data.append(serializer)
+                            else:
+                                is_valid = False
+                                response_errors.append(serializer.errors)
+                        else:
+                            is_valid = False
+                            message = "No PCRReplicate exists with Extraction ID: " + extraction.id + ", "
+                            message += "Target ID: " + target + ", Replicate Number: " + rn
+                            response_errors.append({"pcrreplicate": message})
+                    else:
+                        is_valid = False
+                        message = "No Extraction exists with Extraction Batch ID: " + eb.id + ", "
+                        message += "Sample ID: " + sample
+                        response_errors.append({"extraction": message})
                 else:
                     is_valid = False
-                    response_errors.append(serializer.errors)
+                    message = "No Extraction Batch exists with Analysis Batch ID: " + ab + ", "
+                    message += "Extraction Number: " + en
+                    response_errors.append({"extraction_batch": message})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
@@ -363,15 +380,20 @@ class InhibitionViewSet(HistoryViewSet):
                     is_valid = False
                     response_errors.append({"id":"This field is required."})
                 else:
-                    inhibition = Inhibition.objects.get(id=item.pop('id'))
-                    serializer = self.serializer_class(inhibition, data=item, partial=True)
-                    # if this item is valid, temporarily hold it until all items are proven valid, then save them all
-                    # if even one item is invalid, none will be saved, and the user will be returned the error(s)
-                    if serializer.is_valid():
-                        valid_data.append(serializer)
+                    inhib = item.pop('id')
+                    inhibition = Inhibition.objects.filter(id=inhib).first()
+                    if inhibition:
+                        serializer = self.serializer_class(inhibition, data=item, partial=True)
+                        # if this item is valid, temporarily hold it until all items are proven valid, then save them all
+                        # if even one item is invalid, none will be saved, and the user will be returned the error(s)
+                        if serializer.is_valid():
+                            valid_data.append(serializer)
+                        else:
+                            is_valid = False
+                            response_errors.append(serializer.errors)
                     else:
                         is_valid = False
-                        response_errors.append(serializer.errors)
+                        response_errors.append({"inhibition": "No Inhibition exists with this ID: " + inhib})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
@@ -382,13 +404,16 @@ class InhibitionViewSet(HistoryViewSet):
                 return JsonResponse(response_errors, safe=False, status=400)
         # otherwise, if there is a pk, update the instance indicated by the pk
         else:
-            inhibition = Inhibition.objects.get(id=pk)
-            serializer = self.serializer_class(inhibition, data=request_data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=200)
+            inhibition = Inhibition.objects.filter(id=pk).first()
+            if inhibition:
+                serializer = self.serializer_class(inhibition, data=request_data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data, status=200)
+                else:
+                    return Response(serializer.errors, status=400)
             else:
-                return Response(serializer.errors, status=400)
+                return JsonResponse({"inhibition": "No Inhibition exists with this ID: " + pk}, status=400)
 
 
 class SampleInhibitionViewSet(HistoryViewSet):
@@ -416,33 +441,48 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request):
-        response_data = []
         request_data = JSONParser().parse(request)
         ab = request_data.get('analysis_batch', None)
         en = request_data.get('extraction_number', None)
         na = request_data.get('nucleic_acid_type', None)
-        eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en)
-        serializer = InhibitionCalculateDilutionFactorSerializer(data=request_data)
-        if serializer.is_valid():
-            pos = request_data.get('inhibition_positive_control_cq_value', None)
-            inhibitions = request_data.get('inhibitions', None)
-            for inhibition in inhibitions:
-                cq = inhibition.get('cq_value', None)
-                sample = inhibition.get('sample', None)
-                inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na).first()
-                suggested_dilution_factor = None
-                if 0 < pos - cq < 1:
-                    suggested_dilution_factor = 1
-                if cq > pos and cq - pos < 2:
-                    suggested_dilution_factor = 1
-                if cq - pos >= 2 and cq <= 36:
-                    suggested_dilution_factor = 5
-                if cq > 36 or cq is None:
-                    suggested_dilution_factor = 10
-                new_data = {"id": inhib.id, "sample": sample, "suggested_dilution_factor": suggested_dilution_factor}
-                response_data.append(new_data)
-            return JsonResponse(response_data, safe=False, status=200)
-        return Response(serializer.errors, status=400)
+        eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
+        if eb:
+            serializer = InhibitionCalculateDilutionFactorSerializer(data=request_data)
+            if serializer.is_valid():
+                is_valid = True
+                response_data = []
+                response_errors = []
+                pos = request_data.get('inhibition_positive_control_cq_value', None)
+                inhibitions = request_data.get('inhibitions', None)
+                for inhibition in inhibitions:
+                    cq = inhibition.get('cq_value', None)
+                    sample = inhibition.get('sample', None)
+                    inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na).first()
+                    if inhib:
+                        suggested_dilution_factor = None
+                        if 0 < pos - cq < 1:
+                            suggested_dilution_factor = 1
+                        if cq > pos and cq - pos < 2:
+                            suggested_dilution_factor = 1
+                        if cq - pos >= 2 and cq <= 36:
+                            suggested_dilution_factor = 5
+                        if cq > 36 or cq is None:
+                            suggested_dilution_factor = 10
+                        new_data = {"id": inhib.id, "sample": sample, "suggested_dilution_factor": suggested_dilution_factor}
+                        response_data.append(new_data)
+                    else:
+                        is_valid = False
+                        message = "No Inhibition exists with Sample ID: " + sample
+                        message += ", Extraction Batch ID: " + eb + ", Nucleic Acid Type ID: " + na
+                        response_errors.append({"inhibition": message})
+                if is_valid:
+                    return JsonResponse(response_data, safe=False, status=200)
+                else:
+                    return JsonResponse(response_errors, safe=False, status=400)
+            return Response(serializer.errors, status=400)
+        else:
+            message = "No Extraction Batch exists with Analysis Batch ID: " + ab + " and Extraction Number: " + en
+            return JsonResponse({"extraction_batch": message}, status=400)
 
 
 class TargetViewSet(HistoryViewSet):
