@@ -245,7 +245,14 @@ class ExtractionMethodViewSet(HistoryViewSet):
 
 class ExtractionBatchViewSet(HistoryViewSet):
     queryset = ExtractionBatch.objects.all()
-    serializer_class = ExtractionBatchSerializer
+
+    # override the default serializer_class if summary fields are requested
+    def get_serializer_class(self):
+        include_summary_fields = self.request.query_params.get('includeSummaryFields', None)
+        if include_summary_fields is not None and include_summary_fields.lower() == 'true':
+            return ExtractionBatchSummarySerializer
+        else:
+            return ExtractionBatchSerializer
 
 
 class ReverseTranscriptionViewSet(HistoryViewSet):

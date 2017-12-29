@@ -866,6 +866,7 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
                   'pcrreplicate_negative_control_cq_value', 'pcrreplicate_negative_control_concentration',
                   'pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
+
 class ResultSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1005,8 +1006,8 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
-                  'inhibition_positive_control_cq_value', 'inhibitions', 'suggested_dilution_factor',
+        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition_date', 'nucleic_acid_type',
+                  'dilution_factor', 'inhibition_positive_control_cq_value', 'inhibitions', 'suggested_dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1113,7 +1114,7 @@ class SimpleSampleSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
+class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
@@ -1168,19 +1169,21 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
 
         if extractions is not None:
             for extraction in extractions:
-                replicates = extraction.get('pcrreplicates')
+                replicates = PCRReplicate.objects.filter(extraction=extraction['id'])
                 if replicates is not None:
                     for replicate in replicates:
-                        target_id = replicate.get('target_id')
+                        target_id = replicate.target.id
 
                         # count the number of replicates associated with each target
+                        # if the target is already included in our local dict, increment the rep counter
                         if targets.get(target_id, None) is not None:
                             data = targets[target_id]
                             data['replicates'] += 1
+                        # otherwise, add the target to our local dict and 'initialize' its rep counter
                         else:
                             target = Target.objects.get(id=target_id)
-                            data = {"id": target_id, "name": target.name, "abbrevation": target.abbreviation,
-                                    "type": target.type, "replicates": 1}
+                            data = {"id": target_id, "code": target.code,
+                                    "nucleic_acid_type": target.nucleic_acid_type.id, "replicates": 1}
                         targets[target_id] = data
 
         return targets.values()
@@ -1201,11 +1204,10 @@ class AnalysisBatchExtractionBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionBatch
-        fields = ('id', 'extraction_method', 'reextraction', 'reextraction_note',
-                  'extraction_number', 'extraction_volume', 'elution_volume', 'extraction_date',
-                  'extractions', 'inhibitions', 'reverse_transcriptions', 'targets',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
+                  'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
+                  'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions', 'inhibitions',
+                  'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
@@ -1225,7 +1227,7 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
                 studies.append(data)
         return studies
 
-    extractionbatches = AnalysisBatchExtractionBatchSerializer(many=True, read_only=True)
+    extractionbatches = ExtractionBatchSummarySerializer(many=True, read_only=True)
     samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
 
