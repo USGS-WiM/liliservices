@@ -270,6 +270,11 @@ class PCRReplicateViewSet(HistoryViewSet):
     serializer_class = PCRReplicateSerializer
 
 
+class PCRReplicateControlViewSet(HistoryViewSet):
+    queryset = PCRReplicateControl.objects.all()
+    serializer_class = PCRReplicateControlSerializer
+
+
 class PCRReplicateResultsUploadView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -286,35 +291,70 @@ class PCRReplicateResultsUploadView(views.APIView):
             en = request_data.get('extraction_number', None)
             rn = request_data.get('replicate_number', None)
             sc = request_data.get('standard_curve', None)
-            extpos_cq = request_data.get('extraction_positive_control_cq_value', None)
-            extpos_conc = request_data.get('extraction_positive_control_concentration', None)
-            extneg_cq = request_data.get('extraction_negative_control_cq_value', None)
-            extneg_conc = request_data.get('extraction_negative_control_concentration', None)
-            rtneg_cq = request_data.get('rt_negative_control_cq_value', None)
-            rtneg_conc = request_data.get('rt_negative_control_concentration', None)
-            pcrpos_cq = request_data.get('pcrreplicate_positive_control_cq_value', None)
-            pcrpos_conc = request_data.get('pcrreplicate_positive_control_concentration', None)
-            pcrneg_cq = request_data.get('pcrreplicate_negative_control_cq_value', None)
-            pcrneg_conc = request_data.get('pcrreplicate_negative_control_concentration', None)
+            extneg_cq = request_data.get('ext_neg_cq_value', None)
+            extneg_conc = request_data.get('ext_neg_concentration', None)
+            rtneg_cq = request_data.get('rt_neg_cq_value', None)
+            rtneg_conc = request_data.get('rt_neg_concentration', None)
+            pcrneg_cq = request_data.get('pcr_neg_cq_value', None)
+            pcrneg_conc = request_data.get('pcr_neg_concentration', None)
+            pcrpos_cq = request_data.get('pcr_pos_cq_value', None)
+            pcrpos_conc = request_data.get('pcr_pos_concentration', None)
             pcrreplicates = request_data.get('pcrreplicates', None)
-            for pcrreplicate in pcrreplicates:
-                sample = pcrreplicate.get('sample', None)
-                eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
-                if eb:
+            eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
+            if eb:
+                # TODO: also save control data (extneg, rtneg, pcrneg, pcrpos)
+                for control in ['ext_neg', 'rt_neg', 'pcr_neg', 'pcr_pos']:
+                    control_type = ControlType.objects.get(name=control)
+                    pcrrepcontrol = PCRReplicateControl.objects.filter(extraction_batch=eb.id, target=target,
+                                                       replicate_number=rn, control_type=control_type.id).first()
+                    if pcrrepcontrol:
+                        data = {}
+                        flag = False
+                        if (control + '_cq_value') in request_data or (control + '_gc_reaction') in request_data:
+                            if request_data[control + '_cq_value'] > 0 or request_data[control + '_gc_reaction'] > 0:
+                                flag = True
+                        if control == 'ext_neg':
+                            data = {'cq_value': extneg_cq, 'gc_reaction': extneg_conc, 'bad_result_flag': flag}
+                        elif control == 'rt_neg':
+                            data = {'cq_value': rtneg_cq, 'gc_reaction': rtneg_conc, 'bad_result_flag': flag}
+                        elif control == 'pcr_neg':
+                            data = {'cq_value': pcrneg_cq, 'gc_reaction': pcrneg_conc, 'bad_result_flag': flag}
+                        elif control == 'pcr_pos':
+                            data = {'cq_value': pcrpos_cq, 'gc_reaction': pcrpos_conc, 'bad_result_flag': flag}
+                        serializer = PCRReplicateControlSerializer(pcrrepcontrol, data=data, partial=True)
+                        if serializer.is_valid():
+                            valid_data.append(serializer)
+                        else:
+                            is_valid = False
+                            response_errors.append(serializer.errors)
+                    else:
+                        is_valid = False
+                        message = "No PCRReplicate Control exists with Extraction Batch ID: " + eb.id + ", "
+                        message += "Target ID: " + target + ", Replicate Number: " + rn + ", "
+                        message += "Control Type: " + control_type
+                        response_errors.append({"pcrreplicate": message})
+                for pcrreplicate in pcrreplicates:
+                    sample = pcrreplicate.get('sample', None)
                     extraction = Extraction.objects.filter(extraction_batch=eb.id, sample=sample).first()
                     if extraction:
                         cq_value = pcrreplicate.get('cq_value', 0)
                         gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
-                        pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target, replicate_number=rn).first()
+                        pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target,
+                                                             replicate_number=rn).first()
                         if pcrrep:
                             bad_result_flag = False
-                            if rtneg_cq is not None:
-                                if extneg_cq > 0 or rtneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
-                                    bad_result_flag = True
-                            else:
-                                if extneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
-                                    bad_result_flag = True
-                            new_data = {'cq_value': cq_value, 'gc_reaction': gc_reaction, 'bad_result_flag': bad_result_flag}
+                            if cq_value > 0:
+                                if rtneg_cq is not None:
+                                    if extneg_conc > 0 or rtneg_conc > 0 or pcrneg_conc > 0 or gc_reaction < 0:
+                                        bad_result_flag = True
+                                else:
+                                    if extneg_conc > 0 or pcrneg_conc > 0 or gc_reaction < 0:
+                                        bad_result_flag = True
+                            target = Target.objects.get(id=target)
+                            nucleic_acid_type = target.nucleic_acid_type
+                            replicate_concentration = self.calculate_replicate_concentration(gc_reaction, nucleic_acid_type, extraction, eb, sample)
+                            new_data = {'cq_value': cq_value, 'gc_reaction': gc_reaction,
+                                        'bad_result_flag': bad_result_flag}
                             serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
                             if serializer.is_valid():
                                 valid_data.append(serializer)
@@ -331,21 +371,28 @@ class PCRReplicateResultsUploadView(views.APIView):
                         message = "No Extraction exists with Extraction Batch ID: " + eb.id + ", "
                         message += "Sample ID: " + sample
                         response_errors.append({"extraction": message})
-                else:
-                    is_valid = False
-                    message = "No Extraction Batch exists with Analysis Batch ID: " + ab + ", "
-                    message += "Extraction Number: " + en
-                    response_errors.append({"extraction_batch": message})
+            else:
+                is_valid = False
+                message = "No Extraction Batch exists with Analysis Batch ID: " + ab + ", "
+                message += "Extraction Number: " + en
+                response_errors.append({"extraction_batch": message})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
                     item.save()
                     response_data.append(item.data)
-                # TODO: also save control data (extpos, extneg, rtneg, pcrpos, pcrneg)
                 return JsonResponse(response_data, safe=False, status=200)
             else:
                 return JsonResponse(response_errors, safe=False, status=400)
         return Response(serializer.errors, status=400)
+
+    def calculate_replicate_concentration(self, gc_reaction, nucleic_acid_type, extraction, eb, sample):
+        fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
+        if sample.matrix == 'water':
+            if nucleic_acid_type == 'DNA':
+                return (gc_reaction / eb.reaction_volume) * (eb.reaction_volume / eb.template_volume) * (
+                        eb.elution_volume / eb.extraction_volume) * (1000 microL / 1 mL) * (
+                        fcsv / sample.sample_volume) * eb.dilution_factor * extraction.inhibition.dilution_factor
 
 
 class ResultViewSet(HistoryViewSet):
@@ -459,7 +506,7 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                 is_valid = True
                 response_data = []
                 response_errors = []
-                pos = request_data.get('inhibition_positive_control_cq_value', None)
+                pos = request_data.get('inh_pos_cq_value', None)
                 inhibitions = request_data.get('inhibitions', None)
                 for inhibition in inhibitions:
                     cq = inhibition.get('cq_value', None)

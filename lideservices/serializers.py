@@ -616,9 +616,15 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         else:
             max_extraction_number = 0
         validated_data['extraction_number'] = max_extraction_number + 1
+
+        # if the positive control is included and greater than zero, mark the whole record as invalid
+        if 'ext_pos_cq_value' in validated_data or 'ext_pos_gc_reaction' in validated_data:
+            if validated_data['ext_pos_cq_value'] > 0 or validated_data['ext_pos_gc_reaction'] > 0:
+                validated_data['ext_pos_bad_result_flag'] = True
+
         extr_batch = ExtractionBatch.objects.create(**validated_data)
 
-        # create the child extractions
+        # create the child extractions for this extraction batch
         if extractions is not None:
             for extraction in extractions:
                 sample = extraction['sample']
@@ -687,18 +693,41 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                                                                          modified_by=user)
 
                     new_extr = Extraction.objects.create(extraction_batch=extr_batch, **extraction)
-                    # create the child replicates
+                    # create the child replicates for this extraction
                     if replicates is not None:
                         for replicate in replicates:
-                            for x in range(1, replicate['count']):
-                                target_id = replicate['target']
-                                target = Target.objects.filter(id=target_id).first()
-                                if target:
+                            target_id = replicate['target']
+                            target = Target.objects.filter(id=target_id).first()
+                            if target:
+                                for x in range(1, replicate['count']):
                                     PCRReplicate.objects.create(extraction=new_extr, target=target, replicate_number=x)
-                                else:
-                                    raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
+                            else:
+                                raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
+
                 else:
                     raise serializers.ValidationError("Extraction with Sample ID: " + sample + "does not exist")
+
+        # create the child replicate controls for this extraction batch
+        if replicates is not None:
+            for replicate in replicates:
+                target_id = replicate['target']
+                target = Target.objects.filter(id=target_id).first()
+                if target:
+                    for x in range(1, replicate['count']):
+                        control_type = ControlType.objects.get(name='ext_neg')
+                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
+                                                           replicate_number=x, control_type=control_type)
+                        control_type = ControlType.objects.get(name='rt_neg')
+                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
+                                                           replicate_number=x, control_type=control_type)
+                        control_type = ControlType.objects.get(name='pcr_neg')
+                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
+                                                           replicate_number=x, control_type=control_type)
+                        control_type = ControlType.objects.get(name='pcr_pos')
+                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
+                                                           replicate_number=x, control_type=control_type)
+                else:
+                    raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
         # create the child reverse transcription if present
         if rt is not None:
@@ -724,6 +753,11 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if 'extraction_number' in validated_data and validated_data['extraction_number'] == 0:
             validated_data['extraction_number'] = instance.extraction_number
 
+        # if the positive control is included and greater than zero, mark the whole record as invalid
+        if 'ext_pos_cq_value' in validated_data or 'ext_pos_gc_reaction' in validated_data:
+            if validated_data['ext_pos_cq_value'] > 0 or validated_data['ext_pos_gc_reaction'] > 0:
+                validated_data['ext_pos_bad_result_flag'] = True
+
         # update the Extraction Batch object
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
         instance.extraction_method = validated_data.get('extraction_method', instance.extraction_method)
@@ -737,6 +771,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.elution_volume = validated_data.get('elution_volume', instance.elution_volume)
         instance.sample_dilution_factor = validated_data.get('sample_dilution_factor', instance.sample_dilution_factor)
         instance.reaction_volume = validated_data.get('reaction_volume', instance.reaction_volume)
+        instance.ext_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
+        instance.ext_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
         instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
 
@@ -755,6 +791,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
                   'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions', 'inhibitions',
+                  'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_bad_result_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',
                   'new_rt', 'new_replicates', 'new_extractions')
 
@@ -763,9 +800,38 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
+    def create(self, validated_data):
+        # if the positive control is included and greater than zero, mark the whole record as invalid
+        if 'rt_pos_cq_value' in validated_data or 'rt_pos_gc_reaction' in validated_data:
+            if validated_data['rt_pos_cq_value'] > 0 or validated_data['rt_pos_gc_reaction'] > 0:
+                validated_data['rt_pos_bad_result_flag'] = True
+
+        return ReverseTranscription.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        # if the positive control is included and greater than zero, mark the whole record as invalid
+        if 'rt_pos_cq_value' in validated_data or 'rt_pos_gc_reaction' in validated_data:
+            if validated_data['rt_pos_cq_value'] > 0 or validated_data['rt_pos_gc_reaction'] > 0:
+                validated_data['rt_pos_bad_result_flag'] = True
+
+        # update the Reverse Transcription object
+        instance.extraction_batch = validated_data.get('extraction_batch', instance.extraction_batch)
+        instance.template_volume = validated_data.get('template_volume', instance.template_volume)
+        instance.reaction_volume = validated_data.get('reaction_volume', instance.reaction_volume)
+        instance.rt_date = validated_data.get('rt_date', instance.rt_date)
+        instance.re_rt = validated_data.get('re_rt', instance.re_rt)
+        instance.re_rt_note = validated_data.get('re_rt_note', instance.re_rt_note)
+        instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
+        instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
+        instance.modified_by = validated_data.get('modified_by', instance.modified_by)
+        instance.save()
+
+        return instance
+
     class Meta:
         model = ReverseTranscription
         fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_note',
+                  'rt_pos_cq_value', 'rt_pos_gc_reaction', 'rt_pos_bad_result_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -785,8 +851,20 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'target', 'replicate_number', 'record_type', 'cq_value', 'gc_reaction',
-                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr',
+        fields = ('id', 'extraction', 'target', 'replicate_number' 'cq_value', 'gc_reaction',
+                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 're_pcr',
+                  'ext_neg_control', 'rt_neg_control', 'pcr_neg_control', 'pcr_pos_control',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class PCRReplicateControlSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = PCRReplicateControl
+        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'control_type', 'cq_value', 'gc_reaction',
+                  'replicate_concentration', 'concentration_unit', 'bad_result_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -798,7 +876,7 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
         """
         if 'target' not in data:
             raise serializers.ValidationError("target is required")
-        if 'analysi_batch' not in data:
+        if 'analysis_batch' not in data:
             raise serializers.ValidationError("analysis_batch is required")
         if 'extraction_number' not in data:
             raise serializers.ValidationError("extraction_number is required")
@@ -806,10 +884,10 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("replicate_number is required")
         if 'standard_curve' not in data:
             raise serializers.ValidationError("standard_curve is required")
-        if 'extraction_negative_control_cq_value' not in data:
-            raise serializers.ValidationError("extraction_negative_control_cq_value is required")
-        if 'pcrreplicate_negative_control_cq_value' not in data:
-            raise serializers.ValidationError("pcrreplicate_negative_control_cq_value is required")
+        if 'ext_neg_cq_value' not in data:
+            raise serializers.ValidationError("ext_neg_cq_value is required")
+        if 'pcr_neg_cq_value' not in data:
+            raise serializers.ValidationError("pcr_neg_cq_value is required")
         if 'pcrreplicates' not in data:
             raise serializers.ValidationError("pcrreplicates is required")
         else:
@@ -845,26 +923,24 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
     re_pcr = serializers.IntegerField(read_only=True)
     analysis_batch = serializers.IntegerField(write_only=True)
     extraction_number = serializers.IntegerField(write_only=True)
-    extraction_positive_control_cq_value = serializers.FloatField(write_only=True)
-    extraction_positive_control_concentration = serializers.FloatField(write_only=True)
-    extraction_negative_control_cq_value = serializers.FloatField(write_only=True)
-    extraction_negative_control_concentration = serializers.FloatField(write_only=True)
-    pcrreplicate_positive_control_cq_value = serializers.FloatField(write_only=True)
-    pcrreplicate_positive_control_concentration = serializers.FloatField(write_only=True)
-    pcrreplicate_negative_control_cq_value = serializers.FloatField(write_only=True)
-    pcrreplicate_negative_control_concentration = serializers.FloatField(write_only=True)
+    ext_neg_cq_value = serializers.FloatField(write_only=True)
+    ext_neg_concentration = serializers.FloatField(write_only=True)
+    rt_neg_cq_value = serializers.FloatField(write_only=True)
+    rt_neg_concentration = serializers.FloatField(write_only=True)
+    pcr_neg_cq_value = serializers.FloatField(write_only=True)
+    pcr_neg_concentration = serializers.FloatField(write_only=True)
+    pcr_pos_cq_value = serializers.FloatField(write_only=True)
+    pcr_pos_concentration = serializers.FloatField(write_only=True)
     pcrreplicates = serializers.ListField(write_only=True)
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'target', 'replicate_number', 'record_type', 'cq_value', 'gc_reaction',
-                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 'control_type', 're_pcr',
-                  'analysis_batch', 'extraction_number',
-                  'extraction_positive_control_cq_value', 'extraction_positive_control_concentration',
-                  'extraction_negative_control_cq_value', 'extraction_negative_control_concentration',
-                  'pcrreplicate_positive_control_cq_value', 'pcrreplicate_positive_control_concentration',
-                  'pcrreplicate_negative_control_cq_value', 'pcrreplicate_negative_control_concentration',
-                  'pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'extraction', 'target', 'replicate_number', 'control_type', 'record_type',
+                  'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit', 'bad_result_flag',
+                  're_pcr', 'analysis_batch', 'extraction_number', 'ext_neg_cq_value', 'ext_neg_concentration',
+                  'rt_neg_cq_value', 'rt_neg_concentration', 'pcr_neg_cq_value', 'pcr_neg_concentration',
+                  'pcr_pos_cq_value', 'pcr_pos_concentration', 'pcrreplicates',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ResultSerializer(serializers.ModelSerializer):
@@ -966,8 +1042,8 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
         """
         Ensure inhibition_positive_control_cq_value and inhibitions are included in request data.
         """
-        if 'inhibition_positive_control_cq_value' not in data:
-            raise serializers.ValidationError("inhibition_positive_control_cq_value is required")
+        if 'inh_pos_cq_value' not in data:
+            raise serializers.ValidationError("inh_pos_cq_value is required")
         if 'inhibitions' not in data:
             raise serializers.ValidationError("inhibitions is required")
         ab = data['analysis_batch']
@@ -999,7 +1075,7 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     analysis_batch = serializers.IntegerField(write_only=True)
     extraction_number = serializers.IntegerField(write_only=True)
-    inhibition_positive_control_cq_value = serializers.FloatField(write_only=True)
+    inh_pos_cq_value = serializers.FloatField(write_only=True)
     inhibitions = serializers.ListField(write_only=True)
     sample = serializers.IntegerField(read_only=True)
     suggested_dilution_factor = serializers.FloatField(read_only=True)
@@ -1007,7 +1083,7 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Inhibition
         fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition_date', 'nucleic_acid_type',
-                  'dilution_factor', 'inhibition_positive_control_cq_value', 'inhibitions', 'suggested_dilution_factor',
+                  'dilution_factor', 'inh_pos_cq_value', 'inhibitions', 'suggested_dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

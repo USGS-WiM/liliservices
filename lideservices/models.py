@@ -67,7 +67,7 @@ class Sample(HistoryModel):
     study = models.ForeignKey('Study', related_name='samples')
     study_site_name = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: I don't like this. Location information should be kept in a dedicated table for possible future use in spatial analysis
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
-    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sampler_name', null=True, blank=True)  # QUESTION: This should probably be required, yes?
+    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='sampler_name')  # QUESTION: This should probably be required, yes?
     sample_notes = models.TextField(blank=True)
     sample_description = models.TextField(blank=True)
     arrival_date = models.DateField(null=True, blank=True)
@@ -94,7 +94,7 @@ class Sample(HistoryModel):
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
-    peg_neg = models.ForeignKey('self', related_name='samples', null=True)
+    peg_neg = models.ForeignKey('self', null=True, related_name='samples')
     record_type = models.ForeignKey('RecordType', default=1)
 
     def __str__(self):
@@ -402,7 +402,7 @@ class ExtractionBatch(HistoryModel):
     extraction_string = property(_concat_ids)
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
-    reextraction = models.ForeignKey('self', related_name='extractionbatches', null=True)
+    reextraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
     reextraction_note = models.CharField(max_length=255, null=True, blank=True)
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField(null=True, blank=True)
@@ -412,6 +412,9 @@ class ExtractionBatch(HistoryModel):
     elution_volume = models.FloatField(null=True, blank=True)
     sample_dilution_factor = models.IntegerField(null=True, blank=True)
     reaction_volume = models.FloatField(null=True, blank=True)
+    ext_pos_cq_value = models.FloatField(null=True, blank=True)
+    ext_pos_gc_reaction = models.FloatField(null=True, blank=True)
+    ext_pos_bad_result_flag = models.BooleanField(default=False)
 
     def __str__(self):
         return self.extraction_string
@@ -430,8 +433,11 @@ class ReverseTranscription(HistoryModel):
     template_volume = models.FloatField(null=True, blank=True)
     reaction_volume = models.FloatField(null=True, blank=True)
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    re_rt = models.ForeignKey('self', related_name='reversetranscriptions', null=True)
+    re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
     re_rt_note = models.CharField(max_length=255, null=True, blank=True)
+    rt_pos_cq_value = models.FloatField(null=True, blank=True)
+    rt_pos_gc_reaction = models.FloatField(null=True, blank=True)
+    rt_pos_bad_result_flag = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.id)
@@ -448,8 +454,8 @@ class Extraction(HistoryModel):
 
     sample = models.ForeignKey('Sample', related_name='extractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
-    inhibition_dna = models.ForeignKey('Inhibition', related_name='extractions_dna', null=True)
-    inhibition_rna = models.ForeignKey('Inhibition', related_name='extractions_rna', null=True)
+    inhibition_dna = models.ForeignKey('Inhibition', null=True, related_name='extractions_dna')
+    inhibition_rna = models.ForeignKey('Inhibition', null=True, related_name='extractions_rna')
 
     def __str__(self):
         return str(self.id)
@@ -472,9 +478,11 @@ class PCRReplicate(HistoryModel):
     replicate_concentration = models.FloatField(null=True, blank=True)
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
-    control_type = models.ForeignKey('ControlType', related_name='pcrreplicates', null=True)
     re_pcr = models.BooleanField(default=False)
-    record_type = models.ForeignKey('RecordType', default=1)
+    ext_neg_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
+    rt_neg_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
+    pcr_neg_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
+    pcr_pos_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
 
     def __str__(self):
         return str(self.id)
@@ -482,6 +490,29 @@ class PCRReplicate(HistoryModel):
     class Meta:
         db_table = "lide_pcrreplicate"
         unique_together = ("extraction", "target", "replicate_number")
+
+
+class PCRReplicateControl(HistoryModel):
+    """
+    Polymerase Chain Reaction Replicate Controls
+    """
+
+    extraction_batch = models.ForeignKey('Extraction', related_name='pcrreplicatecontrols')
+    target = models.ForeignKey('Target', related_name='pcrreplicatecontrols')
+    replicate_number = models.FloatField(null=True, blank=True)
+    control_type = models.ForeignKey('ControlType', null=True, related_name='pcrreplicatecontrols')
+    cq_value = models.FloatField(null=True, blank=True)
+    gc_reaction = models.FloatField(null=True, blank=True)
+    replicate_concentration = models.FloatField(null=True, blank=True)
+    concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicatecontrols')  # QUESTION: This should probably be required, yes?
+    bad_result_flag = models.BooleanField(default=False)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_pcrreplicatecontrol"
+        unique_together = ("extraction_batch", "target", "replicate_number", "control_type")
 
 
 class Result(HistoryModel):
