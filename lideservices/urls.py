@@ -28,12 +28,12 @@ router.register(r'inhibitions', views.InhibitionViewSet, 'inhibitions')
 router.register(r'extractionmethods', views.ExtractionMethodViewSet, 'extractionmethods')
 router.register(r'extractionbatches', views.ExtractionBatchViewSet, 'extractionbatches')
 router.register(r'extractions', views.ExtractionViewSet, 'extractions')
+router.register(r'pcrreplicatebatches', views.PCRReplicateBatchViewSet, 'pcrreplicatebatches')
 router.register(r'pcrreplicates', views.PCRReplicateViewSet, 'pcrreplicates')
 router.register(r'reversetranscriptions', views.ReverseTranscriptionViewSet, 'reversetranscriptions')
 router.register(r'standardcurves', views.StandardCurveViewSet, 'standardcurves')
 router.register(r'targets', views.TargetViewSet, 'targets')
 router.register(r'results', views.ResultViewSet, 'results')
-router.register(r'controltypes', views.ControlTypeViewSet, 'controltypes')
 router.register(r'fieldunits', views.FieldUnitViewSet, 'fieldunits')
 router.register(r'otheranalyses', views.OtherAnalysisViewSet, 'otheranalyses')
 router.register(r'users', views.UserViewSet, 'users')
@@ -44,6 +44,4 @@ urlpatterns = [
     url(r'^auth/$', views.AuthView.as_view(), name='authenticate'),
     url(r'^inhibitionscalculatedilutionfactor/$', views.InhibitionCalculateDilutionFactorView.as_view(),
         name='inhibitionscalculatedilutionfactor'),
-    url(r'^pcrreplicateresultsupload/$', views.PCRReplicateResultsUploadView.as_view(),
-        name='pcrreplicateresultsupload'),
 ]

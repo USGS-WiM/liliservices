@@ -624,6 +624,17 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
         extr_batch = ExtractionBatch.objects.create(**validated_data)
 
+        # create the child replicate batches for this extraction batch
+        if replicates is not None:
+            for replicate in replicates:
+                target_id = replicate['target']
+                target = Target.objects.filter(id=target_id).first()
+                if target:
+                    for x in range(1, replicate['count']):
+                        PCRReplicateBatch.objects.create(extraction_batch=extr_batch, target=target, replicate_number=x)
+                else:
+                    raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
+
         # create the child extractions for this extraction batch
         if extractions is not None:
             for extraction in extractions:
@@ -693,6 +704,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                                                                          modified_by=user)
 
                     new_extr = Extraction.objects.create(extraction_batch=extr_batch, **extraction)
+
                     # create the child replicates for this extraction
                     if replicates is not None:
                         for replicate in replicates:
@@ -700,34 +712,14 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             target = Target.objects.filter(id=target_id).first()
                             if target:
                                 for x in range(1, replicate['count']):
-                                    PCRReplicate.objects.create(extraction=new_extr, target=target, replicate_number=x)
+                                    rep_batch = PCRReplicateBatch.objects.get(extraction_batch=extr_batch,
+                                                                              target=target, replicate_number=x)
+                                    PCRReplicate.objects.create(extraction=new_extr, pcrreplicate_batch=rep_batch)
                             else:
                                 raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
                 else:
                     raise serializers.ValidationError("Extraction with Sample ID: " + sample + "does not exist")
-
-        # create the child replicate controls for this extraction batch
-        if replicates is not None:
-            for replicate in replicates:
-                target_id = replicate['target']
-                target = Target.objects.filter(id=target_id).first()
-                if target:
-                    for x in range(1, replicate['count']):
-                        control_type = ControlType.objects.get(name='ext_neg')
-                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
-                                                           replicate_number=x, control_type=control_type)
-                        control_type = ControlType.objects.get(name='rt_neg')
-                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
-                                                           replicate_number=x, control_type=control_type)
-                        control_type = ControlType.objects.get(name='pcr_neg')
-                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
-                                                           replicate_number=x, control_type=control_type)
-                        control_type = ControlType.objects.get(name='pcr_pos')
-                        PCRReplicateControl.objects.create(extraction_batch=extr_batch, target=target,
-                                                           replicate_number=x, control_type=control_type)
-                else:
-                    raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
         # create the child reverse transcription if present
         if rt is not None:
@@ -845,41 +837,19 @@ class ExtractionSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class PCRReplicateSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = PCRReplicate
-        fields = ('id', 'extraction', 'target', 'replicate_number' 'cq_value', 'gc_reaction',
-                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 're_pcr',
-                  'ext_neg_control', 'rt_neg_control', 'pcr_neg_control', 'pcr_pos_control',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class PCRReplicateControlSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = PCRReplicateControl
-        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'control_type', 'cq_value', 'gc_reaction',
-                  'replicate_concentration', 'concentration_unit', 'bad_result_flag',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
+class PCRReplicateBatchSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """
         Ensure target organism results file fields are included in request data.
         """
+        if self.context['request'].method == 'PUT':
+            if 'analysis_batch' not in data:
+                raise serializers.ValidationError("analysis_batch is required")
+            if 'extraction_number' not in data:
+                raise serializers.ValidationError("extraction_number is required")
         if 'target' not in data:
             raise serializers.ValidationError("target is required")
-        if 'analysis_batch' not in data:
-            raise serializers.ValidationError("analysis_batch is required")
-        if 'extraction_number' not in data:
-            raise serializers.ValidationError("extraction_number is required")
         if 'replicate_number' not in data:
             raise serializers.ValidationError("replicate_number is required")
         if 'standard_curve' not in data:
@@ -888,6 +858,8 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("ext_neg_cq_value is required")
         if 'pcr_neg_cq_value' not in data:
             raise serializers.ValidationError("pcr_neg_cq_value is required")
+        if 'pcr_pos_conc' not in data:
+            raise serializers.ValidationError("pcr_pos_conc is required")
         if 'pcrreplicates' not in data:
             raise serializers.ValidationError("pcrreplicates is required")
         else:
@@ -910,36 +882,26 @@ class PCRReplicateResultsUploadSerializer(serializers.ModelSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    extraction = serializers.IntegerField(read_only=True)
-    target = serializers.IntegerField()
-    replicate_number = serializers.IntegerField()
-    record_type = serializers.IntegerField(read_only=True)
-    cq_value = serializers.FloatField(read_only=True)
-    gc_reaction = serializers.FloatField(read_only=True)
-    replicate_concentration = serializers.FloatField(read_only=True)
-    concentration_unit = serializers.IntegerField(read_only=True)
-    bad_result_flag = serializers.BooleanField(read_only=True)
-    control_type = serializers.IntegerField(read_only=True)
-    re_pcr = serializers.IntegerField(read_only=True)
     analysis_batch = serializers.IntegerField(write_only=True)
     extraction_number = serializers.IntegerField(write_only=True)
-    ext_neg_cq_value = serializers.FloatField(write_only=True)
-    ext_neg_concentration = serializers.FloatField(write_only=True)
-    rt_neg_cq_value = serializers.FloatField(write_only=True)
-    rt_neg_concentration = serializers.FloatField(write_only=True)
-    pcr_neg_cq_value = serializers.FloatField(write_only=True)
-    pcr_neg_concentration = serializers.FloatField(write_only=True)
-    pcr_pos_cq_value = serializers.FloatField(write_only=True)
-    pcr_pos_concentration = serializers.FloatField(write_only=True)
-    pcrreplicates = serializers.ListField(write_only=True)
+
+    class Meta:
+        model = PCRReplicateBatch
+        fields = ('id', 'analysis_batch', 'extraction_number', 'extraction_batch', 'target', 'replicate_number', 'note',
+                  'ext_neg_cq_value', 'ext_neg_concentration', 'rt_neg_cq_value', 'rt_neg_concentration',
+                  'pcr_neg_cq_value', 'pcr_neg_concentration', 'pcr_pos_cq_value', 'pcr_pos_concentration',
+                  'pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class PCRReplicateSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'target', 'replicate_number', 'control_type', 'record_type',
-                  'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit', 'bad_result_flag',
-                  're_pcr', 'analysis_batch', 'extraction_number', 'ext_neg_cq_value', 'ext_neg_concentration',
-                  'rt_neg_cq_value', 'rt_neg_concentration', 'pcr_neg_cq_value', 'pcr_neg_concentration',
-                  'pcr_pos_cq_value', 'pcr_pos_concentration', 'pcrreplicates',
+        fields = ('id', 'extraction', 'pcrreplicate_batch' 'cq_value', 'gc_reaction',
+                  'replicate_concentration', 'concentration_unit', 'bad_result_flag', 're_pcr',
+                  'ext_neg_control', 'rt_neg_control', 'pcr_neg_control', 'pcr_pos_control',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1085,15 +1047,6 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
         fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition_date', 'nucleic_acid_type',
                   'dilution_factor', 'inh_pos_cq_value', 'inhibitions', 'suggested_dilution_factor',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class ControlTypeSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = ControlType
-        fields = ('id', 'name', 'abbreviation', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class TargetSerializer(serializers.ModelSerializer):

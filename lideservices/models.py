@@ -444,7 +444,7 @@ class ReverseTranscription(HistoryModel):
 
     class Meta:
         db_table = "lide_reversetranscription"
-        # QUESTION: can there be more than one RT per EB? if so, we should probably have a RT_number field to ensure uniqueness among RTs within one EB
+        unique_together = ("extraction_batch", "re_rt")
 
 
 class Extraction(HistoryModel):
@@ -465,54 +465,56 @@ class Extraction(HistoryModel):
         unique_together = ("sample", "extraction_batch")
 
 
+class PCRReplicateBatch(HistoryModel):
+    """
+    Polymerase Chain Reaction Replicate Batch
+    """
+
+    extraction_batch = models.ForeignKey('Extraction', related_name='pcrreplicatebatches')
+    target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
+    replicate_number = models.FloatField(null=True, blank=True)
+    note = models.TextField(blank=True)
+    ext_neg_cq_value = models.FloatField(null=True, blank=True)
+    ext_neg_gc_reaction = models.FloatField(null=True, blank=True)
+    ext_neg_bad_result_flag = models.BooleanField(default=False)
+    rt_neg_cq_value = models.FloatField(null=True, blank=True)
+    rt_neg_gc_reaction = models.FloatField(null=True, blank=True)
+    rt_neg_bad_result_flag = models.BooleanField(default=False)
+    pcr_neg_cq_value = models.FloatField(null=True, blank=True)
+    pcr_neg_gc_reaction = models.FloatField(null=True, blank=True)
+    pcr_neg_bad_result_flag = models.BooleanField(default=False)
+    pcr_pos_cq_value = models.FloatField(null=True, blank=True)
+    pcr_pos_gc_reaction = models.FloatField(null=True, blank=True)
+    pcr_pos_bad_result_flag = models.BooleanField(default=False)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_pcrreplicatebatch"
+        unique_together = ("extraction_batch", "target", "replicate_number")
+
+
 class PCRReplicate(HistoryModel):
     """
     Polymerase Chain Reaction Replicate
     """
 
     extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
-    target = models.ForeignKey('Target', related_name='pcrreplicates')
-    replicate_number = models.FloatField(null=True, blank=True)
+    pcrreplicate_batch = models.ForeignKey('PCRReplicate', related_name='pcrreplicates')
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.FloatField(null=True, blank=True)
     replicate_concentration = models.FloatField(null=True, blank=True)
-    concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcr_replicates')  # QUESTION: This should probably be required, yes?
+    concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     re_pcr = models.BooleanField(default=False)
-    ext_neg_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
-    rt_neg_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
-    pcr_neg_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
-    pcr_pos_control = models.ForeignKey('PCRReplicateControl', related_name='pcrreplicates')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_pcrreplicate"
-        unique_together = ("extraction", "target", "replicate_number")
-
-
-class PCRReplicateControl(HistoryModel):
-    """
-    Polymerase Chain Reaction Replicate Controls
-    """
-
-    extraction_batch = models.ForeignKey('Extraction', related_name='pcrreplicatecontrols')
-    target = models.ForeignKey('Target', related_name='pcrreplicatecontrols')
-    replicate_number = models.FloatField(null=True, blank=True)
-    control_type = models.ForeignKey('ControlType', null=True, related_name='pcrreplicatecontrols')
-    cq_value = models.FloatField(null=True, blank=True)
-    gc_reaction = models.FloatField(null=True, blank=True)
-    replicate_concentration = models.FloatField(null=True, blank=True)
-    concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicatecontrols')  # QUESTION: This should probably be required, yes?
-    bad_result_flag = models.BooleanField(default=False)
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_pcrreplicatecontrol"
-        unique_together = ("extraction_batch", "target", "replicate_number", "control_type")
+        unique_together = ("extraction", "pcrreplicate_batch")
 
 
 class Result(HistoryModel):
@@ -584,20 +586,6 @@ class Target(NameModel):
 
     class Meta:
         db_table = "lide_target"
-
-
-class ControlType(NameModel):
-    """
-    Control Type
-    """
-
-    abbreviation = models.CharField(max_length=128, null=True, blank=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = "lide_controltype"
 
 
 ######

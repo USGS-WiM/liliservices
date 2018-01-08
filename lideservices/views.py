@@ -270,27 +270,26 @@ class PCRReplicateViewSet(HistoryViewSet):
     serializer_class = PCRReplicateSerializer
 
 
-class PCRReplicateControlViewSet(HistoryViewSet):
-    queryset = PCRReplicateControl.objects.all()
-    serializer_class = PCRReplicateControlSerializer
+class PCRReplicateBatchViewSet(HistoryViewSet):
+    queryset = PCRReplicateBatch.objects.all()
+    serializer_class = PCRReplicateBatchSerializer
 
-
-class PCRReplicateResultsUploadView(views.APIView):
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def post(self, request):
+    # TODO: implement post?
+    # TODO: move this to the serializer!
+    def put(self, request):
         request_data = JSONParser().parse(request)
-        serializer = PCRReplicateResultsUploadSerializer(data=request_data)
+        serializer = PCRReplicateBatchSerializer(data=request_data)
         if serializer.is_valid():
             is_valid = True
             response_data = []
             valid_data = []
             response_errors = []
-            target = request_data.get('target', None)
             ab = request_data.get('analysis_batch', None)
             en = request_data.get('extraction_number', None)
+            eb = request_data.get('extraction_batch', None)
+            target = request_data.get('target', None)
             rn = request_data.get('replicate_number', None)
-            sc = request_data.get('standard_curve', None)
+            # sc = request_data.get('standard_curve', None)
             extneg_cq = request_data.get('ext_neg_cq_value', None)
             extneg_conc = request_data.get('ext_neg_concentration', None)
             rtneg_cq = request_data.get('rt_neg_cq_value', None)
@@ -299,78 +298,87 @@ class PCRReplicateResultsUploadView(views.APIView):
             pcrneg_conc = request_data.get('pcr_neg_concentration', None)
             pcrpos_cq = request_data.get('pcr_pos_cq_value', None)
             pcrpos_conc = request_data.get('pcr_pos_concentration', None)
+            note = request_data.get('note', None)
             pcrreplicates = request_data.get('pcrreplicates', None)
-            eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
+            if not eb:
+                eb = ExtractionBatch.objects.filter(analysis_batch=ab, extraction_number=en).first()
             if eb:
-                # TODO: also save control data (extneg, rtneg, pcrneg, pcrpos)
-                for control in ['ext_neg', 'rt_neg', 'pcr_neg', 'pcr_pos']:
-                    control_type = ControlType.objects.get(name=control)
-                    pcrrepcontrol = PCRReplicateControl.objects.filter(extraction_batch=eb.id, target=target,
-                                                       replicate_number=rn, control_type=control_type.id).first()
-                    if pcrrepcontrol:
-                        data = {}
-                        flag = False
-                        if (control + '_cq_value') in request_data or (control + '_gc_reaction') in request_data:
-                            if request_data[control + '_cq_value'] > 0 or request_data[control + '_gc_reaction'] > 0:
-                                flag = True
-                        if control == 'ext_neg':
-                            data = {'cq_value': extneg_cq, 'gc_reaction': extneg_conc, 'bad_result_flag': flag}
-                        elif control == 'rt_neg':
-                            data = {'cq_value': rtneg_cq, 'gc_reaction': rtneg_conc, 'bad_result_flag': flag}
-                        elif control == 'pcr_neg':
-                            data = {'cq_value': pcrneg_cq, 'gc_reaction': pcrneg_conc, 'bad_result_flag': flag}
-                        elif control == 'pcr_pos':
-                            data = {'cq_value': pcrpos_cq, 'gc_reaction': pcrpos_conc, 'bad_result_flag': flag}
-                        serializer = PCRReplicateControlSerializer(pcrrepcontrol, data=data, partial=True)
-                        if serializer.is_valid():
-                            valid_data.append(serializer)
-                        else:
-                            is_valid = False
-                            response_errors.append(serializer.errors)
-                    else:
-                        is_valid = False
-                        message = "No PCRReplicate Control exists with Extraction Batch ID: " + eb.id + ", "
-                        message += "Target ID: " + target + ", Replicate Number: " + rn + ", "
-                        message += "Control Type: " + control_type
-                        response_errors.append({"pcrreplicate": message})
-                for pcrreplicate in pcrreplicates:
-                    sample = pcrreplicate.get('sample', None)
-                    extraction = Extraction.objects.filter(extraction_batch=eb.id, sample=sample).first()
-                    if extraction:
-                        cq_value = pcrreplicate.get('cq_value', 0)
-                        gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
-                        pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target,
-                                                             replicate_number=rn).first()
-                        if pcrrep:
-                            bad_result_flag = False
-                            if cq_value > 0:
-                                if rtneg_cq is not None:
-                                    if extneg_conc > 0 or rtneg_conc > 0 or pcrneg_conc > 0 or gc_reaction < 0:
-                                        bad_result_flag = True
+                # first ensure the submitted pcr replicate batch exists in the DB, then validate its controls
+                pcrrepbatch = PCRReplicateBatch.objects.filter(extraction_batch=eb.id, target=target,
+                                                               replicate_number=rn).first()
+                if pcrrepbatch:
+                    ext_neg_flag = True if extneg_cq is not None else False
+                    rt_neg_flag = True if rtneg_cq is not None else False
+                    pcr_neg_flag = True if pcrneg_cq is not None else False
+                    # validating the pcr_pos will come in a later release of the software
+                    pcr_pos_flag = False
+                    new_data = {'note': note, 'ext_neg_cq_value': extneg_cq, 'ext_neg_gc_reaction': extneg_conc,
+                                'ext_neg_bad_result_flag': ext_neg_flag, 'rt_neg_cq_value': rtneg_cq,
+                                'rt_neg_gc_reaction': rtneg_conc, 'rt_neg_bad_result_flag': rt_neg_flag,
+                                'pcr_neg_cq_value': pcrneg_cq, 'pcr_neg_gc_reaction': pcrneg_conc,
+                                'pcr_neg_bad_result_flag': pcr_neg_flag, 'pcr_pos_cq_value': pcrpos_cq,
+                                'pcr_pos_gc_reaction': pcrpos_conc, 'pcr_pos_bad_result_flag': pcr_pos_flag}
+                    serializer = PCRReplicateBatchSerializer(pcrrepbatch, data=new_data, partial=True)
+                    if serializer.is_valid():
+                        valid_data.append(serializer)
+                        # then ensure the submitted pcr replicates exist in the DB,
+                        for pcrreplicate in pcrreplicates:
+                            sample = pcrreplicate.get('sample', None)
+                            extraction = Extraction.objects.filter(extraction_batch=eb.id, sample=sample).first()
+                            if extraction:
+                                # finally validate the pcr reps and calculate their final replicate concentrations
+                                cq_value = pcrreplicate.get('cq_value', 0)
+                                gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
+                                pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target,
+                                                                     replicate_number=rn).first()
+                                if pcrrep:
+                                    # ensure that the concentrated/dissolved/diluted volume exists for this sample
+                                    if sample.dissolution_volume is None or sample.post_dilution_volume is None:
+                                        fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
+                                        if fcsv.final_concentrated_sample_volume is None:
+                                            is_valid = False
+                                            message = "No concentrated/dissolved/diluted volume exists for Sample ID: " + sample
+                                            response_errors.append({"pcrreplicate": message})
+                                            # skip to the next item in the loop
+                                            continue
+                                    # that particular sample volume exists, so finish updating this rep
+                                    flag = self.validate_result(cq_value, extneg_cq, rtneg_cq, pcrneg_cq,
+                                                                gc_reaction)
+                                    target = Target.objects.get(id=target)
+                                    nucleic_acid_type = target.nucleic_acid_type
+                                    rep_conc = self.calc_rep_conc(gc_reaction, nucleic_acid_type, extraction, eb,
+                                                                  sample)
+                                    conc_unit = Unit.objects.get(name='Liter')
+                                    if sample.matrix in ['forage_sediment_soil', 'solid_manure']:
+                                        conc_unit = Unit.objects.get(name='gram')
+                                    new_data = {'cq_value': cq_value, 'gc_reaction': gc_reaction,
+                                                'bad_result_flag': flag,
+                                                'replicate_concentration': rep_conc,
+                                                'concentration_unit': conc_unit.id}
+                                    serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
+                                    if serializer.is_valid():
+                                        valid_data.append(serializer)
+                                    else:
+                                        is_valid = False
+                                        response_errors.append(serializer.errors)
                                 else:
-                                    if extneg_conc > 0 or pcrneg_conc > 0 or gc_reaction < 0:
-                                        bad_result_flag = True
-                            target = Target.objects.get(id=target)
-                            nucleic_acid_type = target.nucleic_acid_type
-                            replicate_concentration = self.calculate_replicate_concentration(gc_reaction, nucleic_acid_type, extraction, eb, sample)
-                            new_data = {'cq_value': cq_value, 'gc_reaction': gc_reaction,
-                                        'bad_result_flag': bad_result_flag}
-                            serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
-                            if serializer.is_valid():
-                                valid_data.append(serializer)
+                                    is_valid = False
+                                    message = "No PCRReplicate exists with PCRReplicate Batch ID: " + pcrrepbatch.id + ", "
+                                    message += "Extraction ID: " + extraction.id
+                                    response_errors.append({"pcrreplicate": message})
                             else:
                                 is_valid = False
-                                response_errors.append(serializer.errors)
-                        else:
-                            is_valid = False
-                            message = "No PCRReplicate exists with Extraction ID: " + extraction.id + ", "
-                            message += "Target ID: " + target + ", Replicate Number: " + rn
-                            response_errors.append({"pcrreplicate": message})
+                                message = "No Extraction exists with Extraction Batch ID: " + eb.id + ", "
+                                message += "Sample ID: " + sample
+                                response_errors.append({"extraction": message})
                     else:
                         is_valid = False
-                        message = "No Extraction exists with Extraction Batch ID: " + eb.id + ", "
-                        message += "Sample ID: " + sample
-                        response_errors.append({"extraction": message})
+                        response_errors.append(serializer.errors)
+                else:
+                    is_valid = False
+                    message = "No PCRReplicate Batch exists with Extraction Batch ID: " + eb.id + ", "
+                    message += "Target ID: " + target + ", Replicate Number: " + rn
+                    response_errors.append({"pcrreplicate": message})
             else:
                 is_valid = False
                 message = "No Extraction Batch exists with Analysis Batch ID: " + ab + ", "
@@ -386,13 +394,51 @@ class PCRReplicateResultsUploadView(views.APIView):
                 return JsonResponse(response_errors, safe=False, status=400)
         return Response(serializer.errors, status=400)
 
-    def calculate_replicate_concentration(self, gc_reaction, nucleic_acid_type, extraction, eb, sample):
-        fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
-        if sample.matrix == 'water':
-            if nucleic_acid_type == 'DNA':
-                return (gc_reaction / eb.reaction_volume) * (eb.reaction_volume / eb.template_volume) * (
-                        eb.elution_volume / eb.extraction_volume) * (1000 microL / 1 mL) * (
-                        fcsv / sample.sample_volume) * eb.dilution_factor * extraction.inhibition.dilution_factor
+    def validate_result(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
+        bad_result_flag = False
+        if cq_value > 0:
+            if rtneg_cq is not None:
+                if extneg_cq > 0 or rtneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
+                    bad_result_flag = True
+            else:
+                if extneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
+                    bad_result_flag = True
+        return bad_result_flag
+
+    # Calculate replicate_concentration
+    def calc_rep_conc(self, gc_reaction, nucleic_acid_type, extraction, eb, sample):
+        # first apply the universal expressions
+        prelim_value = (gc_reaction / eb.reaction_volume) * (
+                eb.reaction_volume / eb.template_volume) * (
+                eb.elution_volume / eb.extraction_volume) * (
+                eb.dilution_factor * extraction.inhibition.dilution_factor)
+        # apply the RT the expression if applicable
+        if nucleic_acid_type == 'RNA':
+            # assume that there can be only one RT per EB, except when there is a re_rt,
+            # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
+            # that references the only valid RT; in other words, the re_rt value must be null for the record to be valid
+            rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
+            prelim_value = prelim_value * (rt.reaction_volume / rt.template_volume)
+        # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
+        if sample.matrix_type in ['forage_sediment_soil', 'water', 'wastewater']:
+            fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
+            prelim_value = prelim_value * (fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
+        elif sample.matrix_type == 'air':
+            prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
+        elif sample.matrix_type == 'solid_manure':
+            prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
+        # finally, apply the unit-cancelling expression
+        # QUESTION: is this even necessary in this context (programming)? we're pretty much unitless already
+        if sample.matrix_type in ['air',  'forage_sediment_soil', 'water', 'wastewater']:
+            # 1,000 microliters per 1 milliliter
+            final_value = prelim_value * 1000
+        elif sample.matrix_type == 'liquid_manure':
+            # 1,000,000 microliters per 1 liter
+            final_value = prelim_value * 1000000
+        else:
+            # solid manure
+            final_value = prelim_value
+        return final_value
 
 
 class ResultViewSet(HistoryViewSet):
@@ -542,11 +588,6 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
 class TargetViewSet(HistoryViewSet):
     queryset = Target.objects.all()
     serializer_class = TargetSerializer
-
-
-class ControlTypeViewSet(HistoryViewSet):
-    queryset = ControlType.objects.all()
-    serializer_class = ControlTypeSerializer
 
 
 ######
