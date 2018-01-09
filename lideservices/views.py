@@ -271,8 +271,29 @@ class PCRReplicateViewSet(HistoryViewSet):
 
 
 class PCRReplicateBatchViewSet(HistoryViewSet):
-    queryset = PCRReplicateBatch.objects.all()
     serializer_class = PCRReplicateBatchSerializer
+
+    # override the default queryset to allow filtering by URL arguments
+    def get_queryset(self):
+        queryset = PCRReplicateBatch.objects.all()
+        # if ID is in query, only search by ID and ignore other params
+        batch = self.request.query_params.get('id', None)
+        if batch is not None:
+            queryset = queryset.filter(id__exact=batch)
+        # else, search by other params (that don't include ID)
+        else:
+            analysis_batch = self.request.query_params.get('analysis_batch', None)
+            extraction_number = self.request.query_params.get('extraction_number', None)
+            if analysis_batch is not None and extraction_number is not None:
+                queryset = queryset.filter(extraction_batch__analysis_batch__exact=analysis_batch,
+                                           extraction_batch__extraction_number__exact=extraction_number)
+            target = self.request.query_params.get('target', None)
+            if target is not None:
+                queryset = queryset.filter(target__exact=target)
+            replicate_number = self.request.query_params.get('replicate_number', None)
+            if replicate_number is not None:
+                queryset = queryset.filter(replicate_number__exact=replicate_number)
+        return queryset
 
 
 class ResultViewSet(HistoryViewSet):
