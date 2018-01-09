@@ -932,8 +932,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                     # finally validate the pcr reps and calculate their final replicate concentrations
                     cq_value = pcrreplicate.get('cq_value', 0)
                     gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
-                    pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target,
-                                                         replicate_number=rn).first()
+                    pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, replicate_number=rn).first()
                     if pcrrep:
                         # ensure that the concentrated/dissolved/diluted volume exists for this sample
                         if sample.dissolution_volume is None or sample.post_dilution_volume is None:
