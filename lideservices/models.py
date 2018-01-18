@@ -63,7 +63,7 @@ class Sample(HistoryModel):
 
     sample_type = models.ForeignKey('SampleType', related_name='samples')
     matrix_type = models.ForeignKey('MatrixType', related_name='samples')
-    filter_type = models.ForeignKey('FilterType', related_name='samples')
+    filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
     study_site_name = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: I don't like this. Location information should be kept in a dedicated table for possible future use in spatial analysis
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
