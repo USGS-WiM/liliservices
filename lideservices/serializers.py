@@ -290,7 +290,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'smaple_type_string', 'matrix_type', 'matrix_type_string', 'filter_type',
+        fields = ('id', 'sample_type', 'sample_type_string', 'matrix_type', 'matrix_type_string', 'filter_type',
                   'filter_type_string', 'study', 'study_string', 'study_site_name', 'collaborator_sample_id',
                   'sampler_name', 'sampler_name_string', 'sample_notes', 'sample_description', 'arrival_date',
                   'arrival_notes', 'collection_start_date', 'collection_start_time', 'collection_end_date',
@@ -476,6 +476,8 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         if self.context['request'].method == 'POST':
             if 'new_samples' not in data:
                 raise serializers.ValidationError("new_samples is a required field")
+
+        return data
 
     # on create, also create child objects (sample-analysisbacth M:M relates)
     def create(self, validated_data):
