@@ -528,7 +528,7 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'samples', 'analysis_batch_description', 'analysis_batch_notes',
+        fields = ('id', 'samples', 'analysis_batch_description', 'analysis_batch_notes', 'new_samples',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
