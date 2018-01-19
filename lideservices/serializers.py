@@ -488,8 +488,9 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
         # create a Sample Analysis Batch object for each sample ID submitted
         if new_samples:
-            for new_sample in new_samples:
-                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **new_sample)
+            for sample_id in new_samples:
+                sample = Sample.objects.get(id=sample_id)
+                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, sample=sample)
 
         return analysis_batch
 
@@ -514,13 +515,15 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         # identify and delete relates where sample IDs are present in old list but not new list
         delete_samples = list(set(old_samples) - set(new_samples))
         for sample_id in delete_samples:
-            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=instance, sample=sample_id)
+            sample = Sample.objects.get(id=sample_id)
+            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=instance, sample=sample)
             delete_sample.delete()
 
         # identify and create relates where sample IDs are present in new list but not old list
         add_samples = list(set(new_samples) - set(old_samples))
         for sample_id in add_samples:
-            SampleAnalysisBatch.objects.create(analysis_batch=instance, sample=sample_id)
+            sample = Sample.objects.get(id=sample_id)
+            SampleAnalysisBatch.objects.create(analysis_batch=instance, sample=sample)
 
         return instance
 
