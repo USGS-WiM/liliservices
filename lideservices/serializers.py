@@ -199,81 +199,86 @@ class AliquotSerializer(serializers.ModelSerializer):
 
 
 class SampleSerializer(serializers.ModelSerializer):
-    # sample_type
-    def get_sample_type(self, obj):
-        sample_type_id = obj.sample_type_id
-        sample_type = SampleType.objects.get(id=sample_type_id)
-        sample_type_name = sample_type.name
-        data = {"id": sample_type_id, "name": sample_type_name}
-        return data
-
-    # matrix_type
-    def get_matrix_type(self, obj):
-        matrix_type_id = obj.matrix_type_id
-        matrix_type = MatrixType.objects.get(id=matrix_type_id)
-        matrix_type_name = matrix_type.name
-        data = {"id": matrix_type_id, "name": matrix_type_name}
-        return data
-
-    # filter type
-    def get_filter_type(self, obj):
-        filter_type_id = obj.filter_type_id
-        filter_type = FilterType.objects.get(id=filter_type_id)
-        filter_type_name = filter_type.name
-        data = {"id": filter_type_id, "name": filter_type_name}
-        return data
-
-    # study
-    def get_study(self, obj):
-            study_id = obj.study_id
-            study = Study.objects.get(id=study_id)
-            study_name = study.name
-            data = {"id": study_id, "name": study_name}
-            return data
-
-    # sampler name
-    def get_sampler_name(self, obj):
-        if obj.sampler_name_id is not None:
-            sampler_name_id = obj.sampler_name_id
-            sampler_name = User.objects.get(id=sampler_name_id)
-            sampler_name_name = sampler_name.username if sampler_name is not None else 'Does Not Exist'
-            data = {"id": sampler_name_id, "name": sampler_name_name}
-        else:
-            data = None
-        return data
-
-    # peg_neg_targets_extracted
-    def get_peg_neg_targets_extracted(self, obj):
-        targets_extracted = []
-        peg_neg = obj.peg_neg
-        if peg_neg is not None:
-            peg_neg_id = peg_neg.id
-            extractions = peg_neg.extractions.values()
-
-            if extractions is not None:
-                for extraction in extractions:
-                    replicates = extraction.get('pcrreplicates')
-                    if replicates is not None:
-                        for replicate in replicates:
-                            target_id = replicate.get('target_id')
-
-                            # get the unique target IDs for this peg neg
-                            if target_id not in targets_extracted:
-                                targets_extracted.append(target_id)
-
-        else:
-            peg_neg_id = None
-
-        data = {"id": peg_neg_id, "targets_extracted": targets_extracted}
-        return data
+    # # sample_type
+    # def get_sample_type(self, obj):
+    #     sample_type_id = obj.sample_type_id
+    #     sample_type = SampleType.objects.get(id=sample_type_id)
+    #     sample_type_name = sample_type.name
+    #     data = {"id": sample_type_id, "name": sample_type_name}
+    #     return data
+    #
+    # # matrix_type
+    # def get_matrix_type(self, obj):
+    #     matrix_type_id = obj.matrix_type_id
+    #     matrix_type = MatrixType.objects.get(id=matrix_type_id)
+    #     matrix_type_name = matrix_type.name
+    #     data = {"id": matrix_type_id, "name": matrix_type_name}
+    #     return data
+    #
+    # # filter type
+    # def get_filter_type(self, obj):
+    #     filter_type_id = obj.filter_type_id
+    #     filter_type = FilterType.objects.get(id=filter_type_id)
+    #     filter_type_name = filter_type.name
+    #     data = {"id": filter_type_id, "name": filter_type_name}
+    #     return data
+    #
+    # # study
+    # def get_study(self, obj):
+    #         study_id = obj.study_id
+    #         study = Study.objects.get(id=study_id)
+    #         study_name = study.name
+    #         data = {"id": study_id, "name": study_name}
+    #         return data
+    #
+    # # sampler name
+    # def get_sampler_name(self, obj):
+    #     if obj.sampler_name_id is not None:
+    #         sampler_name_id = obj.sampler_name_id
+    #         sampler_name = User.objects.get(id=sampler_name_id)
+    #         sampler_name_name = sampler_name.username if sampler_name is not None else 'Does Not Exist'
+    #         data = {"id": sampler_name_id, "name": sampler_name_name}
+    #     else:
+    #         data = None
+    #     return data
+    #
+    # # peg_neg_targets_extracted
+    # def get_peg_neg_targets_extracted(self, obj):
+    #     targets_extracted = []
+    #     peg_neg = obj.peg_neg
+    #     if peg_neg is not None:
+    #         peg_neg_id = peg_neg.id
+    #         extractions = peg_neg.extractions.values()
+    #
+    #         if extractions is not None:
+    #             for extraction in extractions:
+    #                 replicates = extraction.get('pcrreplicates')
+    #                 if replicates is not None:
+    #                     for replicate in replicates:
+    #                         target_id = replicate.get('target_id')
+    #
+    #                         # get the unique target IDs for this peg neg
+    #                         if target_id not in targets_extracted:
+    #                             targets_extracted.append(target_id)
+    #
+    #     else:
+    #         peg_neg_id = None
+    #
+    #     data = {"id": peg_neg_id, "targets_extracted": targets_extracted}
+    #     return data
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    sample_type = serializers.SerializerMethodField()
-    matrix_type = serializers.SerializerMethodField()
-    filter_type = serializers.SerializerMethodField()
-    study = serializers.SerializerMethodField()
-    sampler_name = serializers.SerializerMethodField()
+    # sample_type = serializers.SerializerMethodField()
+    # matrix_type = serializers.SerializerMethodField()
+    # filter_type = serializers.SerializerMethodField()
+    # study = serializers.SerializerMethodField()
+    # sampler_name = serializers.SerializerMethodField()
+    sample_type_string = serializers.StringRelatedField(source='sample_type')
+    matrix_type_string = serializers.StringRelatedField(source='matrix_type')
+    filter_type_string = serializers.StringRelatedField(source='filter_type')
+    study_string = serializers.StringRelatedField(source='study')
+    sampler_name_string = serializers.StringRelatedField(source='sampler_name')
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
     final_concentrated_sample_volume = serializers.FloatField(
@@ -285,8 +290,9 @@ class SampleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'matrix_type', 'filter_type', 'study', 'study_site_name',
-                  'collaborator_sample_id', 'sampler_name', 'sample_notes', 'sample_description', 'arrival_date',
+        fields = ('id', 'sample_type', 'smaple_type_string', 'matrix_type', 'matrix_type_string', 'filter_type',
+                  'filter_type_string', 'study', 'study_string', 'study_site_name', 'collaborator_sample_id',
+                  'sampler_name', 'sampler_name_string', 'sample_notes', 'sample_description', 'arrival_date',
                   'arrival_notes', 'collection_start_date', 'collection_start_time', 'collection_end_date',
                   'collection_end_time', 'meter_reading_initial', 'meter_reading_final', 'meter_reading_unit',
                   'total_volume_sampled_initial', 'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled',
@@ -464,22 +470,28 @@ class SampleAnalysisBatchSerializer(serializers.ModelSerializer):
 class AnalysisBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
+    new_samples = serializers.JSONField(write_only=True)
+
+    def validate(self, data):
+        if self.context['request'].method == 'POST':
+            if 'new_samples' not in data:
+                raise serializers.ValidationError("new_samples is a required field")
 
     # on create, also create child objects (sample-analysisbacth M:M relates)
     def create(self, validated_data):
         # pull out sample ID list from the request
-        if 'samples' in validated_data:
-            samples = validated_data.pop('samples')
+        if 'new_samples' in validated_data:
+            new_samples = validated_data.pop('new_samples')
         else:
-            samples = []
+            new_samples = []
 
         # create the Analysis Batch object
         analysis_batch = AnalysisBatch.objects.create(**validated_data)
 
         # create a Sample Analysis Batch object for each sample ID submitted
-        if samples:
-            for sample in samples:
-                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **sample)
+        if new_samples:
+            for new_sample in new_samples:
+                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, **new_sample)
 
         return analysis_batch
 
@@ -489,8 +501,8 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         old_samples = Sample.objects.filter(analysisbatches=instance.id)
 
         # pull out sample ID list from the request
-        if 'samples' in self.initial_data:
-            new_sample_ids = self.initial_data['samples']
+        if 'new_samples' in self.initial_data:
+            new_sample_ids = self.initial_data['new_samples']
             new_samples = Sample.objects.filter(id__in=new_sample_ids)
         else:
             new_samples = []
