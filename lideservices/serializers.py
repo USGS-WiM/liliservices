@@ -242,30 +242,26 @@ class SampleSerializer(serializers.ModelSerializer):
     #         data = None
     #     return data
     #
-    # # peg_neg_targets_extracted
-    # def get_peg_neg_targets_extracted(self, obj):
-    #     targets_extracted = []
-    #     peg_neg = obj.peg_neg
-    #     if peg_neg is not None:
-    #         peg_neg_id = peg_neg.id
-    #         extractions = peg_neg.extractions.values()
-    #
-    #         if extractions is not None:
-    #             for extraction in extractions:
-    #                 replicates = extraction.get('pcrreplicates')
-    #                 if replicates is not None:
-    #                     for replicate in replicates:
-    #                         target_id = replicate.get('target_id')
-    #
-    #                         # get the unique target IDs for this peg neg
-    #                         if target_id not in targets_extracted:
-    #                             targets_extracted.append(target_id)
-    #
-    #     else:
-    #         peg_neg_id = None
-    #
-    #     data = {"id": peg_neg_id, "targets_extracted": targets_extracted}
-    #     return data
+    # peg_neg_targets_extracted
+    def get_peg_neg_targets_extracted(self, obj):
+        targets_extracted = []
+        peg_neg = obj.peg_neg
+        if peg_neg is not None:
+            peg_neg_id = peg_neg.id
+            extractions = peg_neg.extractions.values()
+
+            if extractions is not None:
+                for extraction in extractions:
+                    replicates = extraction.get('pcrreplicates')
+                    if replicates is not None:
+                        for replicate in replicates:
+                            target_id = replicate.get('target_id')
+
+                            # get the unique target IDs for this peg neg
+                            if target_id not in targets_extracted:
+                                targets_extracted.append(target_id)
+
+        return targets_extracted
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
