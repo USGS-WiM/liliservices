@@ -515,15 +515,13 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         # identify and delete relates where sample IDs are present in old list but not new list
         delete_samples = list(set(old_samples) - set(new_samples))
         for sample_id in delete_samples:
-            sample = Sample.objects.get(id=sample_id)
-            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=instance, sample=sample)
+            delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=instance, sample=sample_id)
             delete_sample.delete()
 
         # identify and create relates where sample IDs are present in new list but not old list
         add_samples = list(set(new_samples) - set(old_samples))
         for sample_id in add_samples:
-            sample = Sample.objects.get(id=sample_id)
-            SampleAnalysisBatch.objects.create(analysis_batch=instance, sample=sample)
+            SampleAnalysisBatch.objects.create(analysis_batch=instance, sample=sample_id)
 
         return instance
 
@@ -1095,8 +1093,8 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = PCRReplicateBatch
         fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'note',
-                  'ext_neg_cq_value', 'ext_neg_concentration', 'rt_neg_cq_value', 'rt_neg_concentration',
-                  'pcr_neg_cq_value', 'pcr_neg_concentration', 'pcr_pos_cq_value', 'pcr_pos_concentration',
+                  'ext_neg_cq_value', 'ext_neg_gc_reaction', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
+                  'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_pos_cq_value', 'pcr_pos_gc_reaction',
                   'pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
