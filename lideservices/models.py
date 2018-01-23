@@ -502,7 +502,7 @@ class PCRReplicate(HistoryModel):
 
     extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
     target = models.ForeignKey('Target', related_name='pcrreplicates')
-    pcrreplicate_batch = models.ForeignKey('PCRReplicate', related_name='pcrreplicates')
+    pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.FloatField(null=True, blank=True)
     replicate_concentration = models.FloatField(null=True, blank=True)
