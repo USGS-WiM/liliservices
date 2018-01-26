@@ -78,8 +78,10 @@ class AliquotViewSet(HistoryViewSet):
             # check if many is required
             if isinstance(data, list) and 'aliquot_count' in data[0]:
                 kwargs['many'] = True
+                return super(AliquotViewSet, self).get_serializer(*args, **kwargs)
 
-        return super(AliquotViewSet, self).get_serializer(*args, **kwargs)
+        else:
+            return AliquotSerializer
 
 
 class SampleTypeViewSet(HistoryViewSet):
@@ -131,15 +133,16 @@ class FreezerLocationViewSet(HistoryViewSet):
             box__exact=max_box['box__max'], row__exact=max_row['row__max']).aggregate(Max('spot'))
         last_occupied = FreezerLocation.objects.filter(
             freezer__exact=max_freezer['freezer__max'], rack__exact=max_rack['rack__max'],
-            box__exact=max_box['box__max'], row__exact=max_row['row__max'], spot__exact=max_spot['spot__max'])
-        return last_occupied[0].id
+            box__exact=max_box['box__max'], row__exact=max_row['row__max'], spot__exact=max_spot['spot__max']).first()
+        return last_occupied.id if last_occupied is not None else 0
 
     def get_queryset(self):
         queryset = FreezerLocation.objects.all()
         last_occupied = self.request.query_params.get('last_occupied', None)
         if last_occupied is not None:
             if last_occupied == 'True' or last_occupied == 'true':
-                queryset = queryset.filter(id__exact=self.get_last_occupied_id())
+                if self.get_last_occupied_id() != 0:
+                    queryset = queryset.filter(id__exact=self.get_last_occupied_id())
         return queryset
 
 

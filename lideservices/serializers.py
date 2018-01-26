@@ -110,12 +110,26 @@ class AliquotListSerializer(serializers.ListSerializer):
             if 'freezer_location' in validated_data and aliquot_count == 1:
                 validated_data['freezer_location'] = freezer_location
             # otherwise create a new freezer location for all other aliquots
-            # TODO: this needs to be properly implemented in conjunction with the Freezer Location serializer to ensure that locations are real (i.e., no spot 10 when there can only be 9 spots)
+            # ensure that all locations are real (i.e., no spot 10 when there can only be 9 spots)
             else:
                 freezer_object = Freezer.objects.filter(id=freezer).first()
                 if freezer_object:
+                    spot = spot + count_num
+                    if spot == freezer_object.spots:
+                        spot = 1
+                        row += 1
+                        if row == freezer_object.rows:
+                            row = 1
+                            box +=1
+                            if box == freezer_object.boxes:
+                                box = 1
+                                rack += 1
+                                if rack == freezer_object.racks:
+                                    message = "This freezer is full! No more spots can be allocated. Aborting"
+                                    raise serializers.ValidationError(message)
+
                     freezer_location = FreezerLocation.objects.create(
-                        freezer=freezer_object, rack=rack, box=box, row=row, spot=(spot+max_aliquot_number-1))
+                        freezer=freezer_object, rack=rack, box=box, row=row, spot=spot)
                     validated_data['freezer_location'] = freezer_location
                 else:
                     raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
@@ -1104,9 +1118,8 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'pcrreplicate_batch' 'cq_value', 'gc_reaction',
+        fields = ('id', 'extraction', 'pcrreplicate_batch', 'cq_value', 'gc_reaction',
                   'replicate_concentration', 'concentration_unit', 'bad_result_flag', 're_pcr',
-                  'ext_neg_control', 'rt_neg_control', 'pcr_neg_control', 'pcr_pos_control',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
