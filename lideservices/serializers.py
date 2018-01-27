@@ -114,7 +114,7 @@ class AliquotListSerializer(serializers.ListSerializer):
             else:
                 freezer_object = Freezer.objects.filter(id=freezer).first()
                 if freezer_object:
-                    spot = spot + count_num
+                    spot = count_num + 1
                     if spot == freezer_object.spots:
                         spot = 1
                         row += 1
@@ -181,7 +181,7 @@ class AliquotListSerializer(serializers.ListSerializer):
 class AliquotCustomSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    freezer_location = FreezerLocationSerializer()
+    #freezer_location = FreezerLocationSerializer()
     aliquot_number = serializers.IntegerField(read_only=True, default=0)
     aliquot_count = serializers.IntegerField(write_only=True, required=False)
     freezer = serializers.IntegerField(write_only=True, required=False)

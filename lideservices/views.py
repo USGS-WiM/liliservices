@@ -62,13 +62,13 @@ class SampleViewSet(HistoryViewSet):
 
 class AliquotViewSet(HistoryViewSet):
     queryset = Aliquot.objects.all()
+    serializer_class = AliquotCustomSerializer
 
     def get_serializer_class(self):
-        if self.request.data:
-            if 'aliquot_count' in self.request.data:
-                return AliquotCustomSerializer
-        else:
+        if not isinstance(self.request.data, list):
             return AliquotSerializer
+        else:
+            return self.serializer_class
 
     def get_serializer(self, *args, **kwargs):
         if 'data' in kwargs:
