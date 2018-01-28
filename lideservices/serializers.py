@@ -114,17 +114,18 @@ class AliquotListSerializer(serializers.ListSerializer):
             else:
                 freezer_object = Freezer.objects.filter(id=freezer).first()
                 if freezer_object:
-                    spot = count_num + 1
-                    if spot == freezer_object.spots:
+                    if count_num != 0:
+                        spot += 1
+                    if spot > freezer_object.spots:
                         spot = 1
                         row += 1
-                        if row == freezer_object.rows:
+                        if row > freezer_object.rows:
                             row = 1
                             box +=1
-                            if box == freezer_object.boxes:
+                            if box > freezer_object.boxes:
                                 box = 1
                                 rack += 1
-                                if rack == freezer_object.racks:
+                                if rack > freezer_object.racks:
                                     message = "This freezer is full! No more spots can be allocated. Aborting"
                                     raise serializers.ValidationError(message)
 
