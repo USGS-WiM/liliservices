@@ -129,9 +129,10 @@ class AliquotListSerializer(serializers.ListSerializer):
                                     message = "This freezer is full! No more spots can be allocated. Aborting"
                                     raise serializers.ValidationError(message)
 
-                    freezer_location = FreezerLocation.objects.create(
-                        freezer=freezer_object, rack=rack, box=box, row=row, spot=spot)
-                    validated_data['freezer_location'] = freezer_location
+                    user = self.context['request'].user
+                    fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row, spot=spot,
+                                                        created_by=user, modified_by=user)
+                    validated_data['freezer_location'] = fl
                 else:
                     raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
 
