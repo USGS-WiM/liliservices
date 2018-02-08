@@ -665,8 +665,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # create the child extractions for this extraction batch
         if extractions is not None:
             for extraction in extractions:
-                sample = extraction['sample']
-                extraction['sample'] = Sample.objects.filter(id=sample).first()
+                sample_id = extraction['sample']
+                sample = Sample.objects.filter(id=sample_id).first()
+                extraction['sample'] = sample
                 if extraction:
                     user = self.context['request'].user
                     extraction['created_by'] = user
@@ -683,6 +684,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         else:
                             # otherwise assume inhib_dna is a date string
                             dna = NucleicAcidType.objects.get(name="DNA")
+
                             try:
                                 datetime.strptime(inhib_dna, '%Y-%m-%d')
                                 extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extr_batch,
@@ -752,7 +754,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                 raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
                 else:
-                    raise serializers.ValidationError("Extraction with Sample ID: " + sample + "does not exist")
+                    raise serializers.ValidationError("Extraction with Sample ID: " + sample_id + "does not exist")
 
         # create the child reverse transcription if present
         if rt is not None:
