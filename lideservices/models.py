@@ -470,7 +470,7 @@ class PCRReplicateBatch(HistoryModel):
     Polymerase Chain Reaction Replicate Batch
     """
 
-    extraction_batch = models.ForeignKey('Extraction', related_name='pcrreplicatebatches')
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
     replicate_number = models.FloatField(null=True, blank=True)
     note = models.TextField(blank=True)
