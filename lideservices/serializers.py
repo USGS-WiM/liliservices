@@ -743,7 +743,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                 # first test if this new replicate belongs to a sample that already
                                 # has its sample mean concentration calculated, and if so, set that value to null
                                 result = Result.objects.filter(sample=new_extr.sample, target=target_id).first()
-                                if result.sample_mean_concentration is not None:
+                                if result is not None and result.sample_mean_concentration is not None:
                                     result.update(sample_mean_concentration=None)
                                 # then create the child replicates for this extraction
                                 for x in range(1, replicate['count']):
