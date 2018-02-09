@@ -968,8 +968,8 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                     # finally validate the pcr reps and calculate their final replicate concentrations
                     cq_value = pcrreplicate.get('cq_value', 0)
                     gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
-                    pcrrep = PCRReplicate.objects.filter(extraction=extraction.id, target=target,
-                                                         replicate_number=rn).first()
+                    pcrrep = PCRReplicate.objects.filter(extraction=extraction.id,
+                                                         pcrreplicate_batch=instance.id).first()
                     if pcrrep:
                         # ensure that the concentrated/dissolved/diluted volume exists for this sample
                         if sample.dissolution_volume is None or sample.post_dilution_volume is None:
@@ -1086,7 +1086,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         pos_gc_reactions = []
         exts = Extraction.objects.filter(sample=item['sample'])
         for ext in exts:
-            reps = PCRReplicate.objects.filter(extraction=ext.id, target=item['target'])
+            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=item['target'])
             for rep in reps:
                 if rep.gc_reaction > 0:
                     reps_count = reps_count + 1
@@ -1099,7 +1099,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         reps_with_null_cq_value = []
         exts = Extraction.objects.filter(sample=sample_id)
         for ext in exts:
-            reps = PCRReplicate.objects.filter(extraction=ext.id, target=target_id)
+            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=target_id)
             for rep in reps:
                 if rep.cq_value is None:
                     reps_with_null_cq_value.append(rep.id)
