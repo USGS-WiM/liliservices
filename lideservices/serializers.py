@@ -880,14 +880,14 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         """
         if self.context['request'].method == 'PUT':
             validation_errors = []
-            if 'analysis_batch' not in data:
-                validation_errors.append("analysis_batch is required")
-            if 'extraction_number' not in data:
-                validation_errors.append("extraction_number is required")
-            if 'target' not in data:
-                validation_errors.append("target is required")
-            if 'replicate_number' not in data:
-                validation_errors.append("replicate_number is required")
+            # if 'analysis_batch' not in data:
+            #     validation_errors.append("analysis_batch is required")
+            # if 'extraction_number' not in data:
+            #     validation_errors.append("extraction_number is required")
+            # if 'target' not in data:
+            #     validation_errors.append("target is required")
+            # if 'replicate_number' not in data:
+            #     validation_errors.append("replicate_number is required")
             # if 'standard_curve' not in data:
             #     validation_errors.append("standard_curve is required")
             if 'ext_neg_cq_value' not in data:
@@ -943,7 +943,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             # then update the instance, but do not save until all child replicates are valid
             eb = validated_data.get('extraction_batch', instance.extraction_batch)
             target = validated_data.get('target', instance.target)
-            rn = validated_data.get('replicate_number', instance.replicate_number)
+            # rn = validated_data.get('replicate_number', instance.replicate_number)
             instance.note = validated_data.get('re_rt', instance.re_rt)
             instance.ext_neg_cq_value = extneg_cq
             instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', 0)
@@ -1416,26 +1416,23 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
 
     def get_targets(self, obj):
         targets = {}
-        extractions = obj.extractions.values()
+        pcrrep_batches = obj.pcrreplicatebatches.values()
 
-        if extractions is not None:
-            for extraction in extractions:
-                replicates = PCRReplicate.objects.filter(extraction=extraction['id'])
-                if replicates is not None:
-                    for replicate in replicates:
-                        target_id = replicate.target.id
+        if pcrrep_batches is not None:
+            for pcrrep_batch in pcrrep_batches:
+                target_id = pcrrep_batch.get('target_id')
 
-                        # count the number of replicates associated with each target
-                        # if the target is already included in our local dict, increment the rep counter
-                        if targets.get(target_id, None) is not None:
-                            data = targets[target_id]
-                            data['replicates'] += 1
-                        # otherwise, add the target to our local dict and 'initialize' its rep counter
-                        else:
-                            target = Target.objects.get(id=target_id)
-                            data = {"id": target_id, "code": target.code,
-                                    "nucleic_acid_type": target.nucleic_acid_type.id, "replicates": 1}
-                        targets[target_id] = data
+                # count the number of replicates associated with each target
+                # if the target is already included in our local dict, increment the rep counter
+                if targets.get(target_id, None) is not None:
+                    data = targets[target_id]
+                    data['replicates'] += 1
+                # otherwise, add the target to our local dict and 'initialize' its rep counter
+                else:
+                    target = Target.objects.get(id=target_id)
+                    data = {"id": target_id, "code": target.code,
+                            "nucleic_acid_type": target.nucleic_acid_type.id, "replicates": 1}
+                targets[target_id] = data
 
         return targets.values()
 
@@ -1528,15 +1525,14 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                 inhibitions = Inhibition.objects.filter(extraction_batch__exact=extraction_batch_id)
                 inhibition_count += len(inhibitions)
 
+                pcrreplicatebatches = PCRReplicateBatch.objects.filter(extraction_batch__exact=extraction_batch_id)
+
                 # target count
-                if extractions is not None:
-                    for extraction in extractions:
-                        replicates = PCRReplicate.objects.filter(extraction__exact=extraction.id)
-                        if replicates is not None:
-                            for replicate in replicates:
-                                target = replicate.target
-                                if target not in targets:
-                                    targets.append(replicate.target)
+                if pcrreplicatebatches is not None:
+                    for pcrreplicatebatch in pcrreplicatebatches:
+                        target = pcrreplicatebatch.target
+                        if target not in targets:
+                            targets.append(target)
 
         summary['extraction_count'] = extraction_count
         summary['inhibition_count'] = inhibition_count
