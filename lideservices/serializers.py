@@ -578,9 +578,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     extraction_number = serializers.IntegerField(read_only=True, default=0)
     extractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
-    new_rt = serializers.JSONField(write_only=True)
-    new_replicates = serializers.ListField(write_only=True)
-    new_extractions = serializers.ListField(write_only=True)
+    new_rt = serializers.JSONField(write_only=True, required=False)
+    new_replicates = serializers.ListField(write_only=True, required=False)
+    new_extractions = serializers.ListField(write_only=True, required=False)
 
     def validate(self, data):
         if self.context['request'].method == 'POST':
