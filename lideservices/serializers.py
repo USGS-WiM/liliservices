@@ -804,8 +804,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.elution_volume = validated_data.get('elution_volume', instance.elution_volume)
         instance.sample_dilution_factor = validated_data.get('sample_dilution_factor', instance.sample_dilution_factor)
         instance.reaction_volume = validated_data.get('reaction_volume', instance.reaction_volume)
-        instance.ext_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
-        instance.ext_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
+        instance.ext_pos_cq_value = validated_data.get('ext_pos_cq_value', instance.ext_pos_cq_value)
+        instance.ext_pos_gc_reaction = validated_data.get('ext_pos_gc_reaction', instance.ext_pos_gc_reaction)
         instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
 
