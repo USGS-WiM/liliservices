@@ -618,10 +618,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         details.append(message)
                 if not is_valid:
                     raise serializers.ValidationError(details)
-        elif self.context['request'].method == 'PUT':
-            if 'extraction_number' not in data or data['extraction_number'] == 0:
-                message = "extraction_number is a required field"
-                raise serializers.ValidationError(message)
+        # elif self.context['request'].method == 'PUT':
+        #     if 'extraction_number' not in data or data['extraction_number'] == 0:
+        #         message = "extraction_number is a required field"
+        #         raise serializers.ValidationError(message)
         return data
 
     # on create, also create child objects (extractions and replicates)
@@ -776,9 +776,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if 'new_replicates' in validated_data:
             validated_data.pop('new_replicates')
 
-        # ensure extraction_number is never zero
-        if 'extraction_number' in validated_data and validated_data['extraction_number'] == 0:
-            validated_data['extraction_number'] = instance.extraction_number
+        # # ensure extraction_number is never zero
+        # if 'extraction_number' in validated_data and validated_data['extraction_number'] == 0:
+        #     validated_data['extraction_number'] = instance.extraction_number
 
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'ext_pos_cq_value' in validated_data or 'ext_pos_gc_reaction' in validated_data:
@@ -790,7 +790,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.extraction_method = validated_data.get('extraction_method', instance.extraction_method)
         instance.reextraction = validated_data.get('reextraction', instance.reextraction)
         instance.reextraction_note = validated_data.get('reextraction_note', instance.reextraction_note)
-        instance.extraction_number = validated_data.get('extraction_number', instance.extraction_number)
+        instance.extraction_number = instance.extraction_number # validated_data.get('extraction_number', instance.extraction_number)
         instance.extraction_volume = validated_data.get('extraction_volume', instance.extraction_volume)
         instance.extraction_date = validated_data.get('extraction_date', instance.extraction_date)
         instance.pcr_date = validated_data.get('pcr_date', instance.pcr_date)
