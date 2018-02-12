@@ -645,8 +645,11 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         validated_data['extraction_number'] = max_extraction_number + 1
 
         # if the positive control is included and greater than zero, mark the whole record as invalid
-        if 'ext_pos_cq_value' in validated_data or 'ext_pos_gc_reaction' in validated_data:
-            if validated_data['ext_pos_cq_value'] > 0 or validated_data['ext_pos_gc_reaction'] > 0:
+        if 'ext_pos_cq_value' in validated_data:
+            if validated_data['ext_pos_cq_value'] > 0:
+                validated_data['ext_pos_bad_result_flag'] = True
+        if 'ext_pos_gc_reaction' in validated_data:
+            if validated_data['ext_pos_gc_reaction'] > 0:
                 validated_data['ext_pos_bad_result_flag'] = True
 
         extr_batch = ExtractionBatch.objects.create(**validated_data)
@@ -781,8 +784,11 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         #     validated_data['extraction_number'] = instance.extraction_number
 
         # if the positive control is included and greater than zero, mark the whole record as invalid
-        if 'ext_pos_cq_value' in validated_data or 'ext_pos_gc_reaction' in validated_data:
-            if validated_data['ext_pos_cq_value'] > 0 or validated_data['ext_pos_gc_reaction'] > 0:
+        if 'ext_pos_cq_value' in validated_data:
+            if validated_data['ext_pos_cq_value'] > 0:
+                validated_data['ext_pos_bad_result_flag'] = True
+        if 'ext_pos_gc_reaction' in validated_data:
+            if validated_data['ext_pos_gc_reaction'] > 0:
                 validated_data['ext_pos_bad_result_flag'] = True
 
         # update the Extraction Batch object
@@ -894,8 +900,8 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                 validation_errors.append("ext_neg_cq_value is required")
             if 'pcr_neg_cq_value' not in data:
                 validation_errors.append("pcr_neg_cq_value is required")
-            if 'pcr_pos_conc' not in data:
-                validation_errors.append("pcr_pos_conc is required")
+            if 'pcr_pos_gc_reaction' not in data:
+                validation_errors.append("pcr_pos_gc_reaction is required")
             if 'pcrreplicates' not in data:
                 validation_errors.append("pcrreplicates is required")
             else:
