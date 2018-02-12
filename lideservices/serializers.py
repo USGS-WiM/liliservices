@@ -646,10 +646,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'ext_pos_cq_value' in validated_data:
-            if validated_data['ext_pos_cq_value'] > 0:
+            if validated_data['ext_pos_cq_value'] is not None and validated_data['ext_pos_cq_value'] > 0:
                 validated_data['ext_pos_bad_result_flag'] = True
         if 'ext_pos_gc_reaction' in validated_data:
-            if validated_data['ext_pos_gc_reaction'] > 0:
+            if validated_data['ext_pos_gc_reaction'] is not None and validated_data['ext_pos_gc_reaction'] > 0:
                 validated_data['ext_pos_bad_result_flag'] = True
 
         extr_batch = ExtractionBatch.objects.create(**validated_data)
@@ -785,10 +785,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'ext_pos_cq_value' in validated_data:
-            if validated_data['ext_pos_cq_value'] > 0:
+            if validated_data['ext_pos_cq_value'] is not None and validated_data['ext_pos_cq_value'] > 0:
                 validated_data['ext_pos_bad_result_flag'] = True
         if 'ext_pos_gc_reaction' in validated_data:
-            if validated_data['ext_pos_gc_reaction'] > 0:
+            if validated_data['ext_pos_gc_reaction'] is not None and validated_data['ext_pos_gc_reaction'] > 0:
                 validated_data['ext_pos_bad_result_flag'] = True
 
         # update the Extraction Batch object
@@ -796,7 +796,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.extraction_method = validated_data.get('extraction_method', instance.extraction_method)
         instance.reextraction = validated_data.get('reextraction', instance.reextraction)
         instance.reextraction_note = validated_data.get('reextraction_note', instance.reextraction_note)
-        instance.extraction_number = instance.extraction_number # validated_data.get('extraction_number', instance.extraction_number)
+        instance.extraction_number = instance.extraction_number
         instance.extraction_volume = validated_data.get('extraction_volume', instance.extraction_volume)
         instance.extraction_date = validated_data.get('extraction_date', instance.extraction_date)
         instance.pcr_date = validated_data.get('pcr_date', instance.pcr_date)
@@ -1462,6 +1462,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'template_volume',
                   'elution_volume', 'sample_dilution_factor', 'reaction_volume', 'extractions', 'inhibitions',
                   'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
