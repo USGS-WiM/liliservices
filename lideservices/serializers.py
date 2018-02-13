@@ -572,7 +572,6 @@ class ExtractionMethodSerializer(serializers.ModelSerializer):
 
 
 class ExtractionBatchSerializer(serializers.ModelSerializer):
-    # TODO: implement control records creation (ext_pos_dna, ext_pos_rna, ext_neg, rt_pos, rt_neg, pcr_pos, pcr_neg)
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     extraction_number = serializers.IntegerField(read_only=True, default=0)
@@ -835,16 +834,22 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         # if the positive control is included and greater than zero, mark the whole record as invalid
-        if 'rt_pos_cq_value' in validated_data or 'rt_pos_gc_reaction' in validated_data:
-            if validated_data['rt_pos_cq_value'] > 0 or validated_data['rt_pos_gc_reaction'] > 0:
+        if 'rt_pos_cq_value' in validated_data:
+            if validated_data['rt_pos_cq_value'] is not None and validated_data['rt_pos_cq_value'] > 0:
+                validated_data['rt_pos_bad_result_flag'] = True
+        if 'rt_pos_gc_reaction' in validated_data:
+            if validated_data['rt_pos_gc_reaction'] is not None and validated_data['rt_pos_gc_reaction'] > 0:
                 validated_data['rt_pos_bad_result_flag'] = True
 
         return ReverseTranscription.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
         # if the positive control is included and greater than zero, mark the whole record as invalid
-        if 'rt_pos_cq_value' in validated_data or 'rt_pos_gc_reaction' in validated_data:
-            if validated_data['rt_pos_cq_value'] > 0 or validated_data['rt_pos_gc_reaction'] > 0:
+        if 'rt_pos_cq_value' in validated_data:
+            if validated_data['rt_pos_cq_value'] is not None and validated_data['rt_pos_cq_value'] > 0:
+                validated_data['rt_pos_bad_result_flag'] = True
+        if 'rt_pos_gc_reaction' in validated_data:
+            if validated_data['rt_pos_gc_reaction'] is not None and validated_data['rt_pos_gc_reaction'] > 0:
                 validated_data['rt_pos_bad_result_flag'] = True
 
         # update the Reverse Transcription object
@@ -1074,7 +1079,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         elif sample.matrix_type == 'solid_manure':
             prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
         # finally, apply the unit-cancelling expression
-        # QUESTION: is this even necessary in this context (programming)? we're pretty much unitless already
         if sample.matrix_type in ['air', 'forage_sediment_soil', 'water', 'wastewater']:
             # 1,000 microliters per 1 milliliter
             final_value = prelim_value * 1000
@@ -1094,7 +1098,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=item['target'])
             for rep in reps:
-                if rep.gc_reaction > 0:
+                if rep.gc_reaction > 0 and rep.bad_result_flag == False:
                     reps_count = reps_count + 1
                     pos_gc_reactions.append(rep.gc_reaction)
         smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0
