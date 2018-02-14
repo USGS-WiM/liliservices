@@ -56,8 +56,17 @@ class HistoryViewSet(viewsets.ModelViewSet):
 
 
 class SampleViewSet(HistoryViewSet):
-    queryset = Sample.objects.all()
     serializer_class = SampleSerializer
+
+    # override the default queryset to allow filtering by URL arguments
+    def get_queryset(self):
+        queryset = Sample.objects.all()
+        # filter by sample IDs, exact list
+        sample = self.request.query_params.get('id', None)
+        if sample is not None:
+            sample_list = sample.split(',')
+            queryset = queryset.filter(id__in=sample_list)
+        return queryset
 
 
 class AliquotViewSet(HistoryViewSet):
