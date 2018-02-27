@@ -507,6 +507,7 @@ class PCRReplicate(HistoryModel):
     replicate_concentration = models.FloatField(null=True, blank=True)
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
+    bad_result_flag_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
     re_pcr = models.BooleanField(default=False)
 
     def __str__(self):
@@ -525,6 +526,32 @@ class Result(HistoryModel):
     sample_mean_concentration = models.FloatField(null=True, blank=True)
     sample = models.ForeignKey('Sample', related_name='results')
     target = models.ForeignKey('Target', related_name='results')
+
+    # Determine if all valid replicates for a given sample-target combo are now in the database or not
+    def all_sample_target_reps_uploaded(self):
+        valid_reps_with_null_cq_value = []
+        exts = Extraction.objects.filter(sample=self.sample)
+        for ext in exts:
+            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            for rep in reps:
+                if rep.cq_value is None and rep.bad_result_flag is False:
+                    valid_reps_with_null_cq_value.append(rep.id)
+        return True if len(valid_reps_with_null_cq_value) == 0 else False
+
+    # Calculate sample mean concentration for all samples whose target replicates are now in the database
+    def calc_sample_mean_conc(self):
+        reps_count = 0
+        pos_gc_reactions = []
+        exts = Extraction.objects.filter(sample=self.sample)
+        for ext in exts:
+            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            for rep in reps:
+                if rep.gc_reaction > 0 and not rep.bad_result_flag is False:
+                    reps_count = reps_count + 1
+                    pos_gc_reactions.append(rep.gc_reaction)
+        smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0
+        self.sample_mean_concentration = smc
+        self.save()
 
     def __str__(self):
         return str(self.id)
