@@ -20,12 +20,4 @@ class Migration(migrations.Migration):
             name='bad_result_flag_override',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='pcrreplicates', to=settings.AUTH_USER_MODEL),
         ),
-        migrations.RemoveField(
-            model_name='pcrreplicate',
-            name='target',
-        ),
-        migrations.AlterUniqueTogether(
-            name='pcrreplicate',
-            unique_together=set([('extraction', 'pcrreplicate_batch')]),
-        ),
     ]
