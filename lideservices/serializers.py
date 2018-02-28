@@ -740,7 +740,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                 # has its sample mean concentration calculated, and if so, set that value to null
                                 result = Result.objects.filter(sample=new_extr.sample, target=target_id).first()
                                 if not result:
-                                    result = Result.objects.create(sample=new_extr.sample, target=target_id)
+                                    result = Result.objects.create(sample=new_extr.sample, target=target)
                                 if result is not None and result.sample_mean_concentration is not None:
                                     result.update(sample_mean_concentration=None)
                                 # then create the child replicates for this extraction
@@ -756,6 +756,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
         # create the child reverse transcription if present
         if rt is not None:
+            if rt['rt_date'] == "":
+                rt['rt_date'] = None
             ReverseTranscription.objects.create(extraction_batch=extr_batch, **rt)
 
         return extr_batch
