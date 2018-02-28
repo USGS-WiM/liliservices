@@ -1515,7 +1515,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = ExtractionBatch
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
-                  'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'qpc_template_volume',
+                  'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'qpcr_template_volume',
                   'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume', 'extractions', 'inhibitions',
                   'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
