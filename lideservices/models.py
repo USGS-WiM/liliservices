@@ -510,6 +510,56 @@ class PCRReplicate(HistoryModel):
     bad_result_flag_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
     re_pcr = models.BooleanField(default=False)
 
+    # Calculate replicate_concentration
+    def calc_rep_conc(self):
+        if self.gc_reaction is not None:
+            nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
+            extr = self.extraction
+            eb = self.extraction.extraction_batch
+            sample = self.extraction.sample
+            # TODO: ensure that all necessary values are not null (more than just the following line)
+            if None in (eb.qpcr_reaction_volume, eb.qpcr_template_volume, eb.elution_volume, eb.extraction_volume,
+                        eb.sample_dilution_factor):
+                # escape the whole process and notify user of missing data that is required
+                pass
+            # first apply the universal expressions
+            prelim_value = (self.gc_reaction / eb.qpcr_reaction_volume) * (
+                    eb.qpcr_reaction_volume / eb.qpcr_template_volume) * (
+                                   eb.elution_volume / eb.extraction_volume) * (
+                               eb.sample_dilution_factor)
+            if nucleic_acid_type == 'DNA':
+                prelim_value = prelim_value * extr.inhibition_dna.dilution_factor
+            # apply the RT the expression if applicable
+            elif nucleic_acid_type == 'RNA':
+                # assume that there can be only one RT per EB, except when there is a re_rt,
+                # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
+                # that references the only valid RT; in other words, the re_rt value must be null for the record to be valid
+                rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
+                dl = extr.inhibition_rna.dilution_factor
+                prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
+            # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
+            if sample.matrix_type in ['forage_sediment_soil', 'water', 'wastewater']:
+                fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
+                prelim_value = prelim_value * (
+                        fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
+            elif sample.matrix_type == 'air':
+                prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
+            elif sample.matrix_type == 'solid_manure':
+                prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
+            # finally, apply the unit-cancelling expression
+            if sample.matrix_type in ['air', 'forage_sediment_soil', 'water', 'wastewater']:
+                # 1,000 microliters per 1 milliliter
+                final_value = prelim_value * 1000
+            elif sample.matrix_type == 'liquid_manure':
+                # 1,000,000 microliters per 1 liter
+                final_value = prelim_value * 1000000
+            else:
+                # solid manure
+                final_value = prelim_value
+            return final_value
+        else:
+            return None
+
     def __str__(self):
         return str(self.id)
 
@@ -546,7 +596,7 @@ class Result(HistoryModel):
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
-                if rep.gc_reaction > 0 and not rep.bad_result_flag is False:
+                if rep.gc_reaction > 0 and rep.bad_result_flag is False:
                     reps_count = reps_count + 1
                     pos_gc_reactions.append(rep.gc_reaction)
         smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0

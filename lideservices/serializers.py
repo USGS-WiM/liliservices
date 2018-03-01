@@ -577,8 +577,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.context['request'].method == 'POST':
-            if 'new_rt' not in data:
-                raise serializers.ValidationError("new_rt is a required field")
+            # if 'new_rt' not in data:
+            #     raise serializers.ValidationError("new_rt is a required field")
             if 'new_extractions' not in data:
                 raise serializers.ValidationError("new_extractions is a required field")
             if 'new_replicates' not in data:
@@ -620,7 +620,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     # on create, also create child objects (extractions and replicates)
     def create(self, validated_data):
         # pull out child reverse transcription definition from the request
-        rt = validated_data.pop('new_rt')
+        rt = validated_data.pop('new_rt') if 'new_rt' in validated_data else None
 
         # pull out child extractions list from the request
         extractions = validated_data.pop('new_extractions')
@@ -736,14 +736,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             target_id = replicate['target']
                             target = Target.objects.filter(id=target_id).first()
                             if target:
-                                # first test if this new replicate belongs to a sample that already
-                                # has its sample mean concentration calculated, and if so, set that value to null
-                                result = Result.objects.filter(sample=new_extr.sample, target=target_id).first()
-                                if not result:
-                                    result = Result.objects.create(sample=new_extr.sample, target=target)
-                                if result is not None and result.sample_mean_concentration is not None:
-                                    result.update(sample_mean_concentration=None)
-                                # then create the child replicates for this extraction
+                                # create the child replicates for this extraction
                                 for x in range(1, replicate['count']):
                                     rep_batch = PCRReplicateBatch.objects.get(extraction_batch=extr_batch,
                                                                               target=target, replicate_number=x)
@@ -808,22 +801,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.modified_by = self.context['request'].user
         instance.save()
 
-        # if the bad_result_flag is true, invalidate all child replicates
-        # TODO: determine if this affects just child reps of this EB (rep.ext.eb == this EB), or all child reps of all samples that had at least one extraction in this EB
-        if instance.ext_pos_bad_result_flag:
-            for extraction in instance.extractions:
-                for pcrreplicate in extraction.pcrreplicates:
-                    pcrreplicate.update(bad_result_flag=True)
-
-                    # then test if this replicate belongs to a sample that already
-                    # has its sample mean concentration calculated, and if so, set that value to null
-                    pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
-                    result = Result.objects.filter(sample=extraction.sample, target=pcrrepbatch.target).first()
-                    if not result:
-                        result = Result.objects.create(sample=extraction.sample, target=pcrrepbatch.target)
-                    if result is not None and result.sample_mean_concentration is not None:
-                        result.update(sample_mean_concentration=None)
-
         return instance
 
     # # extraction_method
@@ -878,26 +855,9 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
         instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
         instance.rt_pos_bad_result_flag = validated_data.get('rt_pos_bad_result_flag',
-                                                              instance.rt_pos_bad_result_flag)
+                                                             instance.rt_pos_bad_result_flag)
         instance.modified_by = self.context['request'].user
         instance.save()
-
-        # if the bad_result_flag is true, invalidate all child replicates
-        # TODO: determine if this affects just child reps of this RT's EB (rep.ext.eb == this RT.EB), or all child reps of all samples that had at least one extraction in this RT's EB
-        if instance.rt_pos_bad_result_flag:
-            extraction_batch = ExtractionBatch.objects.get(id=instance.extraction_batch)
-            for extraction in extraction_batch.extractions:
-                for pcrreplicate in extraction.pcrreplicates:
-                    pcrreplicate.update(bad_result_flag=True)
-
-                    # then test if this replicate belongs to a sample that already
-                    # has its sample mean concentration calculated, and if so, set that value to null
-                    pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
-                    result = Result.objects.filter(sample=extraction.sample, target=pcrrepbatch.target).first()
-                    if not result:
-                        result = Result.objects.create(sample=extraction.sample, target=pcrrepbatch.target)
-                    if result is not None and result.sample_mean_concentration is not None:
-                        result.update(sample_mean_concentration=None)
 
         return instance
 
@@ -971,7 +931,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         is_valid = True
         valid_data = []
         response_errors = []
-        sample_mean_conc_calcs = []
 
         updated_pcrreplicates = validated_data.get('updated_pcrreplicates', None)
         existing_reps = PCRReplicate.objects.filter(pcrreplicate_batch=instance.id)
@@ -1033,17 +992,11 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                                     # skip to the next item in the loop
                                     continue
                             # that particular sample volume exists, so finish updating this rep
-                            flag = self.validate_result(cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction)
+                            flag = self.calc_flag(cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction)
                             if isinstance(target, int):
                                 target = Target.objects.get(id=target).first()
-                            nucleic_acid_type = target.nucleic_acid_type
-                            rep_conc = self.calc_rep_conc(gc_reaction, nucleic_acid_type, extraction, eb, sample)
-                            conc_unit = Unit.objects.get(description='Liter')
-                            if sample.matrix_type in ['forage_sediment_soil', 'solid_manure']:
-                                conc_unit = Unit.objects.get(description='gram')
-                            new_data = {'modified_by': user, 'pcrreplicate_batch': instance.id, 'cq_value': cq_value,
-                                        'gc_reaction': gc_reaction, 'bad_result_flag': flag,
-                                        'replicate_concentration': rep_conc, 'concentration_unit': conc_unit.id}
+                            new_data = {'pcrreplicate_batch': instance.id, 'cq_value': cq_value,
+                                        'gc_reaction': gc_reaction, 'bad_result_flag': flag, 'modified_by': user}
                             serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
                             if serializer.is_valid():
                                 valid_data.append(serializer)
@@ -1081,7 +1034,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError(response_errors)
 
-    def validate_result(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
+    def calc_flag(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
         bad_result_flag = False
         if cq_value > 0:
             if rtneg_cq is not None:
@@ -1091,49 +1044,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                 if extneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
                     bad_result_flag = True
         return bad_result_flag
-
-    # Calculate replicate_concentration
-    def calc_rep_conc(self, gc_reaction, nucleic_acid_type, extraction, eb, sample):
-        # TODO: ensure that all necessary values are no null (more than just the following line)
-        if None in (eb.qpcr_reaction_volume, eb.qpcr_template_volume, eb.elution_volume, eb.extraction_volume,
-                    eb.sample_dilution_factor):
-            # escape the whole process and notify user of missing data that is required
-            pass
-        # first apply the universal expressions
-        prelim_value = (gc_reaction / eb.qpcr_reaction_volume) * (
-                eb.qpcr_reaction_volume / eb.qpcr_template_volume) * (
-                               eb.elution_volume / eb.extraction_volume) * (
-                               eb.sample_dilution_factor)
-        if nucleic_acid_type == 'DNA':
-            prelim_value = prelim_value * extraction.inhibition_dna.dilution_factor
-        # apply the RT the expression if applicable
-        elif nucleic_acid_type == 'RNA':
-            # assume that there can be only one RT per EB, except when there is a re_rt,
-            # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
-            # that references the only valid RT; in other words, the re_rt value must be null for the record to be valid
-            rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
-            prelim_value = prelim_value * extraction.inhibition_rna.dilution_factor * (rt.reaction_volume
-                                                                                       / rt.template_volume)
-        # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
-        if sample.matrix_type in ['forage_sediment_soil', 'water', 'wastewater']:
-            fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
-            prelim_value = prelim_value * (
-                    fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
-        elif sample.matrix_type == 'air':
-            prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
-        elif sample.matrix_type == 'solid_manure':
-            prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
-        # finally, apply the unit-cancelling expression
-        if sample.matrix_type in ['air', 'forage_sediment_soil', 'water', 'wastewater']:
-            # 1,000 microliters per 1 milliliter
-            final_value = prelim_value * 1000
-        elif sample.matrix_type == 'liquid_manure':
-            # 1,000,000 microliters per 1 liter
-            final_value = prelim_value * 1000000
-        else:
-            # solid manure
-            final_value = prelim_value
-        return final_value
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1145,7 +1055,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                   'ext_neg_gc_reaction', 'ext_neg_bad_result_flag', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
                   'rt_neg_bad_result_flag', 'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_neg_bad_result_flag',
                   'pcr_pos_cq_value', 'pcr_pos_gc_reaction', 'pcr_pos_bad_result_flag', 'pcrreplicates',
-                   'updated_pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'updated_pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         extra_kwargs = {
             'extraction_batch': {'required': False},
             'pcrreplicates': {'required': False}
@@ -1173,15 +1083,6 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
             instance.modified_by = validated_data.get('modified_by', instance.modified_by)
 
         instance.save()
-
-        # determine if all replicates for a given sample-target combo are now in the database or not
-        # and calculate sample mean concentration if applicable
-        pcrrepbatch = PCRReplicateBatch.objects.get(id=instance.pcrreplicate_batch.id)
-        result = Result.objects.filter(sample=instance.extraction.sample, target=pcrrepbatch.target).first()
-        if not result:
-            result = Result.objects.create(sample=instance.extraction.sample, target=pcrrepbatch.target)
-        if result.all_sample_target_reps_uploaded():
-            result.calc_sample_mean_conc()
 
         return instance
 
