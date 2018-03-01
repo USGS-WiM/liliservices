@@ -403,7 +403,7 @@ class ExtractionBatch(HistoryModel):
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     reextraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
-    reextraction_note = models.CharField(max_length=255, null=True, blank=True)
+    reextraction_notes = models.CharField(max_length=255, null=True, blank=True)
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField(null=True, blank=True)
     extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
@@ -434,7 +434,7 @@ class ReverseTranscription(HistoryModel):
     reaction_volume = models.FloatField(null=True, blank=True)
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
-    re_rt_note = models.CharField(max_length=255, null=True, blank=True)
+    re_rt_notes = models.CharField(max_length=255, null=True, blank=True)
     rt_pos_cq_value = models.FloatField(null=True, blank=True)
     rt_pos_gc_reaction = models.FloatField(null=True, blank=True)
     rt_pos_bad_result_flag = models.BooleanField(default=False)
@@ -473,7 +473,7 @@ class PCRReplicateBatch(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
     replicate_number = models.FloatField(null=True, blank=True)
-    note = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
     ext_neg_cq_value = models.FloatField(null=True, blank=True)
     ext_neg_gc_reaction = models.FloatField(null=True, blank=True)
     ext_neg_bad_result_flag = models.BooleanField(default=False)
@@ -486,6 +486,7 @@ class PCRReplicateBatch(HistoryModel):
     pcr_pos_cq_value = models.FloatField(null=True, blank=True)
     pcr_pos_gc_reaction = models.FloatField(null=True, blank=True)
     pcr_pos_bad_result_flag = models.BooleanField(default=False)
+    re_pcr = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.id)
@@ -508,7 +509,6 @@ class PCRReplicate(HistoryModel):
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicates')  # QUESTION: This should probably be required, yes?
     bad_result_flag = models.BooleanField(default=False)
     bad_result_flag_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
-    re_pcr = models.BooleanField(default=False)
 
     # Calculate replicate_concentration
     def calc_rep_conc(self):

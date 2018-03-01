@@ -305,9 +305,9 @@ class SampleSerializer(serializers.ModelSerializer):
                   'total_volume_sampled_initial', 'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled',
                   'sample_volume_initial', 'sample_volume_filtered', 'filter_born_on_date', 'filter_flag',
                   'secondary_concentration_flag', 'elution_notes', 'technician_initials', 'dissolution_volume',
-                  'post_dilution_volume', 'analysisbatches', 'samplegroups', 'peg_neg', 'peg_neg_targets_extracted',
-                  'final_concentrated_sample_volume', 'final_concentrated_sample_volume_type',
-                  'final_concentrated_sample_volume_notes', 'aliquots',
+                  'post_dilution_volume', 'analysisbatches', 'samplegroups', 'record_type', 'peg_neg',
+                  'peg_neg_targets_extracted', 'final_concentrated_sample_volume',
+                  'final_concentrated_sample_volume_type', 'final_concentrated_sample_volume_notes', 'aliquots',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -785,7 +785,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
         instance.extraction_method = validated_data.get('extraction_method', instance.extraction_method)
         instance.reextraction = validated_data.get('reextraction', instance.reextraction)
-        instance.reextraction_note = validated_data.get('reextraction_note', instance.reextraction_note)
+        instance.reextraction_notes = validated_data.get('reextraction_notes', instance.reextraction_notes)
         instance.extraction_number = instance.extraction_number
         instance.extraction_volume = validated_data.get('extraction_volume', instance.extraction_volume)
         instance.extraction_date = validated_data.get('extraction_date', instance.extraction_date)
@@ -813,7 +813,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionBatch
-        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_notes',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'qpcr_template_volume',
                   'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume', 'extractions', 'inhibitions',
                   'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_bad_result_flag',
@@ -851,7 +851,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         instance.reaction_volume = validated_data.get('reaction_volume', instance.reaction_volume)
         instance.rt_date = validated_data.get('rt_date', instance.rt_date)
         instance.re_rt = validated_data.get('re_rt', instance.re_rt)
-        instance.re_rt_note = validated_data.get('re_rt_note', instance.re_rt_note)
+        instance.re_rt_notes = validated_data.get('re_rt_notes', instance.re_rt_notes)
         instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
         instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
         instance.rt_pos_bad_result_flag = validated_data.get('rt_pos_bad_result_flag',
@@ -863,7 +863,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReverseTranscription
-        fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_note',
+        fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_notes',
                   'rt_pos_cq_value', 'rt_pos_gc_reaction', 'rt_pos_bad_result_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
@@ -875,6 +875,59 @@ class ExtractionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Extraction
         fields = ('id', 'sample', 'extraction_batch', 'inhibition_dna', 'inhibition_rna', 'pcrreplicates',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class PCRReplicateSerializer(serializers.ModelSerializer):
+
+    def update(self, instance, validated_data):
+        # update the instance
+        instance.extraction = validated_data.get('extraction', instance.extraction)
+        instance.pcrreplicate_batch = validated_data.get('pcrreplicate_batch', instance.pcrreplicate_batch)
+        instance.cq_value = validated_data.get('cq_value', instance.cq_value)
+        instance.gc_reaction = validated_data.get('gc_reaction', instance.gc_reaction)
+        instance.replicate_concentration = validated_data.get('replicate_concentration',
+                                                              instance.replicate_concentration)
+        instance.concentration_unit = validated_data.get('concentration_unit', instance.concentration_unit)
+        instance.bad_result_flag = validated_data.get('bad_result_flag', instance.bad_result_flag)
+        instance.bad_result_flag_override = validated_data.get('bad_result_flag_override',
+                                                               instance.bad_result_flag_override)
+        instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
+        if 'request' in self.context and 'user' in self.context['request']:
+            instance.modified_by = self.context['request'].user
+        else:
+            instance.modified_by = validated_data.get('modified_by', instance.modified_by)
+
+        instance.save()
+
+        return instance
+
+    def get_inhibition_dilution_factor(self, obj):
+        extraction_id = obj.extraction_id
+        extraction = Extraction.objects.get(id=extraction_id)
+        pcrreplicate_batch_id = obj.pcrreplicate_batch_id
+        pcrreplicate_batch = PCRReplicateBatch.objects.get(id=pcrreplicate_batch_id)
+        nucleic_acid_type = pcrreplicate_batch.target.nucleic_acid_type
+        if nucleic_acid_type == 'DNA':
+            data = extraction.inhibition_dna.dilution_factor
+        elif nucleic_acid_type == 'RNA':
+            data = extraction.inhibition_rna.dilution_factor
+        else:
+            data = None
+        return data
+
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    sample = serializers.PrimaryKeyRelatedField(source='extraction.sample', read_only=True)
+    peg_neg = serializers.PrimaryKeyRelatedField(source='extraction.sample.peg_neg', read_only=True)
+    inhibition_dilution_factor = serializers.SerializerMethodField()
+    bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
+
+    class Meta:
+        model = PCRReplicate
+        fields = ('id', 'extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
+                  'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
+                  'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -950,7 +1003,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             eb = validated_data.get('extraction_batch', instance.extraction_batch)
             target = validated_data.get('target', instance.target)
             # rn = validated_data.get('replicate_number', instance.replicate_number)
-            instance.note = validated_data.get('note', instance.note)
+            instance.notes = validated_data.get('notes', instance.notes)
             instance.ext_neg_cq_value = extneg_cq
             instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', 0)
             instance.ext_neg_bad_result_flag = ext_neg_flag
@@ -1048,53 +1101,20 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     updated_pcrreplicates = serializers.ListField(write_only=True)
+    extraction_batch = ExtractionBatchSerializer()
+    pcrreplicates = PCRReplicateSerializer(many=True, read_only=True)
 
     class Meta:
         model = PCRReplicateBatch
-        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'note', 'ext_neg_cq_value',
+        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'notes', 'ext_neg_cq_value',
                   'ext_neg_gc_reaction', 'ext_neg_bad_result_flag', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
                   'rt_neg_bad_result_flag', 'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_neg_bad_result_flag',
-                  'pcr_pos_cq_value', 'pcr_pos_gc_reaction', 'pcr_pos_bad_result_flag', 'pcrreplicates',
+                  'pcr_pos_cq_value', 'pcr_pos_gc_reaction', 'pcr_pos_bad_result_flag', 're_pcr', 'pcrreplicates',
                   'updated_pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         extra_kwargs = {
             'extraction_batch': {'required': False},
             'pcrreplicates': {'required': False}
         }
-
-
-class PCRReplicateSerializer(serializers.ModelSerializer):
-
-    def update(self, instance, validated_data):
-        # update the instance
-        instance.extraction = validated_data.get('extraction', instance.extraction)
-        instance.pcrreplicate_batch = validated_data.get('pcrreplicate_batch', instance.pcrreplicate_batch)
-        instance.cq_value = validated_data.get('cq_value', instance.cq_value)
-        instance.gc_reaction = validated_data.get('gc_reaction', instance.gc_reaction)
-        instance.replicate_concentration = validated_data.get('replicate_concentration',
-                                                              instance.replicate_concentration)
-        instance.concentration_unit = validated_data.get('concentration_unit', instance.concentration_unit)
-        instance.bad_result_flag = validated_data.get('bad_result_flag', instance.bad_result_flag)
-        instance.bad_result_flag_override = validated_data.get('bad_result_flag_override',
-                                                               instance.bad_result_flag_override)
-        instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
-        if 'request' in self.context and 'user' in self.context['request']:
-            instance.modified_by = self.context['request'].user
-        else:
-            instance.modified_by = validated_data.get('modified_by', instance.modified_by)
-
-        instance.save()
-
-        return instance
-
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-    bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
-
-    class Meta:
-        model = PCRReplicate
-        fields = ('id', 'extraction', 'pcrreplicate_batch', 'cq_value', 'gc_reaction', 'replicate_concentration',
-                  'concentration_unit', 'bad_result_flag', 'bad_result_flag_override', 're_pcr',
-                  'created_date', 'created_by', 'modified_date', 'modified_by', 'bad_result_flag_override_string',)
 
 
 class ResultSerializer(serializers.ModelSerializer):
@@ -1417,7 +1437,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionBatch
-        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_note',
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_notes',
                   'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'qpcr_template_volume',
                   'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume', 'extractions', 'inhibitions',
                   'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
