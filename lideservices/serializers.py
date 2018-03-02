@@ -881,7 +881,6 @@ class ExtractionSerializer(serializers.ModelSerializer):
 class PCRReplicateListSerializer(serializers.ListSerializer):
 
     # bulk update
-    # TODO: get this right for a patch, not a put
     def update(self, instance, validated_data):
         # Maps for id->instance and id->data item.
         pcrrep_mapping = {pcrrep.id: pcrrep for pcrrep in instance}
