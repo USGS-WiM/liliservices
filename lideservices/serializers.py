@@ -878,6 +878,52 @@ class ExtractionSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class PCRReplicateListSerializer(serializers.ListSerializer):
+
+    # bulk update
+    # TODO: get this right for a patch, not a put
+    def update(self, instance, validated_data):
+        # Maps for id->instance and id->data item.
+        pcrrep_mapping = {pcrrep.id: pcrrep for pcrrep in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+
+        # Perform updates but ignore insertions
+        ret = []
+        for pcrrep_id, data in data_mapping.items():
+            pcrrep = pcrrep_mapping.get(pcrrep_id, None)
+            if pcrrep is not None:
+                data['modified_by'] = self.context['request'].user
+                ret.append(self.child.update(pcrrep, data))
+
+    def get_inhibition_dilution_factor(self, obj):
+        extraction_id = obj.extraction_id
+        extraction = Extraction.objects.get(id=extraction_id)
+        pcrreplicate_batch_id = obj.pcrreplicate_batch_id
+        pcrreplicate_batch = PCRReplicateBatch.objects.get(id=pcrreplicate_batch_id)
+        nucleic_acid_type = pcrreplicate_batch.target.nucleic_acid_type
+        if nucleic_acid_type == 'DNA':
+            data = extraction.inhibition_dna.dilution_factor
+        elif nucleic_acid_type == 'RNA':
+            data = extraction.inhibition_rna.dilution_factor
+        else:
+            data = None
+        return data
+
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    sample = serializers.PrimaryKeyRelatedField(source='extraction.sample', read_only=True)
+    peg_neg = serializers.PrimaryKeyRelatedField(source='extraction.sample.peg_neg', read_only=True)
+    inhibition_dilution_factor = serializers.SerializerMethodField()
+    bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
+
+    class Meta:
+        model = PCRReplicate
+        fields = ('id', 'extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
+                  'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
+                  'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class PCRReplicateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
@@ -892,7 +938,6 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         instance.bad_result_flag = validated_data.get('bad_result_flag', instance.bad_result_flag)
         instance.bad_result_flag_override = validated_data.get('bad_result_flag_override',
                                                                instance.bad_result_flag_override)
-        instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
         if 'request' in self.context and 'user' in self.context['request']:
             instance.modified_by = self.context['request'].user
         else:
@@ -929,6 +974,7 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
                   'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = PCRReplicateListSerializer
 
 
 class PCRReplicateBatchSerializer(serializers.ModelSerializer):
@@ -1016,6 +1062,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             instance.pcr_pos_cq_value = validated_data.get('pcr_pos_cq_value', 0)
             instance.pcr_pos_gc_reaction = validated_data.get('pcr_pos_gc_reaction', 0)
             instance.pcr_pos_bad_result_flag = pcr_pos_flag
+            instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
             instance.modified_by = user
             valid_data.append('pcrrepbatch')
 
@@ -1101,7 +1148,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     updated_pcrreplicates = serializers.ListField(write_only=True)
-    extraction_batch = ExtractionBatchSerializer()
+    extraction_batch = ExtractionBatchSerializer(required=False)
     pcrreplicates = PCRReplicateSerializer(many=True, read_only=True)
 
     class Meta:
@@ -1226,15 +1273,15 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
             inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb.id, nucleic_acid_type=na.id).first()
             if not inhib:
                 is_valid = False
-                message = "An inhibition with analysis_batch_id of (' + ab + ') "
-                message += "and sample_id of (" + sample + ") "
-                message += "and nucleic_acid_type of (" + na + ") does not exist in the database"
+                message = "An inhibition with analysis_batch_id of (" + str(ab) + ") "
+                message += "and sample_id of (" + str(sample) + ") "
+                message += "and nucleic_acid_type of (" + str(na) + ") does not exist in the database"
                 details.append(message)
             elif inhib.nucleic_acid_type != na:
                 is_valid = False
-                message = "Sample " + sample + ": "
-                message += "The submitted nucleic_acid_type (" + inhib.nucleic_acid_type + ") "
-                message += "does not match the existing value (" + na + ") in the database"
+                message = "Sample " + str(sample) + ": "
+                message += "The submitted nucleic_acid_type (" + str(inhib.nucleic_acid_type) + ") "
+                message += "does not match the existing value (" + str(na) + ") in the database"
                 details.append(message)
         if not is_valid:
             raise serializers.ValidationError(details)

@@ -7,18 +7,13 @@ from lideservices.models import *
 def pcrreplicate_post_save(sender, **kwargs):
     instance = kwargs['instance']
 
-    # calculate replicate_concentration and set concentration_unit
+    # if there is a gc_reaction value and set the concentration_unit
     if instance.gc_reaction is not None:
         # calculate their replicate_concentration
         instance.calc_rep_conc()
 
         # set the concentration_unit
-        sample = Sample.objects.get(id=instance.extraction.sample.id)
-        if sample.matrix_type in ['forage_sediment_soil', 'solid_manure']:
-            conc_unit = Unit.objects.get(description='gram')
-        else:
-            conc_unit = Unit.objects.get(description='Liter')
-        instance.concentration_unit = conc_unit.id
+        instance.concentration_unit = instance.get_conc_unit(instance.extraction.sample.id)
 
         instance.save()
 
@@ -44,6 +39,7 @@ def extractionbatch_post_save(sender, **kwargs):
 
     # if the bad_result_flag is true, invalidate all child replicates
     # TODO: determine if this affects just child reps of this EB (rep.ext.eb == this EB), or all child reps of all samples that had at least one extraction in this EB
+    # (preliminary assumption: this only affects direct child reps)
     if instance.ext_pos_bad_result_flag:
         for extraction in instance.extractions:
             for pcrreplicate in extraction.pcrreplicates:
@@ -64,6 +60,7 @@ def reversetranscription_post_save(sender, **kwargs):
 
     # if the bad_result_flag is true, invalidate all child replicates
     # TODO: determine if this affects just child reps of this RT's EB (rep.ext.eb == this RT.EB), or all child reps of all samples that had at least one extraction in this RT's EB
+    # (preliminary assumption: this only affects direct child reps)
     if instance.rt_pos_bad_result_flag:
         extraction_batch = ExtractionBatch.objects.get(id=instance.extraction_batch)
         for extraction in extraction_batch.extractions:

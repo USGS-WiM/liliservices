@@ -278,6 +278,20 @@ class PCRReplicateViewSet(HistoryViewSet):
     queryset = PCRReplicate.objects.all()
     serializer_class = PCRReplicateSerializer
 
+    def get_serializer(self, *args, **kwargs):
+        if 'data' in kwargs:
+            data = kwargs['data']
+
+            # check if many is required
+            if isinstance(data, list):
+                kwargs['many'] = True
+
+        return super(PCRReplicateViewSet, self).get_serializer(*args, **kwargs)
+
+    # override the default PATCH method to allow bulk processing
+    # TODO: patch
+    #def patch(self, request, pk=None):
+
 
 class PCRReplicateBatchViewSet(HistoryViewSet):
     serializer_class = PCRReplicateBatchSerializer
@@ -342,13 +356,13 @@ class InhibitionViewSet(HistoryViewSet):
                 # ensure the id field is present, otherwise nothing can be updated
                 if not item.get('id'):
                     is_valid = False
-                    response_errors.append({"id":"This field is required."})
+                    response_errors.append({"id": "This field is required."})
                 else:
                     inhib = item.pop('id')
                     inhibition = Inhibition.objects.filter(id=inhib).first()
                     if inhibition:
                         serializer = self.serializer_class(inhibition, data=item, partial=True)
-                        # if this item is valid, temporarily hold it until all items are proven valid, then save them all
+                        # if this item is valid, temporarily hold it until all items are proven valid, then save all
                         # if even one item is invalid, none will be saved, and the user will be returned the error(s)
                         if serializer.is_valid():
                             valid_data.append(serializer)
@@ -432,7 +446,8 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                             suggested_dilution_factor = 5
                         if cq > 36 or cq is None:
                             suggested_dilution_factor = 10
-                        new_data = {"id": inhib.id, "sample": sample, "suggested_dilution_factor": suggested_dilution_factor}
+                        new_data = {"id": inhib.id, "sample": sample,
+                                    "suggested_dilution_factor": suggested_dilution_factor}
                         response_data.append(new_data)
                     else:
                         is_valid = False

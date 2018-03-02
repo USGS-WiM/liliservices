@@ -510,6 +510,15 @@ class PCRReplicate(HistoryModel):
     bad_result_flag = models.BooleanField(default=False)
     bad_result_flag_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
 
+    # get the concentration_unit
+    def get_conc_unit(self, sample_id):
+        sample = Sample.objects.get(id=sample_id)
+        if sample.matrix_type in ['forage_sediment_soil', 'solid_manure']:
+            conc_unit = Unit.objects.get(description='gram')
+        else:
+            conc_unit = Unit.objects.get(description='Liter')
+        return conc_unit.id
+
     # Calculate replicate_concentration
     def calc_rep_conc(self):
         if self.gc_reaction is not None:
@@ -533,7 +542,8 @@ class PCRReplicate(HistoryModel):
             elif nucleic_acid_type == 'RNA':
                 # assume that there can be only one RT per EB, except when there is a re_rt,
                 # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
-                # that references the only valid RT; in other words, the re_rt value must be null for the record to be valid
+                # that references the only valid RT;
+                # in other words, the re_rt value must be null for the record to be valid
                 rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
                 dl = extr.inhibition_rna.dilution_factor
                 prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
