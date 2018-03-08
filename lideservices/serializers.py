@@ -43,6 +43,11 @@ class AliquotListSerializer(serializers.ListSerializer):
     def validate(self, data):
         if self.context['request'].method == 'POST':
             d = data[0]
+            if 'sample' not in d:
+                pass
+            if 'samples' not in d:
+                message = "A list of sample IDs is required"
+                raise serializers.ValidationError(message)
             if 'freezer_location' not in d:
                 if 'freezer' not in d or 'rack' not in d or 'box' not in d or 'row' not in d or 'spot' not in d:
                     message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required"
@@ -51,13 +56,16 @@ class AliquotListSerializer(serializers.ListSerializer):
             is_valid = True
             details = []
             for item in data:
+                if 'sample' not in item:
+                    is_valid = False
+                    details.append("sample is a required field")
                 if 'freezer_location' not in item:
                     is_valid = False
                     details.append("freezer_location is a required field")
                 if 'rack' in item or 'box' in item or 'row' in item or 'spot' in item:
                     is_valid = False
-                    message = "coordinates (freezer, rack, box, row, spot) is not allowed in updates; "
-                    message += "use freezer_location instead"
+                    message = "coordinates (freezer, rack, box, row, spot) are not allowed in updates; "
+                    message += "use freezer_location ID instead"
                     details.append(message)
                 if 'aliquot_number' not in item or item['aliquot_number'] == 0:
                     details.append("aliquot_number is a required field")
@@ -94,50 +102,59 @@ class AliquotListSerializer(serializers.ListSerializer):
         else:
             aliquot_count = 1
 
+        # pull out sample IDs from the request
+        sample_ids = validated_data.pop('samples')
+
         aliquots = []
-        for count_num in range(0, aliquot_count):
-            # first determine if any aliquots exist for the parent sample
-            prev_aliquots = Aliquot.objects.filter(sample=validated_data['sample'].id)
-            if prev_aliquots:
-                max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
-            else:
-                max_aliquot_number = 0
-            # then assign the proper aliquot_number
-            validated_data['aliquot_number'] = max_aliquot_number + 1
+        sample_count = 0
+        freezer_object = Freezer.objects.filter(id=freezer).first()
+        for sample_id in sample_ids:
+            sample = Sample.objects.get(id=sample_id)
+            for count_num in range(0, aliquot_count):
+                validated_data['sample'] = sample
 
-            # next create the freezer location for this aliquot to use
-            # use the existing freezer location if it was submitted and the aliquot count is exactly 1
-            if 'freezer_location' in validated_data and aliquot_count == 1:
-                validated_data['freezer_location'] = freezer_location
-            # otherwise create a new freezer location for all other aliquots
-            # ensure that all locations are real (i.e., no spot 10 when there can only be 9 spots)
-            else:
-                freezer_object = Freezer.objects.filter(id=freezer).first()
-                if freezer_object:
-                    if count_num != 0:
-                        spot += 1
-                    if spot > freezer_object.spots:
-                        spot = 1
-                        row += 1
-                        if row > freezer_object.rows:
-                            row = 1
-                            box +=1
-                            if box > freezer_object.boxes:
-                                box = 1
-                                rack += 1
-                                if rack > freezer_object.racks:
-                                    message = "This freezer is full! No more spots can be allocated. Aborting"
-                                    raise serializers.ValidationError(message)
-
-                    user = self.context['request'].user
-                    fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row, spot=spot,
-                                                        created_by=user, modified_by=user)
-                    validated_data['freezer_location'] = fl
+                # first determine if any aliquots exist for the parent sample
+                prev_aliquots = Aliquot.objects.filter(sample=sample_id)
+                if prev_aliquots:
+                    max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
                 else:
-                    raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
+                    max_aliquot_number = 0
+                # then assign the proper aliquot_number
+                validated_data['aliquot_number'] = max_aliquot_number + 1
 
-            aliquot = Aliquot.objects.create(**validated_data)
-            aliquots.append(aliquot)
+                # next create the freezer location for this aliquot to use
+                # use the existing freezer location if it was submitted and the aliquot count is exactly 1
+                if 'freezer_location' in validated_data and len(sample_ids) == 1 and aliquot_count == 1:
+                    validated_data['freezer_location'] = freezer_location
+                # otherwise create a new freezer location for all other aliquots
+                # ensure that all locations are real (i.e., no spot 10 when there can only be 9 spots)
+                else:
+                    if freezer_object:
+                        if (sample_count == 0 and count_num != 0) or sample_count != 0:
+                            spot += 1
+                        if spot > freezer_object.spots:
+                            spot = 1
+                            row += 1
+                            if row > freezer_object.rows:
+                                row = 1
+                                box += 1
+                                if box > freezer_object.boxes:
+                                    box = 1
+                                    rack += 1
+                                    if rack > freezer_object.racks:
+                                        message = "This freezer is full! No more spots can be allocated. Aborting."
+                                        raise serializers.ValidationError(message)
+
+                        user = self.context['request'].user
+                        fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row,
+                                                            spot=spot, created_by=user, modified_by=user)
+                        validated_data['freezer_location'] = fl
+                    else:
+                        raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
+
+                aliquot = Aliquot.objects.create(**validated_data)
+                aliquots.append(aliquot)
+            sample_count += 1
 
         return aliquots
 
@@ -157,7 +174,8 @@ class AliquotListSerializer(serializers.ListSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    aliquot_number = serializers.IntegerField(read_only=True, default=0)
+    samples = serializers.ListField(write_only=True, required=False)
+    aliquot_number = serializers.IntegerField(default=0)
     aliquot_count = serializers.IntegerField(write_only=True, required=False)
     freezer = serializers.IntegerField(write_only=True, required=False)
     rack = serializers.IntegerField(write_only=True, required=False)
@@ -169,17 +187,20 @@ class AliquotListSerializer(serializers.ListSerializer):
         model = Aliquot
         fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
                   'created_date', 'created_by', 'modified_date', 'modified_by',
-                  'aliquot_count', 'freezer', 'rack', 'box', 'row', 'spot',)
+                  'samples', 'aliquot_count', 'freezer', 'rack', 'box', 'row', 'spot',)
         extra_kwargs = {
+            'sample': {'required': False},
             'freezer_location': {'required': False}
         }
+        validators = []
 
 
 class AliquotCustomSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    #freezer_location = FreezerLocationSerializer()
-    aliquot_number = serializers.IntegerField(read_only=True, default=0)
+    # freezer_location = FreezerLocationSerializer()
+    samples = serializers.ListField(write_only=True, required=False)
+    aliquot_number = serializers.IntegerField(default=0)
     aliquot_count = serializers.IntegerField(write_only=True, required=False)
     freezer = serializers.IntegerField(write_only=True, required=False)
     rack = serializers.IntegerField(write_only=True, required=False)
@@ -191,10 +212,12 @@ class AliquotCustomSerializer(serializers.ModelSerializer):
         model = Aliquot
         fields = ('id', 'aliquot_string', 'sample', 'freezer_location', 'aliquot_number', 'frozen',
                   'created_date', 'created_by', 'modified_date', 'modified_by',
-                  'aliquot_count', 'freezer', 'rack', 'box', 'row', 'spot',)
+                  'samples', 'aliquot_count', 'freezer', 'rack', 'box', 'row', 'spot',)
         extra_kwargs = {
+            'sample': {'required': False},
             'freezer_location': {'required': False}
         }
+        validators = []
         list_serializer_class = AliquotListSerializer
 
 
@@ -210,55 +233,12 @@ class AliquotSerializer(serializers.ModelSerializer):
 
 
 class SampleSerializer(serializers.ModelSerializer):
-    # # sample_type
-    # def get_sample_type(self, obj):
-    #     sample_type_id = obj.sample_type_id
-    #     sample_type = SampleType.objects.get(id=sample_type_id)
-    #     sample_type_name = sample_type.name
-    #     data = {"id": sample_type_id, "name": sample_type_name}
-    #     return data
-    #
-    # # matrix_type
-    # def get_matrix_type(self, obj):
-    #     matrix_type_id = obj.matrix_type_id
-    #     matrix_type = MatrixType.objects.get(id=matrix_type_id)
-    #     matrix_type_name = matrix_type.name
-    #     data = {"id": matrix_type_id, "name": matrix_type_name}
-    #     return data
-    #
-    # # filter type
-    # def get_filter_type(self, obj):
-    #     filter_type_id = obj.filter_type_id
-    #     filter_type = FilterType.objects.get(id=filter_type_id)
-    #     filter_type_name = filter_type.name
-    #     data = {"id": filter_type_id, "name": filter_type_name}
-    #     return data
-    #
-    # # study
-    # def get_study(self, obj):
-    #         study_id = obj.study_id
-    #         study = Study.objects.get(id=study_id)
-    #         study_name = study.name
-    #         data = {"id": study_id, "name": study_name}
-    #         return data
-    #
-    # # sampler name
-    # def get_sampler_name(self, obj):
-    #     if obj.sampler_name_id is not None:
-    #         sampler_name_id = obj.sampler_name_id
-    #         sampler_name = User.objects.get(id=sampler_name_id)
-    #         sampler_name_name = sampler_name.username if sampler_name is not None else 'Does Not Exist'
-    #         data = {"id": sampler_name_id, "name": sampler_name_name}
-    #     else:
-    #         data = None
-    #     return data
-    #
+
     # peg_neg_targets_extracted
     def get_peg_neg_targets_extracted(self, obj):
         targets_extracted = []
         peg_neg = obj.peg_neg
         if peg_neg is not None:
-            peg_neg_id = peg_neg.id
             extractions = peg_neg.extractions.values()
 
             if extractions is not None:
@@ -276,11 +256,6 @@ class SampleSerializer(serializers.ModelSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    # sample_type = serializers.SerializerMethodField()
-    # matrix_type = serializers.SerializerMethodField()
-    # filter_type = serializers.SerializerMethodField()
-    # study = serializers.SerializerMethodField()
-    # sampler_name = serializers.SerializerMethodField()
     sample_type_string = serializers.StringRelatedField(source='sample_type')
     matrix_type_string = serializers.StringRelatedField(source='matrix_type')
     filter_type_string = serializers.StringRelatedField(source='filter_type')
