@@ -759,8 +759,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # update the Extraction Batch object
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
         instance.extraction_method = validated_data.get('extraction_method', instance.extraction_method)
-        instance.reextraction = validated_data.get('reextraction', instance.reextraction)
-        instance.reextraction_notes = validated_data.get('reextraction_notes', instance.reextraction_notes)
+        instance.re_extraction = validated_data.get('re_extraction', instance.re_extraction)
+        instance.re_extraction_notes = validated_data.get('re_extraction_notes', instance.re_extraction_notes)
         instance.extraction_number = instance.extraction_number
         instance.extraction_volume = validated_data.get('extraction_volume', instance.extraction_volume)
         instance.extraction_date = validated_data.get('extraction_date', instance.extraction_date)
@@ -788,10 +788,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionBatch
-        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_notes',
-                  'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'qpcr_template_volume',
-                  'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume', 'extractions', 'inhibitions',
-                  'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_bad_result_flag',
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
+                  're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
+                  'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
+                  'extractions', 'inhibitions', 'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_bad_result_flag',
                   'created_date', 'created_by', 'modified_date', 'modified_by',
                   'new_rt', 'new_replicates', 'new_extractions')
 
@@ -1458,10 +1458,11 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExtractionBatch
-        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 'reextraction', 'reextraction_notes',
-                  'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date', 'qpcr_template_volume',
-                  'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume', 'extractions', 'inhibitions',
-                  'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
+                  're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
+                  'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
+                  'extractions', 'inhibitions', 'reverse_transcriptions', 'targets',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
