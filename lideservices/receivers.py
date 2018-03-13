@@ -7,7 +7,7 @@ from lideservices.models import *
 def pcrreplicate_post_save(sender, **kwargs):
     instance = kwargs['instance']
 
-    # if there is a gc_reaction value and set the concentration_unit
+    # if there is a gc_reaction value, calculate the replicate_concentration and set the concentration_unit
     if instance.gc_reaction is not None:
         # calculate their replicate_concentration
         instance.calc_rep_conc()
@@ -16,6 +16,23 @@ def pcrreplicate_post_save(sender, **kwargs):
         instance.concentration_unit = instance.get_conc_unit(instance.extraction.sample.id)
 
         instance.save()
+
+    # assess the bad_result_flag
+    # bad_result_flag defaults to True (i.e., the rep is invalid) and can only be set to False if:
+    #     1. all parent controls exist
+    #     2. all parent control flags are False (i.e., the controls are valid)
+    #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
+    if instance.bad_result_flag_override is None:
+        if (
+                not instance.pcrreplicate_batch.ext_neg_bad_result_flag and
+                not instance.pcrreplicate_batch.rt_neg_bad_result_flag and
+                not instance.pcr_neg_bad_result_flag.pcr_neg_flag and
+                instance.cq_value >= 0 and
+                instance.gc_reaction >= 0
+        ):
+            instance.bad_result_flag = False
+        else:
+            instance.bad_result_flag = True
 
     # determine if all replicates for a given sample-target combo are now in the database or not
     # and calculate sample mean concentration if yes or set to null if no

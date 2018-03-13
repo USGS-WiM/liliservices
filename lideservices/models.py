@@ -507,7 +507,7 @@ class PCRReplicate(HistoryModel):
     gc_reaction = models.FloatField(null=True, blank=True)
     replicate_concentration = models.FloatField(null=True, blank=True)
     concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicates')  # QUESTION: This should probably be required, yes?
-    bad_result_flag = models.BooleanField(default=False)
+    bad_result_flag = models.BooleanField(default=True)
     bad_result_flag_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
 
     # get the concentration_unit
@@ -606,7 +606,7 @@ class Result(HistoryModel):
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
-                if rep.gc_reaction > 0 and rep.bad_result_flag is False:
+                if rep.gc_reaction >= 0 and rep.bad_result_flag is False:
                     reps_count = reps_count + 1
                     pos_gc_reactions.append(rep.gc_reaction)
         smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0

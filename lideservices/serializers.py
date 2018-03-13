@@ -883,11 +883,19 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
             data = None
         return data
 
+    def get_all_parent_controls_uploaded(self, obj):
+        data = False
+        pcrrep_batch = PCRReplicateBatch.objects.get(id=obj.pcrreplicate_batch_id)
+        if pcrrep_batch.ext_neg_cq_value and pcrrep_batch.rt_neg_cq_value and pcrrep_batch.pcr_neg_cq_value:
+            data = True
+        return data
+
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     sample = serializers.PrimaryKeyRelatedField(source='extraction.sample', read_only=True)
     peg_neg = serializers.PrimaryKeyRelatedField(source='extraction.sample.peg_neg', read_only=True)
     inhibition_dilution_factor = serializers.SerializerMethodField()
+    all_parent_controls_uploaded = serializers.SerializerMethodField()
     bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
 
     class Meta:
@@ -895,7 +903,7 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
         fields = ('id', 'extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
                   'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class PCRReplicateSerializer(serializers.ModelSerializer):
@@ -935,11 +943,19 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
             data = None
         return data
 
+    def get_all_parent_controls_uploaded(self, obj):
+        data = False
+        pcrrep_batch = PCRReplicateBatch.objects.get(id=obj.pcrreplicate_batch_id)
+        if pcrrep_batch.ext_neg_cq_value and pcrrep_batch.rt_neg_cq_value and pcrrep_batch.pcr_neg_cq_value:
+            data = True
+        return data
+
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     sample = serializers.PrimaryKeyRelatedField(source='extraction.sample', read_only=True)
     peg_neg = serializers.PrimaryKeyRelatedField(source='extraction.sample.peg_neg', read_only=True)
     inhibition_dilution_factor = serializers.SerializerMethodField()
+    all_parent_controls_uploaded = serializers.SerializerMethodField()
     bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
 
     class Meta:
@@ -947,7 +963,7 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
                   'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = PCRReplicateListSerializer
 
 
@@ -1012,9 +1028,9 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             extneg_cq = validated_data.get('ext_neg_cq_value', 0)
             rtneg_cq = validated_data.get('rt_neg_cq_value', 0)
             pcrneg_cq = validated_data.get('pcr_neg_cq_value', 0)
-            ext_neg_flag = True if extneg_cq != 0 else False
-            rt_neg_flag = True if rtneg_cq != 0 else False
-            pcr_neg_flag = True if pcrneg_cq != 0 else False
+            ext_neg_flag = False if extneg_cq == 0 else True
+            rt_neg_flag = False if rtneg_cq == 0 else True
+            pcr_neg_flag = False if pcrneg_cq == 0 else True
             # validating the pcr_pos will come in a later release of the software
             # sc = validated_data.get('standard_curve', None)
             pcr_pos_flag = False
@@ -1066,11 +1082,11 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                                     # skip to the next item in the loop
                                     continue
                             # that particular sample volume exists, so finish updating this rep
-                            flag = self.calc_flag(cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction)
+                            # ensure target is a Target object, not an integer
                             if isinstance(target, int):
                                 target = Target.objects.get(id=target).first()
                             new_data = {'pcrreplicate_batch': instance.id, 'cq_value': cq_value,
-                                        'gc_reaction': gc_reaction, 'bad_result_flag': flag, 'modified_by': user}
+                                        'gc_reaction': gc_reaction, 'modified_by': user}
                             serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
                             if serializer.is_valid():
                                 valid_data.append(serializer)
@@ -1109,14 +1125,14 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(response_errors)
 
     def calc_flag(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
-        bad_result_flag = False
-        if cq_value > 0:
+        bad_result_flag = True
+        if cq_value is None:
             if rtneg_cq is not None:
-                if extneg_cq > 0 or rtneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
-                    bad_result_flag = True
+                if extneg_cq == 0 and rtneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
+                    bad_result_flag = False
             else:
-                if extneg_cq > 0 or pcrneg_cq > 0 or gc_reaction < 0:
-                    bad_result_flag = True
+                if extneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
+                    bad_result_flag = False
         return bad_result_flag
 
     created_by = serializers.StringRelatedField()
