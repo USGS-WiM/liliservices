@@ -234,6 +234,29 @@ class AliquotSerializer(serializers.ModelSerializer):
 
 class SampleSerializer(serializers.ModelSerializer):
 
+    # validate required fields by matrix (beyond the fields required for every sample record regardless of matrix)
+    def validate(self, data):
+        matrix_id = data['matrix']
+        matrix = Matrix.objects.get(id=matrix_id)
+        if matrix.code == 'W':
+            if 'filter_type' not in data:
+                message = "filter_type is a required field for the water matrix"
+                raise serializers.ValidationError(message)
+        elif matrix.code == 'SM':
+            if 'post_dilution_volume' not in data:
+                message = "post_dilution_volume is a required field for the solid manure matrix"
+                raise serializers.ValidationError(message)
+        elif matrix.code == 'A':
+            is_valid = True
+            details = []
+            if 'filter_type' not in data:
+                details.append("filter_type is a required field for the water matrix")
+            if 'dissolution_volume' not in data:
+                details.append("dissolution_volume is a required field for the solid manure matrix")
+            if not is_valid:
+                raise serializers.ValidationError(details)
+        return data
+
     # peg_neg_targets_extracted
     def get_peg_neg_targets_extracted(self, obj):
         targets_extracted = []
@@ -257,7 +280,7 @@ class SampleSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     sample_type_string = serializers.StringRelatedField(source='sample_type')
-    matrix_type_string = serializers.StringRelatedField(source='matrix_type')
+    matrix_string = serializers.StringRelatedField(source='matrix')
     filter_type_string = serializers.StringRelatedField(source='filter_type')
     study_string = serializers.StringRelatedField(source='study')
     sampler_name_string = serializers.StringRelatedField(source='sampler_name')
@@ -268,11 +291,11 @@ class SampleSerializer(serializers.ModelSerializer):
     final_concentrated_sample_volume_type = serializers.StringRelatedField(
         source='final_concentrated_sample_volume.concentration_type.name', read_only=True)
     final_concentrated_sample_volume_notes = serializers.CharField(
-        source='final_concentrated_sample_volume.final_concentrated_sample_volume_notes', read_only=True)
+        source='final_concentrated_sample_volume.notes', read_only=True)
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'sample_type_string', 'matrix_type', 'matrix_type_string', 'filter_type',
+        fields = ('id', 'sample_type', 'sample_type_string', 'matrix', 'matrix_string', 'filter_type',
                   'filter_type_string', 'study', 'study_string', 'study_site_name', 'collaborator_sample_id',
                   'sampler_name', 'sampler_name_string', 'sample_notes', 'sample_description', 'arrival_date',
                   'arrival_notes', 'collection_start_date', 'collection_start_time', 'collection_end_date',
@@ -295,12 +318,12 @@ class SampleTypeSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'code', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class MatrixTypeSerializer(serializers.ModelSerializer):
+class MatrixSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
     class Meta:
-        model = MatrixType
+        model = Matrix
         fields = ('id', 'name', 'code', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -363,8 +386,7 @@ class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
 
     class Meta:
         model = FinalConcentratedSampleVolume
-        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
-                  'final_concentrated_sample_volume_notes',
+        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume', 'notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -374,8 +396,7 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FinalConcentratedSampleVolume
-        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume',
-                  'final_concentrated_sample_volume_notes',
+        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume', 'notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = FinalConcentratedSampleVolumeListSerializer
 
@@ -544,33 +565,35 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     extraction_number = serializers.IntegerField(read_only=True, default=0)
-    extractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    sample_extractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     new_rt = serializers.JSONField(write_only=True, required=False)
     new_replicates = serializers.ListField(write_only=True, required=False)
-    new_extractions = serializers.ListField(write_only=True, required=False)
+    new_sample_extractions = serializers.ListField(write_only=True, required=False)
 
     def validate(self, data):
         if self.context['request'].method == 'POST':
             # if 'new_rt' not in data:
             #     raise serializers.ValidationError("new_rt is a required field")
-            if 'new_extractions' not in data:
-                raise serializers.ValidationError("new_extractions is a required field")
+            if 'new_sample_extractions' not in data:
+                raise serializers.ValidationError("new_sample_extractions is a required field")
             if 'new_replicates' not in data:
                 raise serializers.ValidationError("new_replicates is a required field")
-            if 'new_extractions' in data:
+            if 'new_sample_extractions' in data:
                 is_valid = True
                 details = []
                 for item in data['new_extractions']:
                     if 'sample' not in item:
                         is_valid = False
-                        details.append("sample is a required field within new_extractions")
+                        details.append("sample is a required field within new_sample_extractions")
                     if 'inhibition_dna' not in item and 'inhibition_rna' not in item:
                         is_valid = False
                         message = ""
                         if 'sample' in item:
-                            message += "new extraction with sample_id " + item['sample'] + " is missing an inhibition; "
-                        message += "inhibition_dna or inhibition_rna is a required field within new_extractions"
+                            message += "new sample_extraction with sample_id " + item['sample']
+                            message += " is missing an inhibition; "
+                        message += "Either inhibition_dna or inhibition_rna is required within new_sample_extractions"
+                        message += " (these two fields cannot both be null) "
                         details.append(message)
                 if not is_valid:
                     raise serializers.ValidationError(details)
@@ -592,13 +615,13 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         #         raise serializers.ValidationError(message)
         return data
 
-    # on create, also create child objects (extractions and replicates)
+    # on create, also create child objects (sample_extractions and replicates)
     def create(self, validated_data):
         # pull out child reverse transcription definition from the request
         rt = validated_data.pop('new_rt') if 'new_rt' in validated_data else None
 
-        # pull out child extractions list from the request
-        extractions = validated_data.pop('new_extractions')
+        # pull out child sample_extractions list from the request
+        sample_extractions = validated_data.pop('new_sample_extractions')
 
         # pull out child replicates list from the request
         replicates = validated_data.pop('new_replicates')
@@ -633,23 +656,23 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 else:
                     raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
-        # create the child extractions for this extraction batch
-        if extractions is not None:
-            for extraction in extractions:
-                sample_id = extraction['sample']
+        # create the child sample_extractions for this extraction batch
+        if sample_extractions is not None:
+            for sample_extraction in sample_extractions:
+                sample_id = sample_extraction['sample']
                 sample = Sample.objects.filter(id=sample_id).first()
-                extraction['sample'] = sample
-                if extraction:
+                sample_extraction['sample'] = sample
+                if sample_extraction:
                     user = self.context['request'].user
-                    extraction['created_by'] = user
-                    extraction['modified_by'] = user
-                    if 'inhibition_dna' in extraction:
-                        inhib_dna = extraction['inhibition_dna']
+                    sample_extraction['created_by'] = user
+                    sample_extraction['modified_by'] = user
+                    if 'inhibition_dna' in sample_extraction:
+                        inhib_dna = sample_extraction['inhibition_dna']
                         # if inhib_dna is an integer, assume it is an existing Inhibition ID
                         if isinstance(inhib_dna, int):
                             inhib = Inhibition.objects.filter(id=inhib_dna).first()
                             if inhib:
-                                extraction['inhibition_dna'] = inhib
+                                sample_extraction['inhibition_dna'] = inhib
                             else:
                                 raise serializers.ValidationError("No Inhibition exists with ID: " + str(inhib_dna))
                         else:
@@ -658,28 +681,22 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
                             try:
                                 datetime.strptime(inhib_dna, '%Y-%m-%d')
-                                extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extr_batch,
-                                                                                         sample=sample,
-                                                                                         inhibition_date=inhib_dna,
-                                                                                         nucleic_acid_type=dna,
-                                                                                         created_by=user,
-                                                                                         modified_by=user)
+                                sample_extraction['inhibition_dna'] = Inhibition.objects.create(
+                                    extraction_batch=extr_batch, sample=sample, inhibition_date=inhib_dna,
+                                    nucleic_acid_type=dna, created_by=user, modified_by=user)
                             # if inhib_dna is not a date string, assign it today's date
                             except ValueError:
                                 today = datetime.today().strftime('%Y-%m-%d')
-                                extraction['inhibition_dna'] = Inhibition.objects.create(extraction_batch=extr_batch,
-                                                                                         sample=sample,
-                                                                                         inhibition_date=today,
-                                                                                         nucleic_acid_type=dna,
-                                                                                         created_by=user,
-                                                                                         modified_by=user)
-                    if 'inhibition_rna' in extraction:
-                        inhib_rna = extraction['inhibition_rna']
+                                sample_extraction['inhibition_dna'] = Inhibition.objects.create(
+                                    extraction_batch=extr_batch, sample=sample, inhibition_date=today,
+                                    nucleic_acid_type=dna, created_by=user, modified_by=user)
+                    if 'inhibition_rna' in sample_extraction:
+                        inhib_rna = sample_extraction['inhibition_rna']
                         # if inhib_rna is an integer, assume it is an existing Inhibition ID
                         if isinstance(inhib_rna, int):
                             inhib = Inhibition.objects.filter(id=inhib_rna).first()
                             if inhib:
-                                extraction['inhibition_rna'] = inhib
+                                sample_extraction['inhibition_rna'] = inhib
                             else:
                                 raise serializers.ValidationError("No Inhibition exists with ID: " + str(inhib_rna))
                         else:
@@ -687,40 +704,35 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             rna = NucleicAcidType.objects.get(name="RNA")
                             try:
                                 datetime.strptime(inhib_rna, '%Y-%m-%d')
-                                extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extr_batch,
-                                                                                         sample=sample,
-                                                                                         inhibition_date=inhib_rna,
-                                                                                         nucleic_acid_type=rna,
-                                                                                         created_by=user,
-                                                                                         modified_by=user)
+                                sample_extraction['inhibition_rna'] = Inhibition.objects.create(
+                                    extraction_batch=extr_batch, sample=sample, inhibition_date=inhib_rna,
+                                    nucleic_acid_type=rna, created_by=user, modified_by=user)
                             # if inhib_rna is not a date string, assign it today's date
                             except ValueError:
                                 today = datetime.today().strftime('%Y-%m-%d')
-                                extraction['inhibition_rna'] = Inhibition.objects.create(extraction_batch=extr_batch,
-                                                                                         sample=sample,
-                                                                                         inhibition_date=today,
-                                                                                         nucleic_acid_type=rna,
-                                                                                         created_by=user,
-                                                                                         modified_by=user)
+                                sample_extraction['inhibition_rna'] = Inhibition.objects.create(
+                                    extraction_batch=extr_batch, sample=sample, inhibition_date=today,
+                                    nucleic_acid_type=rna, created_by=user, modified_by=user)
 
-                    new_extr = Extraction.objects.create(extraction_batch=extr_batch, **extraction)
+                    new_extr = SampleExtraction.objects.create(extraction_batch=extr_batch, **sample_extraction)
 
-                    # create the child replicates for this extraction
+                    # create the child replicates for this sample_extraction
                     if replicates is not None:
                         for replicate in replicates:
                             target_id = replicate['target']
                             target = Target.objects.filter(id=target_id).first()
                             if target:
-                                # create the child replicates for this extraction
+                                # create the child replicates for this sample_extraction
                                 for x in range(1, replicate['count']):
-                                    rep_batch = PCRReplicateBatch.objects.get(extraction_batch=extr_batch,
-                                                                              target=target, replicate_number=x)
-                                    PCRReplicate.objects.create(extraction=new_extr, pcrreplicate_batch=rep_batch)
+                                    rep_batch = PCRReplicateBatch.objects.get(
+                                        extraction_batch=extr_batch, target=target, replicate_number=x)
+                                    PCRReplicate.objects.create(
+                                        sample_extraction=new_extr, pcrreplicate_batch=rep_batch)
                             else:
                                 raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
                 else:
-                    raise serializers.ValidationError("Extraction with Sample ID: " + sample_id + "does not exist")
+                    raise serializers.ValidationError("No SampleExtraction exists with Sample ID: " + str(sample_id))
 
         # create the child reverse transcription if present
         if rt is not None:
@@ -730,15 +742,15 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
 
         return extr_batch
 
-    # on update, any submitted nested objects (extractions, replicates) will be ignored
+    # on update, any submitted nested objects (sample_extractions, replicates) will be ignored
     def update(self, instance, validated_data):
         # remove child reverse transcription definition from the request
         if 'new_rt' in validated_data:
             validated_data.pop('new_rt')
 
         # remove child extractions list from the request
-        if 'new_extractions' in validated_data:
-            validated_data.pop('new_extractions')
+        if 'new_sample_extractions' in validated_data:
+            validated_data.pop('new_sample_extractions')
 
         # remove child replicates list from the request
         if 'new_replicates' in validated_data:
@@ -791,9 +803,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'extractions', 'inhibitions', 'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_bad_result_flag',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',
-                  'new_rt', 'new_replicates', 'new_extractions')
+                  'sample_extractions', 'inhibitions', 'ext_pos_cq_value', 'ext_pos_gc_reaction',
+                  'ext_pos_bad_result_flag', 'new_rt', 'new_replicates', 'new_sample_extractions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ReverseTranscriptionSerializer(serializers.ModelSerializer):
@@ -843,12 +855,18 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
-class ExtractionSerializer(serializers.ModelSerializer):
+class SampleExtractionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
+    def validate(self, data):
+        if 'inhibition_dna' not in data and 'inhibition_rna' not in data:
+            message = "Either inhibition_dna or inhibition_rna is required (these two fields cannot both be null)"
+            raise serializers.ValidationError(message)
+        return data
+
     class Meta:
-        model = Extraction
+        model = SampleExtraction
         fields = ('id', 'sample', 'extraction_batch', 'inhibition_dna', 'inhibition_rna', 'pcrreplicates',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
@@ -870,15 +888,15 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
                 ret.append(self.child.update(pcrrep, data))
 
     def get_inhibition_dilution_factor(self, obj):
-        extraction_id = obj.extraction_id
-        extraction = Extraction.objects.get(id=extraction_id)
+        sample_extraction_id = obj.sample_extraction_id
+        sample_extraction = SampleExtraction.objects.get(id=sample_extraction_id)
         pcrreplicate_batch_id = obj.pcrreplicate_batch_id
         pcrreplicate_batch = PCRReplicateBatch.objects.get(id=pcrreplicate_batch_id)
         nucleic_acid_type = pcrreplicate_batch.target.nucleic_acid_type
         if nucleic_acid_type == 'DNA':
-            data = extraction.inhibition_dna.dilution_factor
+            data = sample_extraction.inhibition_dna.dilution_factor
         elif nucleic_acid_type == 'RNA':
-            data = extraction.inhibition_rna.dilution_factor
+            data = sample_extraction.inhibition_rna.dilution_factor
         else:
             data = None
         return data
@@ -892,25 +910,28 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    sample = serializers.PrimaryKeyRelatedField(source='extraction.sample', read_only=True)
-    peg_neg = serializers.PrimaryKeyRelatedField(source='extraction.sample.peg_neg', read_only=True)
+    sample = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample', read_only=True)
+    peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
     inhibition_dilution_factor = serializers.SerializerMethodField()
     all_parent_controls_uploaded = serializers.SerializerMethodField()
     bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
+        fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
                   'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
                   'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        extra_kwargs = {
+            'concentration_unit': {'required': False}
+        }
 
 
 class PCRReplicateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         # update the instance
-        instance.extraction = validated_data.get('extraction', instance.extraction)
+        instance.sample_extraction = validated_data.get('sample_extraction', instance.sample_extraction)
         instance.pcrreplicate_batch = validated_data.get('pcrreplicate_batch', instance.pcrreplicate_batch)
         instance.cq_value = validated_data.get('cq_value', instance.cq_value)
         instance.gc_reaction = validated_data.get('gc_reaction', instance.gc_reaction)
@@ -930,15 +951,15 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         return instance
 
     def get_inhibition_dilution_factor(self, obj):
-        extraction_id = obj.extraction_id
-        extraction = Extraction.objects.get(id=extraction_id)
+        sample_extraction_id = obj.sample_extraction_id
+        sample_extraction = SampleExtraction.objects.get(id=sample_extraction_id)
         pcrreplicate_batch_id = obj.pcrreplicate_batch_id
         pcrreplicate_batch = PCRReplicateBatch.objects.get(id=pcrreplicate_batch_id)
         nucleic_acid_type = pcrreplicate_batch.target.nucleic_acid_type
         if nucleic_acid_type == 'DNA':
-            data = extraction.inhibition_dna.dilution_factor
+            data = sample_extraction.inhibition_dna.dilution_factor
         elif nucleic_acid_type == 'RNA':
-            data = extraction.inhibition_rna.dilution_factor
+            data = sample_extraction.inhibition_rna.dilution_factor
         else:
             data = None
         return data
@@ -952,19 +973,22 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    sample = serializers.PrimaryKeyRelatedField(source='extraction.sample', read_only=True)
-    peg_neg = serializers.PrimaryKeyRelatedField(source='extraction.sample.peg_neg', read_only=True)
+    sample = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample', read_only=True)
+    peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
     inhibition_dilution_factor = serializers.SerializerMethodField()
     all_parent_controls_uploaded = serializers.SerializerMethodField()
     bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
+        fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
                   'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
                   'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = PCRReplicateListSerializer
+        extra_kwargs = {
+            'concentration_unit': {'required': False}
+        }
 
 
 class PCRReplicateBatchSerializer(serializers.ModelSerializer):
@@ -1063,13 +1087,14 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                 if sample:
                     if isinstance(eb, int):
                         eb = ExtractionBatch.objects.filter(id=eb).first()
-                    extraction = Extraction.objects.filter(extraction_batch=eb.id, sample=sample.id).first()
-                    if extraction:
+                    sample_extraction = SampleExtraction.objects.filter(
+                        extraction_batch=eb.id, sample=sample.id).first()
+                    if sample_extraction:
                         # finally validate the pcr reps and calculate their final replicate concentrations
                         cq_value = pcrreplicate.get('cq_value', 0)
                         gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
-                        pcrrep = PCRReplicate.objects.filter(extraction=extraction.id,
-                                                             pcrreplicate_batch=instance.id).first()
+                        pcrrep = PCRReplicate.objects.filter(
+                            extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
                         if pcrrep:
                             # ensure that the concentrated/dissolved/diluted volume exists for this sample
                             if sample.dissolution_volume is None or sample.post_dilution_volume is None:
@@ -1096,13 +1121,13 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                         else:
                             is_valid = False
                             message = "No PCRReplicate exists with PCRReplicate Batch ID: " + instance.id + ", "
-                            message += "Extraction ID: " + extraction.id
+                            message += "SampleExtraction ID: " + sample_extraction.id
                             response_errors.append({"pcrreplicate": message})
                     else:
                         is_valid = False
-                        message = "No Extraction exists with Extraction Batch ID: " + eb.id + ", "
+                        message = "No SampleExtraction exists with Extraction Batch ID: " + eb.id + ", "
                         message += "Sample ID: " + sample_id
-                        response_errors.append({"extraction": message})
+                        response_errors.append({"sampleextraction": message})
                 else:
                     is_valid = False
                     message = "No Sample exists with Sample ID: " + sample_id
@@ -1359,12 +1384,12 @@ class SimpleSampleSerializer(serializers.ModelSerializer):
         data = {"id": sample_type_id, "name": sample_type_name}
         return data
 
-    # matrix_type
-    def get_matrix_type(self, obj):
-        matrix_type_id = obj.matrix_type_id
-        matrix_type = MatrixType.objects.get(id=matrix_type_id)
-        matrix_type_name = matrix_type.name
-        data = {"id": matrix_type_id, "name": matrix_type_name}
+    # matrix
+    def get_matrix(self, obj):
+        matrix_id = obj.matrix_id
+        matrix = Matrix.objects.get(id=matrix_id)
+        matrix_name = matrix.name
+        data = {"id": matrix_id, "name": matrix_name}
         return data
 
     # study
@@ -1378,12 +1403,12 @@ class SimpleSampleSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     sample_type = serializers.SerializerMethodField()
-    matrix_type = serializers.SerializerMethodField()
+    matrix = serializers.SerializerMethodField()
     study = serializers.SerializerMethodField()
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'matrix_type', 'study', 'collaborator_sample_id', 'sample_description',
+        fields = ('id', 'sample_type', 'matrix', 'study', 'collaborator_sample_id', 'sample_description',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1393,11 +1418,11 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
 
     def get_inhibitions(self, obj):
         inhibitions = {}
-        extractions = obj.extractions.values()
+        sample_extractions = obj.sampleextractions.values()
 
-        if extractions is not None:
-            for extraction in extractions:
-                sample_id = extraction.get('sample_id')
+        if sample_extractions is not None:
+            for sample_extraction in sample_extractions:
+                sample_id = sample_extraction.get('sample_id')
                 if sample_id is not None:
                     sample = Sample.objects.get(id=sample_id)
                     sample_inhibitions = sample.inhibitions.values()
@@ -1466,7 +1491,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         data = {"id": extraction_method_id, "name": extraction_method_name}
         return data
 
-    extractions = ExtractionSerializer(many=True, read_only=True)
+    sample_extractions = SampleExtractionSerializer(many=True, read_only=True)
     inhibitions = serializers.SerializerMethodField()
     reverse_transcriptions = serializers.SerializerMethodField()
     targets = serializers.SerializerMethodField()
@@ -1477,7 +1502,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'extractions', 'inhibitions', 'reverse_transcriptions', 'targets',
+                  'sample_extractions', 'inhibitions', 'reverse_transcriptions', 'targets',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1499,14 +1524,14 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
                 studies.append(data)
         return studies
 
-    extractionbatches = ExtractionBatchSummarySerializer(many=True, read_only=True)
+    extraction_batches = ExtractionBatchSummarySerializer(many=True, read_only=True)
     samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
 
     class Meta:
         model = AnalysisBatch
         fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies',
-                  'extractionbatches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'extraction_batches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
@@ -1526,22 +1551,22 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                 studies.append(data)
         return studies
 
-    # summary: extraction count, inhibition count, reverse transcription count, target count
+    # summary: sample_extraction count, inhibition count, reverse transcription count, target count
     def get_summary(self, obj):
         summary = {}
-        extraction_count = 0
+        sample_extraction_count = 0
         inhibition_count = 0
         reverse_transcription_count = 0
         targets = []
 
-        # extraction and reverse_transcription count
+        # samples_extraction and reverse_transcription count
         extraction_batches = obj.extractionbatches.values()
         if extraction_batches is not None:
             for extraction_batch in extraction_batches:
                 extraction_batch_id = extraction_batch.get('id')
 
-                extractions = Extraction.objects.filter(extraction_batch__exact=extraction_batch_id)
-                extraction_count += len(extractions)
+                sample_extractions = SampleExtraction.objects.filter(extraction_batch__exact=extraction_batch_id)
+                sample_extraction_count += len(sample_extractions)
 
                 reversetranscriptions = ReverseTranscription.objects.filter(extraction_batch__exact=extraction_batch_id)
                 reverse_transcription_count += len(reversetranscriptions)
@@ -1558,7 +1583,7 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                         if target not in targets:
                             targets.append(target)
 
-        summary['extraction_count'] = extraction_count
+        summary['sample_extraction_count'] = sample_extraction_count
         summary['inhibition_count'] = inhibition_count
         summary['reverse_transcription_count'] = reverse_transcription_count
         summary['target_count'] = len(targets)

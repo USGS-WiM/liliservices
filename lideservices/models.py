@@ -47,8 +47,6 @@ class NameModel(HistoryModel):
         abstract = True
 
 
-# TODO: assign proper field types and properties to each model field
-
 ######
 #
 #  Samples
@@ -62,35 +60,35 @@ class Sample(HistoryModel):
     """
 
     sample_type = models.ForeignKey('SampleType', related_name='samples')
-    matrix_type = models.ForeignKey('MatrixType', related_name='samples')
+    matrix = models.ForeignKey('Matrix', related_name='samples')
     filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
-    study_site_name = models.CharField(max_length=128, null=True, blank=True)  # COMMENT: I don't like this. Location information should be kept in a dedicated table for possible future use in spatial analysis
+    study_site_name = models.CharField(max_length=128, null=True, blank=True)
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
-    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='sampler_name')  # QUESTION: This should probably be required, yes?
+    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='sampler_name') # TODO: this probably should be free text, holding external (non-staff) names
     sample_notes = models.TextField(blank=True)
     sample_description = models.TextField(blank=True)
     arrival_date = models.DateField(null=True, blank=True)
     arrival_notes = models.TextField(blank=True)
-    collection_start_date = models.DateField(null=True, blank=True)
+    collection_start_date = models.DateField()
     collection_start_time = models.TimeField(null=True, blank=True)
     collection_end_date = models.DateField(null=True, blank=True)
     collection_end_time = models.TimeField(null=True, blank=True)
-    meter_reading_initial = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    meter_reading_final = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    meter_reading_unit = models.ForeignKey('Unit', null=True, related_name='samples_meter_units')  # QUESTION: This should probably be required, yes?  # COMMENT: this field doesn't belong here, it should go in a related table dedicated to this matrix type
+    meter_reading_initial = models.FloatField(null=True, blank=True)
+    meter_reading_final = models.FloatField(null=True, blank=True)
+    meter_reading_unit = models.ForeignKey('Unit', null=True, related_name='samples_meter_units')
     total_volume_sampled_initial = models.FloatField(null=True, blank=True)
-    total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')  # QUESTION: This should probably be required, yes?
-    total_volume_or_mass_sampled = models.FloatField(null=True, blank=True)
-    sample_volume_initial = models.FloatField(null=True, blank=True)
-    sample_volume_filtered = models.FloatField(null=True, blank=True)
-    filter_born_on_date = models.DateField(null=True, blank=True)  # COMMENT: Are these throw-away filters? Or do they need/want to keep track of them for later analysis? If the latter, it would need a dedicated table, yes?
+    total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')
+    total_volume_or_mass_sampled = models.FloatField()
+    sample_volume_initial = models.FloatField(null=True, blank=True) # TODO: delete this superfluous field?
+    sample_volume_filtered = models.FloatField(null=True, blank=True) # TODO: delete this superfluous field?
+    filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
-    elution_notes = models.TextField(blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    technician_initials = models.CharField(max_length=4, null=True, blank=True)  # COMMENT: this field could be replaced by the created_by/edited_by fields
-    dissolution_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
-    post_dilution_volume = models.FloatField(null=True, blank=True)  # COMMENT: this field probably doesn't belong here, it should go in a related table dedicated to this matrix type
+    elution_notes = models.TextField(blank=True)
+    technician_initials = models.CharField(max_length=128, null=True, blank=True)
+    dissolution_volume = models.FloatField(null=True, blank=True)
+    post_dilution_volume = models.FloatField(null=True, blank=True)
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
@@ -102,7 +100,6 @@ class Sample(HistoryModel):
 
     class Meta:
         db_table = "lide_sample"
-        # TODO: 'unique together' fields
 
 
 class Aliquot(HistoryModel):
@@ -117,7 +114,7 @@ class Aliquot(HistoryModel):
     aliquot_string = property(_concat_ids)
     sample = models.ForeignKey('Sample', related_name='aliquots')
     freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
-    aliquot_number = models.IntegerField(null=True)
+    aliquot_number = models.IntegerField()
     frozen = models.BooleanField(default=True)
 
     def __str__(self):
@@ -142,9 +139,9 @@ class SampleType(NameModel):
         db_table = "lide_sampletype"
 
 
-class MatrixType(NameModel):
+class Matrix(NameModel):
     """
-    Matrix Type
+    Matrix
     """
 
     code = models.CharField(max_length=128, unique=True)
@@ -153,7 +150,8 @@ class MatrixType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_matrixtype"
+        db_table = "lide_matrix"
+        verbose_name_plural = "matrices"
 
 
 class FilterType(NameModel):
@@ -161,7 +159,7 @@ class FilterType(NameModel):
     Filter Type
     """
 
-    matrix = models.ForeignKey('MatrixType', related_name='filters')
+    matrix = models.ForeignKey('Matrix', related_name='filters')
 
     def __str__(self):
         return self.name
@@ -182,6 +180,7 @@ class Study(NameModel):
 
     class Meta:
         db_table = "lide_study"
+        verbose_name_plural = "studies"
 
 
 class Unit(NameModel):
@@ -189,6 +188,7 @@ class Unit(NameModel):
     Defined units of measurement for data values.
     """
 
+    symbol = models.CharField(max_length=128, unique=True)
     description = models.TextField(blank=True)
 
     def __str__(self):
@@ -221,10 +221,10 @@ class FreezerLocation(HistoryModel):
 
     class Meta:
         db_table = "lide_freezer_location"
-        # QUESTION: should there be unique freezer locations?
+        unique_together = ("freezer", "rack", "box", "row", "spot")
 
 
-class Freezer(HistoryModel):
+class Freezer(NameModel):
     """
     Freezer
     """
@@ -255,15 +255,14 @@ class FinalConcentratedSampleVolume(HistoryModel):
 
     sample = models.OneToOneField('Sample', related_name='final_concentrated_sample_volume')
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
-    final_concentrated_sample_volume = models.FloatField(null=True, blank=True)
-    final_concentrated_sample_volume_notes = models.TextField(blank=True)
+    final_concentrated_sample_volume = models.FloatField()
+    notes = models.TextField(blank=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_finalconcentratedsamplevolume"
-        # QUESTION: should there be unique final concentrated sample volumes?
 
 
 class ConcentrationType(NameModel):
@@ -336,6 +335,7 @@ class SampleAnalysisBatch(HistoryModel):
     class Meta:
         db_table = "lide_sampleanalysisbatch"
         unique_together = ("sample", "analysis_batch")
+        verbose_name_plural = "sampleanalysisbatches"
 
 
 class AnalysisBatch(HistoryModel):
@@ -344,14 +344,15 @@ class AnalysisBatch(HistoryModel):
     """
 
     samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
-    analysis_batch_description = models.CharField(max_length=128, null=True, blank=True)
-    analysis_batch_notes = models.CharField(max_length=128, null=True, blank=True)
+    analysis_batch_description = models.CharField(max_length=128, blank=True)
+    analysis_batch_notes = models.CharField(max_length=128, blank=True)
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_analysisbatch"
+        verbose_name_plural = "analysisbatches"
 
 
 class AnalysisBatchTemplate(NameModel):
@@ -361,8 +362,8 @@ class AnalysisBatchTemplate(NameModel):
 
     target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
     description = models.TextField(blank=True)
-    extraction_volume = models.FloatField(null=True, blank=True)
-    elution_volume = models.FloatField(null=True, blank=True)
+    extraction_volume = models.FloatField()
+    elution_volume = models.FloatField()
 
     def __str__(self):
         return self.name
@@ -403,25 +404,27 @@ class ExtractionBatch(HistoryModel):
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
-    re_extraction_notes = models.CharField(max_length=255, null=True, blank=True)
+    re_extraction_notes = models.TextField(null=True, blank=True)
     extraction_number = models.IntegerField()
-    extraction_volume = models.FloatField(null=True, blank=True)
-    extraction_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    pcr_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    qpcr_template_volume = models.FloatField(null=True, blank=True, default=6)
-    elution_volume = models.FloatField(null=True, blank=True)
-    sample_dilution_factor = models.IntegerField(null=True, blank=True)
-    qpcr_reaction_volume = models.FloatField(null=True, blank=True, default=20)
+    extraction_volume = models.FloatField()
+    extraction_date = models.DateField(default=date.today, db_index=True)
+    pcr_date = models.DateField(default=date.today, db_index=True)
+    qpcr_template_volume = models.FloatField(default=6)
+    elution_volume = models.FloatField()
+    sample_dilution_factor = models.IntegerField()
+    qpcr_reaction_volume = models.FloatField(default=20)
     ext_pos_cq_value = models.FloatField(null=True, blank=True)
     ext_pos_gc_reaction = models.FloatField(null=True, blank=True)
-    ext_pos_bad_result_flag = models.BooleanField(default=False)
+    ext_pos_invalid = models.BooleanField(default=True)
 
     def __str__(self):
         return self.extraction_string
 
     class Meta:
         db_table = "lide_extractionbatch"
-        unique_together = ("analysis_batch", "extraction_number")
+        unique_together = ("analysis_batch", "extraction_number", "re_extraction")
+        verbose_name_plural = "extractionbatches"
+        #  TODO: reassess extraction_number assignment logic for cases of re_extraction and re-use of the extraction_number
 
 
 class ReverseTranscription(HistoryModel):
@@ -430,14 +433,14 @@ class ReverseTranscription(HistoryModel):
     """
 
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
-    template_volume = models.FloatField(null=True, blank=True)
-    reaction_volume = models.FloatField(null=True, blank=True)
+    template_volume = models.FloatField()
+    reaction_volume = models.FloatField()
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
-    re_rt_notes = models.CharField(max_length=255, null=True, blank=True)
+    re_rt_notes = models.TextField(blank=True)
     rt_pos_cq_value = models.FloatField(null=True, blank=True)
     rt_pos_gc_reaction = models.FloatField(null=True, blank=True)
-    rt_pos_bad_result_flag = models.BooleanField(default=False)
+    rt_pos_invalid = models.BooleanField(default=True)
 
     def __str__(self):
         return str(self.id)
@@ -447,21 +450,21 @@ class ReverseTranscription(HistoryModel):
         unique_together = ("extraction_batch", "re_rt")
 
 
-class Extraction(HistoryModel):
+class SampleExtraction(HistoryModel):
     """
-    Extraction
+    Sample Extraction
     """
 
-    sample = models.ForeignKey('Sample', related_name='extractions')
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='extractions')
-    inhibition_dna = models.ForeignKey('Inhibition', null=True, related_name='extractions_dna')
-    inhibition_rna = models.ForeignKey('Inhibition', null=True, related_name='extractions_rna')
+    sample = models.ForeignKey('Sample', related_name='sampleextractions')
+    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='sampleextractions')
+    inhibition_dna = models.ForeignKey('Inhibition', null=True, related_name='sampleextractions_dna')
+    inhibition_rna = models.ForeignKey('Inhibition', null=True, related_name='sampleextractions_rna')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_extraction"
+        db_table = "lide_sampleextraction"
         unique_together = ("sample", "extraction_batch")
 
 
@@ -472,28 +475,29 @@ class PCRReplicateBatch(HistoryModel):
 
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
-    replicate_number = models.FloatField(null=True, blank=True)
+    replicate_number = models.IntegerField()
     notes = models.TextField(blank=True)
     ext_neg_cq_value = models.FloatField(null=True, blank=True)
     ext_neg_gc_reaction = models.FloatField(null=True, blank=True)
-    ext_neg_bad_result_flag = models.BooleanField(default=False)
+    ext_neg_invalid = models.BooleanField(default=True)
     rt_neg_cq_value = models.FloatField(null=True, blank=True)
     rt_neg_gc_reaction = models.FloatField(null=True, blank=True)
-    rt_neg_bad_result_flag = models.BooleanField(default=False)
+    rt_neg_invalid = models.BooleanField(default=True)
     pcr_neg_cq_value = models.FloatField(null=True, blank=True)
     pcr_neg_gc_reaction = models.FloatField(null=True, blank=True)
-    pcr_neg_bad_result_flag = models.BooleanField(default=False)
+    pcr_neg_invalid = models.BooleanField(default=True)
     pcr_pos_cq_value = models.FloatField(null=True, blank=True)
     pcr_pos_gc_reaction = models.FloatField(null=True, blank=True)
-    pcr_pos_bad_result_flag = models.BooleanField(default=False)
-    re_pcr = models.BooleanField(default=False)
+    pcr_pos_invalid = models.BooleanField(default=True)
+    re_pcr = models.ForeignKey('self', null=True, related_name='pcrreplicatebatches')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_pcrreplicatebatch"
-        unique_together = ("extraction_batch", "target", "replicate_number")
+        unique_together = ("extraction_batch", "target", "replicate_number", "re_pcr")
+        verbose_name_plural = "pcrreplicatebatches"
 
 
 class PCRReplicate(HistoryModel):
@@ -501,14 +505,14 @@ class PCRReplicate(HistoryModel):
     Polymerase Chain Reaction Replicate
     """
 
-    extraction = models.ForeignKey('Extraction', related_name='pcrreplicates')
+    sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
     cq_value = models.FloatField(null=True, blank=True)
-    gc_reaction = models.FloatField(null=True, blank=True)
-    replicate_concentration = models.FloatField(null=True, blank=True)
-    concentration_unit = models.ForeignKey('Unit', null=True, related_name='pcrreplicates')  # QUESTION: This should probably be required, yes?
-    bad_result_flag = models.BooleanField(default=True)
-    bad_result_flag_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
+    gc_reaction = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    replicate_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    concentration_unit = models.ForeignKey('Unit', related_name='pcrreplicates')
+    invalid = models.BooleanField(default=True)
+    invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
 
     # get the concentration_unit
     def get_conc_unit(self, sample_id):
@@ -523,9 +527,9 @@ class PCRReplicate(HistoryModel):
     def calc_rep_conc(self):
         if self.gc_reaction is not None:
             nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
-            extr = self.extraction
-            eb = self.extraction.extraction_batch
-            sample = self.extraction.sample
+            extr = self.sample_extraction
+            eb = self.sample_extraction.extraction_batch
+            sample = self.sample_extraction.sample
             # TODO: ensure that all necessary values are not null (more than just the following line)
             if None in (eb.qpcr_reaction_volume, eb.qpcr_template_volume, eb.elution_volume, eb.extraction_volume,
                         eb.sample_dilution_factor):
@@ -548,19 +552,19 @@ class PCRReplicate(HistoryModel):
                 dl = extr.inhibition_rna.dilution_factor
                 prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
             # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
-            if sample.matrix_type in ['forage_sediment_soil', 'water', 'wastewater']:
+            if sample.matrix in ['forage_sediment_soil', 'water', 'wastewater']:
                 fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
                 prelim_value = prelim_value * (
                         fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
-            elif sample.matrix_type == 'air':
+            elif sample.matrix == 'air':
                 prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
-            elif sample.matrix_type == 'solid_manure':
+            elif sample.matrix == 'solid_manure':
                 prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
             # finally, apply the unit-cancelling expression
-            if sample.matrix_type in ['air', 'forage_sediment_soil', 'water', 'wastewater']:
+            if sample.matrix in ['air', 'forage_sediment_soil', 'water', 'wastewater']:
                 # 1,000 microliters per 1 milliliter
                 final_value = prelim_value * 1000
-            elif sample.matrix_type == 'liquid_manure':
+            elif sample.matrix == 'liquid_manure':
                 # 1,000,000 microliters per 1 liter
                 final_value = prelim_value * 1000000
             else:
@@ -575,7 +579,7 @@ class PCRReplicate(HistoryModel):
 
     class Meta:
         db_table = "lide_pcrreplicate"
-        unique_together = ("extraction", "pcrreplicate_batch")
+        unique_together = ("sample_extraction", "pcrreplicate_batch")
 
 
 class Result(HistoryModel):
@@ -583,14 +587,14 @@ class Result(HistoryModel):
     Result
     """
 
-    sample_mean_concentration = models.FloatField(null=True, blank=True)
+    sample_mean_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
     sample = models.ForeignKey('Sample', related_name='results')
     target = models.ForeignKey('Target', related_name='results')
 
     # Determine if all valid replicates for a given sample-target combo are now in the database or not
     def all_sample_target_reps_uploaded(self):
         valid_reps_with_null_cq_value = []
-        exts = Extraction.objects.filter(sample=self.sample)
+        exts = SampleExtraction.objects.filter(sample=self.sample)
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
@@ -602,7 +606,7 @@ class Result(HistoryModel):
     def calc_sample_mean_conc(self):
         reps_count = 0
         pos_gc_reactions = []
-        exts = Extraction.objects.filter(sample=self.sample)
+        exts = SampleExtraction.objects.filter(sample=self.sample)
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
@@ -618,7 +622,7 @@ class Result(HistoryModel):
 
     class Meta:
         db_table = "lide_result"
-        # QUESTION: should sample and target be unique_together?
+        unique_together = ("sample", "target")
 
 
 class StandardCurve(HistoryModel):
@@ -647,7 +651,7 @@ class Inhibition(HistoryModel):
 
     sample = models.ForeignKey('Sample', related_name='inhibitions')
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='inhibitions')
-    inhibition_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
+    inhibition_date = models.DateField(default=date.today, db_index=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
     dilution_factor = models.IntegerField(null=True, blank=True)
 
@@ -656,7 +660,7 @@ class Inhibition(HistoryModel):
 
     class Meta:
         db_table = "lide_inhibition"
-        # QUESTION: can there be more than one inhibition per EB? if so, we should probably have an inhibition_number field to ensure uniqueness among inhibitions within one EB
+        unique_together = ("sample", "extraction_batch", "nucleic_acid_type")
 
 
 class Target(NameModel):
@@ -664,9 +668,9 @@ class Target(NameModel):
     Target
     """
 
-    code = models.CharField(max_length=128, null=True, blank=True)
+    code = models.CharField(max_length=128, unique=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
-    notes = models.CharField(max_length=128, null=True, blank=True)
+    notes = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
@@ -735,3 +739,4 @@ class OtherAnalysis(HistoryModel):
 
     class Meta:
         db_table = "lide_otheranalysis"
+        verbose_name_plural = "otheranalyses"

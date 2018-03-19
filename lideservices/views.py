@@ -95,9 +95,9 @@ class SampleTypeViewSet(HistoryViewSet):
     serializer_class = SampleTypeSerializer
 
 
-class MatrixTypeViewSet(HistoryViewSet):
-    queryset = MatrixType.objects.all()
-    serializer_class = MatrixTypeSerializer
+class MatrixViewSet(HistoryViewSet):
+    queryset = Matrix.objects.all()
+    serializer_class = MatrixSerializer
 
 
 class FilterTypeViewSet(HistoryViewSet):
@@ -269,9 +269,9 @@ class ReverseTranscriptionViewSet(HistoryViewSet):
     serializer_class = ReverseTranscriptionSerializer
 
 
-class ExtractionViewSet(HistoryViewSet):
-    queryset = Extraction.objects.all()
-    serializer_class = ExtractionSerializer
+class SampleExtractionViewSet(HistoryViewSet):
+    queryset = SampleExtraction.objects.all()
+    serializer_class = SampleExtractionSerializer
 
 
 class PCRReplicateViewSet(HistoryViewSet):
