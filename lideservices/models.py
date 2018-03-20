@@ -338,7 +338,7 @@ class SampleAnalysisBatch(HistoryModel):
         verbose_name_plural = "sampleanalysisbatches"
 
 
-class AnalysisBatch(HistoryModel):
+class AnalysisBatch(NameModel):
     """
     Analysis Batch
     """
@@ -424,7 +424,7 @@ class ExtractionBatch(HistoryModel):
         db_table = "lide_extractionbatch"
         unique_together = ("analysis_batch", "extraction_number", "re_extraction")
         verbose_name_plural = "extractionbatches"
-        #  TODO: reassess extraction_number assignment logic for cases of re_extraction and re-use of the extraction_number
+        #  TODO: reassess extraction_number assignment logic for cases of re_extraction and re-use of extraction_number
 
 
 class ReverseTranscription(HistoryModel):
@@ -518,9 +518,9 @@ class PCRReplicate(HistoryModel):
     def get_conc_unit(self, sample_id):
         sample = Sample.objects.get(id=sample_id)
         if sample.matrix_type in ['forage_sediment_soil', 'solid_manure']:
-            conc_unit = Unit.objects.get(description='gram')
+            conc_unit = Unit.objects.get(name='gram')
         else:
-            conc_unit = Unit.objects.get(description='Liter')
+            conc_unit = Unit.objects.get(name='Liter')
         return conc_unit.id
 
     # Calculate replicate_concentration
