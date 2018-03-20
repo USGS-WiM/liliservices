@@ -598,7 +598,7 @@ class Result(HistoryModel):
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
-                if rep.cq_value is None and rep.bad_result_flag is False:
+                if rep.cq_value is None and rep.invalid is False:
                     valid_reps_with_null_cq_value.append(rep.id)
         return True if len(valid_reps_with_null_cq_value) == 0 else False
 
@@ -610,7 +610,7 @@ class Result(HistoryModel):
         for ext in exts:
             reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
-                if rep.gc_reaction >= 0 and rep.bad_result_flag is False:
+                if rep.gc_reaction >= 0 and rep.invalid is False:
                     reps_count = reps_count + 1
                     pos_gc_reactions.append(rep.gc_reaction)
         smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0

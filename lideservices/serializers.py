@@ -262,11 +262,11 @@ class SampleSerializer(serializers.ModelSerializer):
         targets_extracted = []
         peg_neg = obj.peg_neg
         if peg_neg is not None:
-            extractions = peg_neg.extractions.values()
+            sample_extractions = peg_neg.sampleextractions.values()
 
-            if extractions is not None:
-                for extraction in extractions:
-                    replicates = extraction.get('pcrreplicates')
+            if sample_extractions is not None:
+                for sample_extraction in sample_extractions:
+                    replicates = sample_extraction.get('pcrreplicates')
                     if replicates is not None:
                         for replicate in replicates:
                             target_id = replicate.get('target_id')
@@ -565,7 +565,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     extraction_number = serializers.IntegerField(read_only=True, default=0)
-    sample_extractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     new_rt = serializers.JSONField(write_only=True, required=False)
     new_replicates = serializers.ListField(write_only=True, required=False)
@@ -638,10 +638,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'ext_pos_cq_value' in validated_data:
             if validated_data['ext_pos_cq_value'] is not None and validated_data['ext_pos_cq_value'] > 0:
-                validated_data['ext_pos_bad_result_flag'] = True
+                validated_data['ext_pos_invalidg'] = True
         if 'ext_pos_gc_reaction' in validated_data:
             if validated_data['ext_pos_gc_reaction'] is not None and validated_data['ext_pos_gc_reaction'] > 0:
-                validated_data['ext_pos_bad_result_flag'] = True
+                validated_data['ext_pos_invalid'] = True
 
         extr_batch = ExtractionBatch.objects.create(**validated_data)
 
@@ -763,10 +763,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'ext_pos_cq_value' in validated_data:
             if validated_data['ext_pos_cq_value'] is not None and validated_data['ext_pos_cq_value'] > 0:
-                validated_data['ext_pos_bad_result_flag'] = True
+                validated_data['ext_pos_invalid'] = True
         if 'ext_pos_gc_reaction' in validated_data:
             if validated_data['ext_pos_gc_reaction'] is not None and validated_data['ext_pos_gc_reaction'] > 0:
-                validated_data['ext_pos_bad_result_flag'] = True
+                validated_data['ext_pos_invalid'] = True
 
         # update the Extraction Batch object
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
@@ -783,8 +783,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.qpcr_reaction_volume = validated_data.get('qpcr_reaction_volume', instance.qpcr_reaction_volume)
         instance.ext_pos_cq_value = validated_data.get('ext_pos_cq_value', instance.ext_pos_cq_value)
         instance.ext_pos_gc_reaction = validated_data.get('ext_pos_gc_reaction', instance.ext_pos_gc_reaction)
-        instance.ext_pos_bad_result_flag = validated_data.get('ext_pos_bad_result_flag',
-                                                              instance.ext_pos_bad_result_flag)
+        instance.ext_pos_invalid = validated_data.get('ext_pos_invalid', instance.ext_pos_invalid)
         instance.modified_by = self.context['request'].user
         instance.save()
 
@@ -803,8 +802,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'sample_extractions', 'inhibitions', 'ext_pos_cq_value', 'ext_pos_gc_reaction',
-                  'ext_pos_bad_result_flag', 'new_rt', 'new_replicates', 'new_sample_extractions',
+                  'sampleextractions', 'inhibitions', 'ext_pos_cq_value', 'ext_pos_gc_reaction',
+                  'ext_pos_invalid', 'new_rt', 'new_replicates', 'new_sample_extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -816,10 +815,10 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'rt_pos_cq_value' in validated_data:
             if validated_data['rt_pos_cq_value'] is not None and validated_data['rt_pos_cq_value'] > 0:
-                validated_data['rt_pos_bad_result_flag'] = True
+                validated_data['rt_pos_invalid'] = True
         if 'rt_pos_gc_reaction' in validated_data:
             if validated_data['rt_pos_gc_reaction'] is not None and validated_data['rt_pos_gc_reaction'] > 0:
-                validated_data['rt_pos_bad_result_flag'] = True
+                validated_data['rt_pos_invalid'] = True
 
         return ReverseTranscription.objects.create(**validated_data)
 
@@ -827,10 +826,10 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         # if the positive control is included and greater than zero, mark the whole record as invalid
         if 'rt_pos_cq_value' in validated_data:
             if validated_data['rt_pos_cq_value'] is not None and validated_data['rt_pos_cq_value'] > 0:
-                validated_data['rt_pos_bad_result_flag'] = True
+                validated_data['rt_pos_invalid'] = True
         if 'rt_pos_gc_reaction' in validated_data:
             if validated_data['rt_pos_gc_reaction'] is not None and validated_data['rt_pos_gc_reaction'] > 0:
-                validated_data['rt_pos_bad_result_flag'] = True
+                validated_data['rt_pos_invalid'] = True
 
         # update the Reverse Transcription object
         instance.extraction_batch = validated_data.get('extraction_batch', instance.extraction_batch)
@@ -841,8 +840,8 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         instance.re_rt_notes = validated_data.get('re_rt_notes', instance.re_rt_notes)
         instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
         instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
-        instance.rt_pos_bad_result_flag = validated_data.get('rt_pos_bad_result_flag',
-                                                             instance.rt_pos_bad_result_flag)
+        instance.rt_pos_invalid = validated_data.get('rt_pos_invalid',
+                                                             instance.rt_pos_invalid)
         instance.modified_by = self.context['request'].user
         instance.save()
 
@@ -851,7 +850,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReverseTranscription
         fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_notes',
-                  'rt_pos_cq_value', 'rt_pos_gc_reaction', 'rt_pos_bad_result_flag',
+                  'rt_pos_cq_value', 'rt_pos_gc_reaction', 'rt_pos_invalid',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -914,13 +913,13 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
     peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
     inhibition_dilution_factor = serializers.SerializerMethodField()
     all_parent_controls_uploaded = serializers.SerializerMethodField()
-    bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
+    invalid_override_string = serializers.StringRelatedField(source='invalid_override')
 
     class Meta:
         model = PCRReplicate
         fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
-                  'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
+                  'invalid', 'invalid_override', 'invalid_override_string',
                   'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         extra_kwargs = {
             'concentration_unit': {'required': False}
@@ -938,9 +937,9 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         instance.replicate_concentration = validated_data.get('replicate_concentration',
                                                               instance.replicate_concentration)
         instance.concentration_unit = validated_data.get('concentration_unit', instance.concentration_unit)
-        instance.bad_result_flag = validated_data.get('bad_result_flag', instance.bad_result_flag)
-        instance.bad_result_flag_override = validated_data.get('bad_result_flag_override',
-                                                               instance.bad_result_flag_override)
+        instance.invalid = validated_data.get('invalid', instance.invalid)
+        instance.invalid_override = validated_data.get('invalid_override',
+                                                               instance.invalid_override)
         if 'request' in self.context and 'user' in self.context['request']:
             instance.modified_by = self.context['request'].user
         else:
@@ -977,13 +976,13 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
     inhibition_dilution_factor = serializers.SerializerMethodField()
     all_parent_controls_uploaded = serializers.SerializerMethodField()
-    bad_result_flag_override_string = serializers.StringRelatedField(source='bad_result_flag_override')
+    invalid_override_string = serializers.StringRelatedField(source='invalid_override')
 
     class Meta:
         model = PCRReplicate
         fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
-                  'bad_result_flag', 'bad_result_flag_override', 'bad_result_flag_override_string',
+                  'invalid', 'invalid_override', 'invalid_override_string',
                   'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = PCRReplicateListSerializer
         extra_kwargs = {
@@ -1066,16 +1065,16 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             instance.notes = validated_data.get('notes', instance.notes)
             instance.ext_neg_cq_value = extneg_cq
             instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', 0)
-            instance.ext_neg_bad_result_flag = ext_neg_flag
+            instance.ext_neg_invalid = ext_neg_flag
             instance.rt_neg_cq_value = rtneg_cq
             instance.rt_neg_gc_reaction = validated_data.get('rt_neg_gc_reaction', 0)
-            instance.rt_neg_bad_result_flag = rt_neg_flag
+            instance.rt_neg_invalid = rt_neg_flag
             instance.pcr_neg_cq_value = pcrneg_cq
             instance.pcr_neg_gc_reaction = validated_data.get('pcr_neg_gc_reaction', 0)
-            instance.pcr_neg_bad_result_flag = pcr_neg_flag
+            instance.pcr_neg_invalid = pcr_neg_flag
             instance.pcr_pos_cq_value = validated_data.get('pcr_pos_cq_value', 0)
             instance.pcr_pos_gc_reaction = validated_data.get('pcr_pos_gc_reaction', 0)
-            instance.pcr_pos_bad_result_flag = pcr_pos_flag
+            instance.pcr_pos_invalid = pcr_pos_flag
             instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
             instance.modified_by = user
             valid_data.append('pcrrepbatch')
@@ -1150,15 +1149,15 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(response_errors)
 
     def calc_flag(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
-        bad_result_flag = True
+        invalid = True
         if cq_value is None:
             if rtneg_cq is not None:
                 if extneg_cq == 0 and rtneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
-                    bad_result_flag = False
+                    invalid = False
             else:
                 if extneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
-                    bad_result_flag = False
-        return bad_result_flag
+                    invalid = False
+        return invalid
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1169,9 +1168,9 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = PCRReplicateBatch
         fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'notes', 'ext_neg_cq_value',
-                  'ext_neg_gc_reaction', 'ext_neg_bad_result_flag', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
-                  'rt_neg_bad_result_flag', 'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_neg_bad_result_flag',
-                  'pcr_pos_cq_value', 'pcr_pos_gc_reaction', 'pcr_pos_bad_result_flag', 're_pcr', 'pcrreplicates',
+                  'ext_neg_gc_reaction', 'ext_neg_invalid', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
+                  'rt_neg_invalid', 'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_neg_invalid',
+                  'pcr_pos_cq_value', 'pcr_pos_gc_reaction', 'pcr_pos_invalid', 're_pcr', 'pcrreplicates',
                   'updated_pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         extra_kwargs = {
             'extraction_batch': {'required': False},
@@ -1502,7 +1501,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'sample_extractions', 'inhibitions', 'reverse_transcriptions', 'targets',
+                  'sampleextractions', 'inhibitions', 'reverse_transcriptions', 'targets',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

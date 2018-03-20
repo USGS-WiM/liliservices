@@ -17,22 +17,22 @@ def pcrreplicate_post_save(sender, **kwargs):
 
         instance.save()
 
-    # assess the bad_result_flag
-    # bad_result_flag defaults to True (i.e., the rep is invalid) and can only be set to False if:
+    # assess the invalid flags
+    # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
     #     1. all parent controls exist
     #     2. all parent control flags are False (i.e., the controls are valid)
     #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
-    if instance.bad_result_flag_override is None:
+    if instance.invalid_override is None:
         if (
-                not instance.pcrreplicate_batch.ext_neg_bad_result_flag and
-                not instance.pcrreplicate_batch.rt_neg_bad_result_flag and
-                not instance.pcr_neg_bad_result_flag.pcr_neg_flag and
+                not instance.pcrreplicate_batch.ext_neg_invalid and
+                not instance.pcrreplicate_batch.rt_neg_invalid and
+                not instance.pcr_neg_invalid.pcr_neg_flag and
                 instance.cq_value >= 0 and
                 instance.gc_reaction >= 0
         ):
-            instance.bad_result_flag = False
+            instance.invalid = False
         else:
-            instance.bad_result_flag = True
+            instance.invalid = True
 
     # determine if all replicates for a given sample-target combo are now in the database or not
     # and calculate sample mean concentration if yes or set to null if no
@@ -54,11 +54,11 @@ def pcrreplicate_post_save(sender, **kwargs):
 def extractionbatch_post_save(sender, **kwargs):
     instance = kwargs['instance']
 
-    # if the bad_result_flag is true, invalidate all child replicates
-    if instance.ext_pos_bad_result_flag:
+    # if the invalid is true, invalidate all child replicates
+    if instance.ext_pos_invalid:
         for extraction in instance.extractions:
             for pcrreplicate in extraction.pcrreplicates:
-                pcrreplicate.update(bad_result_flag=True)
+                pcrreplicate.update(invalid=True)
 
                 # determine if all replicates for a given sample-target combo are now in the database or not
                 # and calculate sample mean concentration if yes or set to null if no
@@ -80,12 +80,12 @@ def extractionbatch_post_save(sender, **kwargs):
 def reversetranscription_post_save(sender, **kwargs):
     instance = kwargs['instance']
 
-    # if the bad_result_flag is true, invalidate all child replicates
-    if instance.rt_pos_bad_result_flag:
+    # if the invalid is true, invalidate all child replicates
+    if instance.rt_pos_invalid:
         extraction_batch = ExtractionBatch.objects.get(id=instance.extraction_batch)
         for extraction in extraction_batch.extractions:
             for pcrreplicate in extraction.pcrreplicates:
-                pcrreplicate.update(bad_result_flag=True)
+                pcrreplicate.update(invalid=True)
 
                 # determine if all replicates for a given sample-target combo are now in the database or not
                 # and calculate sample mean concentration if yes or set to null if no
