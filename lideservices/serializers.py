@@ -236,8 +236,7 @@ class SampleSerializer(serializers.ModelSerializer):
 
     # validate required fields by matrix (beyond the fields required for every sample record regardless of matrix)
     def validate(self, data):
-        matrix_id = data['matrix']
-        matrix = Matrix.objects.get(id=matrix_id)
+        matrix = data['matrix']
         if matrix.code == 'W':
             if 'filter_type' not in data:
                 message = "filter_type is a required field for the water matrix"
@@ -351,7 +350,7 @@ class UnitSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Unit
-        fields = ('id', 'name', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'name', 'symbol', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -582,7 +581,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
             if 'new_sample_extractions' in data:
                 is_valid = True
                 details = []
-                for item in data['new_extractions']:
+                for item in data['new_samples_extractions']:
                     if 'sample' not in item:
                         is_valid = False
                         details.append("sample is a required field within new_sample_extractions")
@@ -1490,7 +1489,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         data = {"id": extraction_method_id, "name": extraction_method_name}
         return data
 
-    sample_extractions = SampleExtractionSerializer(many=True, read_only=True)
+    sampleextractions = SampleExtractionSerializer(many=True, read_only=True)
     inhibitions = serializers.SerializerMethodField()
     reverse_transcriptions = serializers.SerializerMethodField()
     targets = serializers.SerializerMethodField()
@@ -1523,14 +1522,14 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
                 studies.append(data)
         return studies
 
-    extraction_batches = ExtractionBatchSummarySerializer(many=True, read_only=True)
+    extractionbatches = ExtractionBatchSummarySerializer(many=True, read_only=True)
     samples = SimpleSampleSerializer(many=True, read_only=True)
     studies = serializers.SerializerMethodField()
 
     class Meta:
         model = AnalysisBatch
         fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies',
-                  'extraction_batches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'extractionbatches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
