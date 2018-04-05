@@ -1092,7 +1092,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                         cq_value = pcrreplicate.get('cq_value', 0)
                         gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
                         pcrrep = PCRReplicate.objects.filter(
-                            extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
+                            sample_extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
                         if pcrrep:
                             # ensure that the concentrated/dissolved/diluted volume exists for this sample
                             if sample.dissolution_volume is None or sample.post_dilution_volume is None:
