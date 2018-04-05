@@ -581,7 +581,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
             if 'new_sample_extractions' in data:
                 is_valid = True
                 details = []
-                for item in data['new_samples_extractions']:
+                for item in data['new_sample_extractions']:
                     if 'sample' not in item:
                         is_valid = False
                         details.append("sample is a required field within new_sample_extractions")
