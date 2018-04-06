@@ -404,7 +404,7 @@ class ExtractionBatch(HistoryModel):
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
-    re_extraction_notes = models.TextField(null=True, blank=True)
+    re_extraction_notes = models.TextField(blank=True)
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField()
     extraction_date = models.DateField(default=date.today, db_index=True)
@@ -530,14 +530,20 @@ class PCRReplicate(HistoryModel):
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
 
+    # override the save method to update enter the correct (and required) concentration unit value
+    def save(self, *args, **kwargs):
+        print(self.sample_extraction.sample.id)
+        self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
+        super(PCRReplicate, self).save(*args, **kwargs)
+
     # get the concentration_unit
     def get_conc_unit(self, sample_id):
         sample = Sample.objects.get(id=sample_id)
-        if sample.matrix_type in ['forage_sediment_soil', 'solid_manure']:
+        if sample.matrix in ['forage_sediment_soil', 'solid_manure']:
             conc_unit = Unit.objects.get(name='gram')
         else:
             conc_unit = Unit.objects.get(name='Liter')
-        return conc_unit.id
+        return conc_unit
 
     # Calculate replicate_concentration
     def calc_rep_conc(self):

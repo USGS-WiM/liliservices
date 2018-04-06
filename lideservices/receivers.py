@@ -11,10 +11,6 @@ def pcrreplicate_post_save(sender, **kwargs):
     if instance.gc_reaction is not None:
         # calculate their replicate_concentration
         instance.calc_rep_conc()
-
-        # set the concentration_unit
-        instance.concentration_unit = instance.get_conc_unit(instance.extraction.sample.id)
-
         instance.save()
 
     # assess the invalid flags

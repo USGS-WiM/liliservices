@@ -737,6 +737,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if rt is not None:
             if rt['rt_date'] == "":
                 rt['rt_date'] = None
+            if 're_rt_notes' not in rt or rt['re_rt_notes'] is None:
+                rt['re_rt_notes'] = ""
             ReverseTranscription.objects.create(extraction_batch=extr_batch, **rt)
 
         return extr_batch
@@ -839,8 +841,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         instance.re_rt_notes = validated_data.get('re_rt_notes', instance.re_rt_notes)
         instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
         instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
-        instance.rt_pos_invalid = validated_data.get('rt_pos_invalid',
-                                                             instance.rt_pos_invalid)
+        instance.rt_pos_invalid = validated_data.get('rt_pos_invalid', instance.rt_pos_invalid)
         instance.modified_by = self.context['request'].user
         instance.save()
 
@@ -937,8 +938,7 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
                                                               instance.replicate_concentration)
         instance.concentration_unit = validated_data.get('concentration_unit', instance.concentration_unit)
         instance.invalid = validated_data.get('invalid', instance.invalid)
-        instance.invalid_override = validated_data.get('invalid_override',
-                                                               instance.invalid_override)
+        instance.invalid_override = validated_data.get('invalid_override', instance.invalid_override)
         if 'request' in self.context and 'user' in self.context['request']:
             instance.modified_by = self.context['request'].user
         else:
@@ -1452,7 +1452,8 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
                 rt = ReverseTranscription.objects.get(id=reverse_transcription_id)
                 data = {"id": reverse_transcription_id, "extraction_batch": rt.extraction_batch.id,
                         "template_volume": rt.template_volume, "reaction_volume": rt.reaction_volume,
-                        "rt_date": rt.rt_date, "re_rt": rt.re_rt, "created_date": rt.created_date,
+                        "rt_date": rt.rt_date, "re_rt": rt.re_rt, "re_rt_notes": rt.re_rt_notes,
+                        "created_date": rt.created_date,
                         "created_by": rt.created_by.username if rt.created_by is not None else None,
                         "modified_date": rt.modified_date,
                         "modified_by": rt.modified_by.username if rt.modified_by is not None else None}
