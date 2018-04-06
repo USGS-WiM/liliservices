@@ -980,9 +980,10 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PCRReplicate
         fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
-                  'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
-                  'invalid', 'invalid_override', 'invalid_override_string',
-                  'all_parent_controls_uploaded', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'cq_value', 'gc_reaction', 'gc_reaction_sci', 'replicate_concentration',
+                  'replicate_concentration_sci', 'concentration_unit', 'invalid', 'invalid_override',
+                  'invalid_override_string', 'all_parent_controls_uploaded',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = PCRReplicateListSerializer
         extra_kwargs = {
             'concentration_unit': {'required': False}
@@ -1183,7 +1184,7 @@ class ResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Result
-        fields = ('id', 'sample_mean_concentration', 'sample', 'target',
+        fields = ('id', 'sample_mean_concentration', 'sample_mean_concentration_sci', 'sample', 'target',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

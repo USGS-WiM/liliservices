@@ -505,11 +505,27 @@ class PCRReplicate(HistoryModel):
     Polymerase Chain Reaction Replicate
     """
 
+    def _get_gc_reaction_sci(self):
+        sci_val = self.gc_reaction
+        if sci_val:
+            sci_val = '{0: E}'.format(sci_val)
+            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+        return sci_val
+
+    def _get_replicate_concentration_sci(self):
+        sci_val = self.replicate_concentration
+        if sci_val:
+            sci_val = '{0: E}'.format(sci_val)
+            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+        return sci_val
+
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
     cq_value = models.FloatField(null=True, blank=True)
     gc_reaction = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    gc_reaction_sci = property(_get_gc_reaction_sci)
     replicate_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    replicate_concentration_sci = property(_get_replicate_concentration_sci)
     concentration_unit = models.ForeignKey('Unit', related_name='pcrreplicates')
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
@@ -587,7 +603,15 @@ class Result(HistoryModel):
     Result
     """
 
+    def _get_sample_mean_concentration_sci(self):
+        sci_val = self.sample_mean_concentration
+        if sci_val:
+            sci_val = '{0: E}'.format(sci_val)
+            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+        return sci_val
+
     sample_mean_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    sample_mean_concentration_sci = property(_get_sample_mean_concentration_sci)
     sample = models.ForeignKey('Sample', related_name='results')
     target = models.ForeignKey('Target', related_name='results')
 
