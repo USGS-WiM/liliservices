@@ -52,6 +52,19 @@ class AliquotListSerializer(serializers.ListSerializer):
                 if 'freezer' not in d or 'rack' not in d or 'box' not in d or 'row' not in d or 'spot' not in d:
                     message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required"
                     raise serializers.ValidationError(message)
+            if 'freezer' in d and 'rack' in d and 'box' in d and 'row' in d and 'spot' in d:
+                freezer_object = Freezer.objects.filter(id=d['freezer']).first()
+                if freezer_object:
+                    if (d['rack'] > freezer_object.racks or d['box'] > freezer_object.boxes
+                            or d['row'] > freezer_object.rows or d['spot'] > freezer_object.spots):
+                        message = "The submitted freezer location (rack: " + str(d['rack']) + ", box: " + str(d['box'])
+                        message += ", row: " + str(d['row']) + ", spot: " + str(d['spot']) + ") does not exist in the "
+                        message += "submitted freezer (" + str(d['freezer']) + ") whose maximum dimensions are (rack: "
+                        message += str(freezer_object.racks) + ", box: " + str(freezer_object.boxes) + ", row: "
+                        message += str(freezer_object.rows) + ", spot: " + str(freezer_object.spots) + ")."
+                        raise serializers.ValidationError(message)
+                else:
+                    raise serializers.ValidationError("The submitted freezer (" + d['freezer'] + ") does not exist!")
         elif self.context['request'].method == 'PUT':
             is_valid = True
             details = []
