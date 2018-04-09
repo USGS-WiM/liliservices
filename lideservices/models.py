@@ -532,7 +532,6 @@ class PCRReplicate(HistoryModel):
 
     # override the save method to update enter the correct (and required) concentration unit value
     def save(self, *args, **kwargs):
-        print(self.sample_extraction.sample.id)
         self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
         super(PCRReplicate, self).save(*args, **kwargs)
 
