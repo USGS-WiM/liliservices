@@ -63,7 +63,7 @@ class Sample(HistoryModel):
     matrix = models.ForeignKey('Matrix', related_name='samples')
     filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
-    study_site_name = models.CharField(max_length=128, null=True, blank=True)
+    study_site_name = models.CharField(max_length=128, blank=True)
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
     sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='sampler_name') # TODO: this probably should be free text, holding external (non-staff) names
     sample_notes = models.TextField(blank=True)
@@ -86,7 +86,7 @@ class Sample(HistoryModel):
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
     elution_notes = models.TextField(blank=True)
-    technician_initials = models.CharField(max_length=128, null=True, blank=True)
+    technician_initials = models.CharField(max_length=128, blank=True)
     dissolution_volume = models.FloatField(null=True, blank=True)
     post_dilution_volume = models.FloatField(null=True, blank=True)
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',

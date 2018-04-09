@@ -750,8 +750,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if rt is not None:
             if rt['rt_date'] == "":
                 rt['rt_date'] = None
-            if 're_rt_notes' not in rt or rt['re_rt_notes'] is None:
-                rt['re_rt_notes'] = ""
             ReverseTranscription.objects.create(extraction_batch=extr_batch, **rt)
 
         return extr_batch
