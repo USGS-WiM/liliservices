@@ -35,6 +35,8 @@ router.register(r'standardcurves', views.StandardCurveViewSet, 'standardcurves')
 router.register(r'targets', views.TargetViewSet, 'targets')
 router.register(r'results', views.ResultViewSet, 'results')
 router.register(r'fieldunits', views.FieldUnitViewSet, 'fieldunits')
+router.register(r'nucleicacidtypes', views.NucleicAcidTypeViewSet, 'nucleicacidtypes')
+router.register(r'recordtypes', views.RecordTypeViewSet, 'recordtypes')
 router.register(r'otheranalyses', views.OtherAnalysisViewSet, 'otheranalyses')
 router.register(r'users', views.UserViewSet, 'users')
 

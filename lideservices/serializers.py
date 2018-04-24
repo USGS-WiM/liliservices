@@ -1406,6 +1406,24 @@ class FieldUnitSerializer(serializers.ModelSerializer):
         fields = ('id', 'table', 'field', 'unit', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class NucleicAcidTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = NucleicAcidType
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class RecordTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = RecordType
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class OtherAnalysisSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()

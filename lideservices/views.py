@@ -527,6 +527,16 @@ class FieldUnitViewSet(HistoryViewSet):
     serializer_class = FieldUnitSerializer
 
 
+class NucleicAcidTypeViewSet(HistoryViewSet):
+    queryset = NucleicAcidType.objects.all()
+    serializer_class = NucleicAcidTypeSerializer
+
+
+class RecordTypeViewSet(HistoryViewSet):
+    queryset = RecordType.objects.all()
+    serializer_class = RecordTypeSerializer
+
+
 class OtherAnalysisViewSet(HistoryViewSet):
     queryset = OtherAnalysis.objects.all()
     serializer_class = OtherAnalysisSerializer
