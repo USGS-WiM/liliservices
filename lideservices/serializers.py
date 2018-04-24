@@ -185,6 +185,8 @@ class AliquotListSerializer(serializers.ListSerializer):
                 data['modified_by'] = self.context['request'].user
                 ret.append(self.child.update(aliquot, data))
 
+        return ret
+
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     samples = serializers.ListField(write_only=True, required=False)
@@ -395,6 +397,8 @@ class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
             if fcsv is not None:
                 data['modified_by'] = self.context['request'].user
                 ret.append(self.child.update(fcsv, data))
+
+        return ret
 
     class Meta:
         model = FinalConcentratedSampleVolume
@@ -925,6 +929,8 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
                 data['modified_by'] = self.context['request'].user
                 ret.append(self.child.update(pcrrep, data))
 
+        return ret
+
     def get_inhibition_dilution_factor(self, obj):
         sample_extraction_id = obj.sample_extraction_id
         sample_extraction = SampleExtraction.objects.get(id=sample_extraction_id)
@@ -1284,6 +1290,8 @@ class InhibitionListSerializer(serializers.ListSerializer):
                 data['modified_by'] = self.context['request'].user
                 ret.append(self.child.update(inhibition, data))
 
+        return ret
+
     class Meta:
         class Meta:
             model = Inhibition
@@ -1586,7 +1594,7 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies',
+        fields = ('id', 'name', 'analysis_batch_description', 'analysis_batch_notes', 'samples', 'studies',
                   'extractionbatches', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1651,5 +1659,5 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AnalysisBatch
-        fields = ('id', 'analysis_batch_description', 'analysis_batch_notes', 'studies', 'summary',
+        fields = ('id', 'name', 'analysis_batch_description', 'analysis_batch_notes', 'studies', 'summary',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
