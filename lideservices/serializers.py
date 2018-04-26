@@ -1599,11 +1599,12 @@ class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
         if vals is not None:
             for val in vals:
                 study_id = val.get('study_id')
-                study = Study.objects.get(id=study_id)
-                study_name = study.name
-                study_description = study.description
-                data = {"id": study_id, "name": study_name, "description": study_description}
-                studies.append(data)
+                if not any(study.get('id', None) == study_id for study in studies):
+                    study = Study.objects.get(id=study_id)
+                    study_name = study.name
+                    study_description = study.description
+                    data = {"id": study_id, "name": study_name, "description": study_description}
+                    studies.append(data)
         return studies
 
     extractionbatches = ExtractionBatchSummarySerializer(many=True, read_only=True)
@@ -1627,10 +1628,11 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         if vals is not None:
             for val in vals:
                 study_id = val.get('study_id')
-                study = Study.objects.get(id=study_id)
-                study_name = study.name
-                data = {"id": study_id, "name": study_name}
-                studies.append(data)
+                if not any(study.get('id', None) == study_id for study in studies):
+                    study = Study.objects.get(id=study_id)
+                    study_name = study.name
+                    data = {"id": study_id, "name": study_name}
+                    studies.append(data)
         return studies
 
     # summary: sample_extraction count, inhibition count, reverse transcription count, target count
