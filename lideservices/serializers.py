@@ -370,7 +370,7 @@ class UnitSerializer(serializers.ModelSerializer):
 
 ######
 #
-#  Concentrated Sample Volumes
+#  Final Sample Values
 #
 ######
 
@@ -424,6 +424,16 @@ class ConcentrationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConcentrationType
         fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = FinalSampleMeanConcentration
+        fields = ('id', 'sample_mean_concentration', 'sample_mean_concentration_sci', 'sample', 'target',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -1239,16 +1249,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         }
 
 
-class ResultSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = Result
-        fields = ('id', 'sample_mean_concentration', 'sample_mean_concentration_sci', 'sample', 'target',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
 class StandardCurveSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1635,22 +1635,18 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                     studies.append(data)
         return studies
 
-    # summary: sample_extraction count, inhibition count, reverse transcription count, target count
+    # summary: extraction_batch count, inhibition count, reverse transcription count, target count
     def get_summary(self, obj):
         summary = {}
-        sample_extraction_count = 0
         inhibition_count = 0
         reverse_transcription_count = 0
         targets = []
 
-        # samples_extraction and reverse_transcription count
+        # extraction_batch and reverse_transcription count
         extraction_batches = obj.extractionbatches.values()
         if extraction_batches is not None:
             for extraction_batch in extraction_batches:
                 extraction_batch_id = extraction_batch.get('id')
-
-                sample_extractions = SampleExtraction.objects.filter(extraction_batch__exact=extraction_batch_id)
-                sample_extraction_count += len(sample_extractions)
 
                 reversetranscriptions = ReverseTranscription.objects.filter(extraction_batch__exact=extraction_batch_id)
                 reverse_transcription_count += len(reversetranscriptions)
@@ -1667,7 +1663,7 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
                         if target not in targets:
                             targets.append(target)
 
-        summary['sample_extraction_count'] = sample_extraction_count
+        summary['extraction_batch_count'] = len(extraction_batches)
         summary['inhibition_count'] = inhibition_count
         summary['reverse_transcription_count'] = reverse_transcription_count
         summary['target_count'] = len(targets)

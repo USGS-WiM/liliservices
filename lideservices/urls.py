@@ -16,6 +16,8 @@ router.register(r'freezerlocations', views.FreezerLocationViewSet, 'freezerlocat
 router.register(r'freezers', views.FreezerViewSet, 'freezers')
 router.register(r'finalconcentratedsamplevolumes', views.FinalConcentratedSampleVolumeViewSet,
                 'finalconcentratedsamplevolumes')
+router.register(r'finalsamplemeanconcentrations', views.FinalSampleMeanConcentrationViewSet,
+                'finalsamplemeanconcentrations')
 router.register(r'concentrationtype', views.ConcentrationTypeViewSet, 'concentrationtype')
 router.register(r'samplegroups', views.SampleGroupViewSet, 'samplegroups')
 router.register(r'sampleinhibitions', views.SampleInhibitionViewSet, 'sampleinhibitions')
@@ -33,7 +35,6 @@ router.register(r'pcrreplicates', views.PCRReplicateViewSet, 'pcrreplicates')
 router.register(r'reversetranscriptions', views.ReverseTranscriptionViewSet, 'reversetranscriptions')
 router.register(r'standardcurves', views.StandardCurveViewSet, 'standardcurves')
 router.register(r'targets', views.TargetViewSet, 'targets')
-router.register(r'results', views.ResultViewSet, 'results')
 router.register(r'fieldunits', views.FieldUnitViewSet, 'fieldunits')
 router.register(r'nucleicacidtypes', views.NucleicAcidTypeViewSet, 'nucleicacidtypes')
 router.register(r'recordtypes', views.RecordTypeViewSet, 'recordtypes')

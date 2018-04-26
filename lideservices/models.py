@@ -63,9 +63,9 @@ class Sample(HistoryModel):
     matrix = models.ForeignKey('Matrix', related_name='samples')
     filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
-    study_site_name = models.CharField(max_length=128, blank=True)
+    study_site_name = models.CharField(max_length=128, blank=True, default='')
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
-    sampler_name = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='sampler_name') # TODO: this probably should be free text, holding external (non-staff) names
+    sampler_name = models.CharField(max_length=128, blank=True, default='')
     sample_notes = models.TextField(blank=True, default='')
     sample_description = models.TextField(blank=True)
     arrival_date = models.DateField(null=True, blank=True)
@@ -80,13 +80,13 @@ class Sample(HistoryModel):
     total_volume_sampled_initial = models.FloatField(null=True, blank=True)
     total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')
     total_volume_or_mass_sampled = models.FloatField()
-    sample_volume_initial = models.FloatField(null=True, blank=True) # TODO: delete this superfluous field?
-    sample_volume_filtered = models.FloatField(null=True, blank=True) # TODO: delete this superfluous field?
+    sample_volume_initial = models.FloatField(null=True, blank=True)
+    sample_volume_filtered = models.FloatField(null=True, blank=True)
     filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
     elution_notes = models.TextField(blank=True, default='')
-    technician_initials = models.CharField(max_length=128, blank=True)
+    technician_initials = models.CharField(max_length=128, blank=True, default='')
     dissolution_volume = models.FloatField(null=True, blank=True)
     post_dilution_volume = models.FloatField(null=True, blank=True)
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
@@ -243,7 +243,7 @@ class Freezer(NameModel):
 
 ######
 #
-#  Concentrated Sample Volumes
+#  Final Sample Values
 #
 ######
 
@@ -275,6 +275,57 @@ class ConcentrationType(NameModel):
 
     class Meta:
         db_table = "lide_concentrationtype"
+
+
+class FinalSampleMeanConcentration(HistoryModel):
+    """
+    Final Sample Mean Concentration
+    """
+
+    def _get_sample_mean_concentration_sci(self):
+        sci_val = self.sample_mean_concentration
+        if sci_val:
+            sci_val = '{0: E}'.format(sci_val)
+            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+        return sci_val
+
+    sample_mean_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    sample_mean_concentration_sci = property(_get_sample_mean_concentration_sci)
+    sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
+    target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
+
+    # Determine if all valid replicates for a given sample-target combo are now in the database or not
+    def all_sample_target_reps_uploaded(self):
+        valid_reps_with_null_cq_value = []
+        exts = SampleExtraction.objects.filter(sample=self.sample)
+        for ext in exts:
+            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            for rep in reps:
+                if rep.cq_value is None and rep.invalid is False:
+                    valid_reps_with_null_cq_value.append(rep.id)
+        return True if len(valid_reps_with_null_cq_value) == 0 else False
+
+    # Calculate sample mean concentration for all samples whose target replicates are now in the database
+    def calc_sample_mean_conc(self):
+        reps_count = 0
+        pos_gc_reactions = []
+        exts = SampleExtraction.objects.filter(sample=self.sample)
+        for ext in exts:
+            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            for rep in reps:
+                if rep.gc_reaction >= 0 and rep.invalid is False:
+                    reps_count = reps_count + 1
+                    pos_gc_reactions.append(rep.gc_reaction)
+        smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0
+        self.sample_mean_concentration = smc
+        self.save()
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        db_table = "lide_finalsamplemeanconcentration"
+        unique_together = ("sample", "target")
 
 
 ######
@@ -344,7 +395,7 @@ class AnalysisBatch(NameModel):
     """
 
     samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
-    analysis_batch_description = models.CharField(max_length=128, blank=True)
+    analysis_batch_description = models.CharField(max_length=128, blank=True, default='')
     analysis_batch_notes = models.CharField(max_length=128, blank=True, default='')
 
     def __str__(self):
@@ -603,57 +654,6 @@ class PCRReplicate(HistoryModel):
         unique_together = ("sample_extraction", "pcrreplicate_batch")
 
 
-class Result(HistoryModel):
-    """
-    Result
-    """
-
-    def _get_sample_mean_concentration_sci(self):
-        sci_val = self.sample_mean_concentration
-        if sci_val:
-            sci_val = '{0: E}'.format(sci_val)
-            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
-        return sci_val
-
-    sample_mean_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
-    sample_mean_concentration_sci = property(_get_sample_mean_concentration_sci)
-    sample = models.ForeignKey('Sample', related_name='results')
-    target = models.ForeignKey('Target', related_name='results')
-
-    # Determine if all valid replicates for a given sample-target combo are now in the database or not
-    def all_sample_target_reps_uploaded(self):
-        valid_reps_with_null_cq_value = []
-        exts = SampleExtraction.objects.filter(sample=self.sample)
-        for ext in exts:
-            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
-            for rep in reps:
-                if rep.cq_value is None and rep.invalid is False:
-                    valid_reps_with_null_cq_value.append(rep.id)
-        return True if len(valid_reps_with_null_cq_value) == 0 else False
-
-    # Calculate sample mean concentration for all samples whose target replicates are now in the database
-    def calc_sample_mean_conc(self):
-        reps_count = 0
-        pos_gc_reactions = []
-        exts = SampleExtraction.objects.filter(sample=self.sample)
-        for ext in exts:
-            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
-            for rep in reps:
-                if rep.gc_reaction >= 0 and rep.invalid is False:
-                    reps_count = reps_count + 1
-                    pos_gc_reactions.append(rep.gc_reaction)
-        smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0
-        self.sample_mean_concentration = smc
-        self.save()
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        db_table = "lide_result"
-        unique_together = ("sample", "target")
-
-
 class StandardCurve(HistoryModel):
     """
     Standard Curve
@@ -729,6 +729,7 @@ class FieldUnit(HistoryModel):
 
     class Meta:
         db_table = "lide_fieldunit"
+        unique_together = ("table", "field")
 
 
 class NucleicAcidType(NameModel):

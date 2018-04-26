@@ -159,7 +159,7 @@ class FreezerViewSet(HistoryViewSet):
 
 ######
 #
-#  Concentrated Sample Volumes
+#  Final Sample Values
 #
 ######
 
@@ -182,6 +182,35 @@ class FinalConcentratedSampleVolumeViewSet(HistoryViewSet):
 class ConcentrationTypeViewSet(HistoryViewSet):
     queryset = ConcentrationType.objects.all()
     serializer_class = ConcentrationTypeSerializer
+
+
+class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
+    serializer_class = FinalSampleMeanConcentrationSerializer
+
+    # override the default queryset to allow filtering by URL arguments
+    def get_queryset(self):
+        queryset = FinalSampleMeanConcentration.objects.all()
+        # filter by sample ID, exact
+        sample = self.request.query_params.get('sample', None)
+        if sample is not None:
+            queryset = queryset.filter(sample__exact=sample)
+        # filter by target ID, exact
+        target = self.request.query_params.get('target', None)
+        if sample is not None:
+            queryset = queryset.filter(target__exact=target)
+        # filter by study ID, exact
+        study = self.request.query_params.get('study', None)
+        if study is not None:
+            queryset = queryset.filter(sample__study__exact=study)
+        # filter by collection_start_date, exact
+        collection_start_date = self.request.query_params.get('collection_start_date', None)
+        if collection_start_date is not None:
+            queryset = queryset.filter(sample__collection_start_date__exact=collection_start_date)
+        # filter by collaborator_sample_id, exact
+        collaborator_sample_id = self.request.query_params.get('collaborator_sample_id', None)
+        if collaborator_sample_id is not None:
+            queryset = queryset.filter(sample__collaborator_sample_id__exact=collaborator_sample_id)
+        return queryset
 
 
 ######
@@ -363,11 +392,6 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             if replicate_number is not None:
                 queryset = queryset.filter(replicate_number__exact=replicate_number)
         return queryset
-
-
-class ResultViewSet(HistoryViewSet):
-    queryset = Result.objects.all()
-    serializer_class = ResultSerializer
 
 
 class StandardCurveViewSet(HistoryViewSet):

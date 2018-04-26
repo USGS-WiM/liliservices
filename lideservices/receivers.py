@@ -33,16 +33,18 @@ def pcrreplicate_post_save(sender, **kwargs):
     # determine if all replicates for a given sample-target combo are now in the database or not
     # and calculate sample mean concentration if yes or set to null if no
     pcrrepbatch = PCRReplicateBatch.objects.get(id=instance.pcrreplicate_batch.id)
-    result = Result.objects.filter(sample=instance.extraction.sample, target=pcrrepbatch.target).first()
-    # if the sample-target combo (result) does not exist, create it
-    if not result:
-        result = Result.objects.create(sample=instance.extraction.sample, target=pcrrepbatch.target)
+    fsmc = FinalSampleMeanConcentration.objects.filter(
+        sample=instance.extraction.sample, target=pcrrepbatch.target).first()
+    # if the sample-target combo (fsmc) does not exist, create it
+    if not fsmc:
+        fsmc = FinalSampleMeanConcentration.objects.create(
+            sample=instance.extraction.sample, target=pcrrepbatch.target)
     # if all the valid related reps have gc_reaction values, calculate sample mean concentration
-    if result.all_sample_target_reps_uploaded():
-        result.calc_sample_mean_conc()
+    if fsmc.all_sample_target_reps_uploaded():
+        fsmc.calc_sample_mean_conc()
     # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
     else:
-        result.update(sample_mean_concentration=None)
+        fsmc.update(sample_mean_concentration=None)
 
 
 # listen for updated extraction batch instances
@@ -59,16 +61,18 @@ def extractionbatch_post_save(sender, **kwargs):
                 # determine if all replicates for a given sample-target combo are now in the database or not
                 # and calculate sample mean concentration if yes or set to null if no
                 pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
-                result = Result.objects.filter(sample=extraction.sample, target=pcrrepbatch.target).first()
-                # if the sample-target combo (result) does not exist, create it
-                if not result:
-                    result = Result.objects.create(sample=extraction.sample, target=pcrrepbatch.target)
+                fsmc = FinalSampleMeanConcentration.objects.filter(
+                    sample=extraction.sample, target=pcrrepbatch.target).first()
+                # if the sample-target combo (fsmc) does not exist, create it
+                if not fsmc:
+                    fsmc = FinalSampleMeanConcentration.objects.create(
+                        sample=extraction.sample, target=pcrrepbatch.target)
                 # if all the valid related reps have gc_reaction values, calculate sample mean concentration
-                if result.all_sample_target_reps_uploaded():
-                    result.calc_sample_mean_conc()
+                if fsmc.all_sample_target_reps_uploaded():
+                    fsmc.calc_sample_mean_conc()
                 # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
                 else:
-                    result.update(sample_mean_concentration=None)
+                    fsmc.update(sample_mean_concentration=None)
 
 
 # listen for updated reverse transcription instances
@@ -86,13 +90,15 @@ def reversetranscription_post_save(sender, **kwargs):
                 # determine if all replicates for a given sample-target combo are now in the database or not
                 # and calculate sample mean concentration if yes or set to null if no
                 pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
-                result = Result.objects.filter(sample=extraction.sample, target=pcrrepbatch.target).first()
-                # if the sample-target combo (result) does not exist, create it
-                if not result:
-                    result = Result.objects.create(sample=extraction.sample, target=pcrrepbatch.target)
+                fsmc = FinalSampleMeanConcentration.objects.filter(
+                    sample=extraction.sample, target=pcrrepbatch.target).first()
+                # if the sample-target combo (fsmc) does not exist, create it
+                if not fsmc:
+                    fsmc = FinalSampleMeanConcentration.objects.create(
+                        sample=extraction.sample, target=pcrrepbatch.target)
                 # if all the valid related reps have gc_reaction values, calculate sample mean concentration
-                if result.all_sample_target_reps_uploaded():
-                    result.calc_sample_mean_conc()
+                if fsmc.all_sample_target_reps_uploaded():
+                    fsmc.calc_sample_mean_conc()
                 # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
                 else:
-                    result.update(sample_mean_concentration=None)
+                    fsmc.update(sample_mean_concentration=None)
