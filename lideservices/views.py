@@ -190,26 +190,31 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
         queryset = FinalSampleMeanConcentration.objects.all()
-        # filter by sample ID, exact
+        # filter by sample ID, exact list
         sample = self.request.query_params.get('sample', None)
         if sample is not None:
-            queryset = queryset.filter(sample__exact=sample)
-        # filter by target ID, exact
+            sample_list = sample.split(',')
+            queryset = queryset.filter(sample__in=sample_list)
+        # filter by target ID, exact list
         target = self.request.query_params.get('target', None)
         if sample is not None:
-            queryset = queryset.filter(target__exact=target)
-        # filter by study ID, exact
+            target_list = sample.split(',')
+            queryset = queryset.filter(target__in=target_list)
+        # filter by study ID, exact list
         study = self.request.query_params.get('study', None)
         if study is not None:
-            queryset = queryset.filter(sample__study__exact=study)
-        # filter by collection_start_date, exact
+            study_list = sample.split(',')
+            queryset = queryset.filter(sample__study__in=study_list)
+        # filter by collection_start_date, exact list
         collection_start_date = self.request.query_params.get('collection_start_date', None)
         if collection_start_date is not None:
-            queryset = queryset.filter(sample__collection_start_date__exact=collection_start_date)
-        # filter by collaborator_sample_id, exact
+            collection_start_date_list = sample.split(',')
+            queryset = queryset.filter(sample__collection_start_date__in=collection_start_date_list)
+        # filter by collaborator_sample_id, exact list
         collaborator_sample_id = self.request.query_params.get('collaborator_sample_id', None)
         if collaborator_sample_id is not None:
-            queryset = queryset.filter(sample__collaborator_sample_id__exact=collaborator_sample_id)
+            collaborator_sample_id_list = sample.split(',')
+            queryset = queryset.filter(sample__collaborator_sample_id__in=collaborator_sample_id_list)
         return queryset
 
 
