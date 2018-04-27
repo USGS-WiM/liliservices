@@ -589,7 +589,7 @@ class PCRReplicate(HistoryModel):
     # get the concentration_unit
     def get_conc_unit(self, sample_id):
         sample = Sample.objects.get(id=sample_id)
-        if sample.matrix in ['forage_sediment_soil', 'solid_manure']:
+        if sample.matrix.code in ['F', 'SM']:
             conc_unit = Unit.objects.get(name='gram')
         else:
             conc_unit = Unit.objects.get(name='Liter')
@@ -602,6 +602,7 @@ class PCRReplicate(HistoryModel):
             extr = self.sample_extraction
             eb = self.sample_extraction.extraction_batch
             sample = self.sample_extraction.sample
+            matrix = sample.matrix.code
             # TODO: ensure that all necessary values are not null (more than just the following line)
             if None in (eb.qpcr_reaction_volume, eb.qpcr_template_volume, eb.elution_volume, eb.extraction_volume,
                         eb.sample_dilution_factor):
@@ -624,19 +625,19 @@ class PCRReplicate(HistoryModel):
                 dl = extr.inhibition_rna.dilution_factor
                 prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
             # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
-            if sample.matrix in ['forage_sediment_soil', 'water', 'wastewater']:
+            if matrix in ['F', 'W', 'WW']:
                 fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
                 prelim_value = prelim_value * (
                         fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
-            elif sample.matrix == 'air':
+            elif matrix == 'A':
                 prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
-            elif sample.matrix == 'solid_manure':
+            elif matrix == 'SM':
                 prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
             # finally, apply the unit-cancelling expression
-            if sample.matrix in ['air', 'forage_sediment_soil', 'water', 'wastewater']:
+            if matrix in ['A', 'F', 'W', 'WW']:
                 # 1,000 microliters per 1 milliliter
                 final_value = prelim_value * 1000
-            elif sample.matrix == 'liquid_manure':
+            elif matrix == 'LM':
                 # 1,000,000 microliters per 1 liter
                 final_value = prelim_value * 1000000
             else:

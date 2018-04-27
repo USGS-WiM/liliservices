@@ -1166,16 +1166,35 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                         pcrrep = PCRReplicate.objects.filter(
                             sample_extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
                         if pcrrep:
-                            # ensure that the concentrated/dissolved/diluted volume exists for this sample
-                            if sample.dissolution_volume is None or sample.post_dilution_volume is None:
+                            matrix = sample.matrix.code
+                            # if the sample is from a matrix that requires a final concentrated sample volume,
+                            # ensure that the FCSV value exists (note that zero evaluates to null in value checking)
+                            if matrix in ['F', 'W', 'WW']:
                                 fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
                                 if fcsv.final_concentrated_sample_volume is None:
                                     is_valid = False
-                                    message = "No concentrated/dissolved/diluted volume exists"
+                                    message = "No final concentrated sample volume exists"
                                     message += " for Sample ID: " + sample
                                     response_errors.append({"pcrreplicate": message})
                                     # skip to the next item in the loop
                                     continue
+                            # if the sample is from a matrix that requires a dissolution volume,
+                            # ensure that the dissolution volume exists for this sample
+                            elif matrix == 'A' and sample.dissolution_volume is None:
+                                is_valid = False
+                                message = "No dissolution volume exists"
+                                message += " for Sample ID: " + sample
+                                response_errors.append({"pcrreplicate": message})
+                                # skip to the next item in the loop
+                                continue
+                            # if the sample is from a matrix that requires a post dilution volume,
+                            elif matrix == 'SM' and sample.post_dilution_volume is None:
+                                is_valid = False
+                                message = "No post dilution volume exists"
+                                message += " for Sample ID: " + sample
+                                response_errors.append({"pcrreplicate": message})
+                                # skip to the next item in the loop
+                                continue
                             # that particular sample volume exists, so finish updating this rep
                             # ensure target is a Target object, not an integer
                             if isinstance(target, int):
