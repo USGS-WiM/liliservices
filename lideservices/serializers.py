@@ -1,6 +1,99 @@
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from rest_framework import serializers
 from lideservices.models import *
+
+
+# class NormalizeDecimalField(serializers.DecimalField):
+#     def to_representation(self, value):
+#         normalized = value.normalize()
+#         sign, digits, exponent = normalized.as_tuple()
+#         if exponent > 0:
+#             return Decimal((sign, digits + (0,) * exponent, 0))
+#         else:
+#             return normalized
+
+
+class RStripDecimalField(serializers.DecimalField):
+    def to_representation(self, value):
+        s = "{:.100f}".format(value)
+        return s.rstrip('0').rstrip('.') if '.' in s else s
+
+
+######
+#
+#  Final Sample Values
+#
+######
+
+
+class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    # bulk create
+    def create(self, validated_data):
+        fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
+        return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
+
+    # bulk update
+    def update(self, instance, validated_data):
+        # Maps for id->instance and id->data item.
+        fcsv_mapping = {fcsv.id: fcsv for fcsv in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+
+        # Perform updates but ignore insertions
+        ret = []
+        for fcsv_id, data in data_mapping.items():
+            fcsv = fcsv_mapping.get(fcsv_id, None)
+            if fcsv is not None:
+                data['modified_by'] = self.context['request'].user
+                ret.append(self.child.update(fcsv, data))
+
+        return ret
+
+    class Meta:
+        model = FinalConcentratedSampleVolume
+        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume', 'notes',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    # fcsv_no_coerce_to_string = serializers.DecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100, coerce_to_string=False)
+    # fcsv_round = serializers.DecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100, coerce_to_string=False, rounding=ROUND_HALF_UP)
+    # fcsv_round_custom = RoundingDecimalField(source='final_concentrated_sample_volume', max_digits=21, decimal_places=14)
+    # fcsv_normalized = NormalizeDecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100)
+    # fcsv_rstripped = RStripDecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100)
+
+    class Meta:
+        model = FinalConcentratedSampleVolume
+        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume', 'notes',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = FinalConcentratedSampleVolumeListSerializer
+        # extra_kwargs = {
+        #     'final_concentrated_sample_volume': {'max_digits': 20, 'decimal_places': 10}
+        # }
+
+
+class ConcentrationTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = ConcentrationType
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = FinalSampleMeanConcentration
+        fields = ('id', 'sample_mean_concentration', 'sample_mean_concentration_sci', 'sample', 'target',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######
@@ -269,6 +362,9 @@ class SampleSerializer(serializers.ModelSerializer):
                 details.append("dissolution_volume is a required field for the solid manure matrix")
             if not is_valid:
                 raise serializers.ValidationError(details)
+        if 'meter_reading_initial' in data and 'meter_reading_final' in data:
+            if data['meter_reading_initial'] > data['meter_reading_final']:
+                raise serializers.ValidationError("meter_reading_final must be larger than meter_reading_initial")
         return data
 
     # peg_neg_targets_extracted
@@ -300,12 +396,13 @@ class SampleSerializer(serializers.ModelSerializer):
     sampler_name_string = serializers.StringRelatedField(source='sampler_name')
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
-    final_concentrated_sample_volume = serializers.FloatField(
-        source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
-    final_concentrated_sample_volume_type = serializers.StringRelatedField(
-        source='final_concentrated_sample_volume.concentration_type.name', read_only=True)
-    final_concentrated_sample_volume_notes = serializers.CharField(
-        source='final_concentrated_sample_volume.notes', read_only=True)
+    final_concentrated_sample_volume_type = FinalConcentratedSampleVolumeSerializer()
+    # final_concentrated_sample_volume = serializers.FloatField(
+    #     source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
+    # final_concentrated_sample_volume_type = serializers.StringRelatedField(
+    #     source='final_concentrated_sample_volume.concentration_type.name', read_only=True)
+    # final_concentrated_sample_volume_notes = serializers.CharField(
+    #     source='final_concentrated_sample_volume.notes', read_only=True)
 
     class Meta:
         model = Sample
@@ -318,8 +415,8 @@ class SampleSerializer(serializers.ModelSerializer):
                   'sample_volume_initial', 'sample_volume_filtered', 'filter_born_on_date', 'filter_flag',
                   'secondary_concentration_flag', 'elution_notes', 'technician_initials', 'dissolution_volume',
                   'post_dilution_volume', 'analysisbatches', 'samplegroups', 'record_type', 'peg_neg',
-                  'peg_neg_targets_extracted', 'final_concentrated_sample_volume',
-                  'final_concentrated_sample_volume_type', 'final_concentrated_sample_volume_notes', 'aliquots',
+                  'peg_neg_targets_extracted', 'final_concentrated_sample_volume', 'aliquots',
+                  # 'final_concentrated_sample_volume_type', 'final_concentrated_sample_volume_notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -366,74 +463,6 @@ class UnitSerializer(serializers.ModelSerializer):
     class Meta:
         model = Unit
         fields = ('id', 'name', 'symbol', 'description', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-######
-#
-#  Final Sample Values
-#
-######
-
-
-class FinalConcentratedSampleVolumeListSerializer(serializers.ListSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    # bulk create
-    def create(self, validated_data):
-        fcsvs = [FinalConcentratedSampleVolume(**item) for item in validated_data]
-        return FinalConcentratedSampleVolume.objects.bulk_create(fcsvs)
-
-    # bulk update
-    def update(self, instance, validated_data):
-        # Maps for id->instance and id->data item.
-        fcsv_mapping = {fcsv.id: fcsv for fcsv in instance}
-        data_mapping = {item['id']: item for item in validated_data}
-
-        # Perform updates but ignore insertions
-        ret = []
-        for fcsv_id, data in data_mapping.items():
-            fcsv = fcsv_mapping.get(fcsv_id, None)
-            if fcsv is not None:
-                data['modified_by'] = self.context['request'].user
-                ret.append(self.child.update(fcsv, data))
-
-        return ret
-
-    class Meta:
-        model = FinalConcentratedSampleVolume
-        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume', 'notes',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = FinalConcentratedSampleVolume
-        fields = ('id', 'sample', 'concentration_type', 'final_concentrated_sample_volume', 'notes',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
-        list_serializer_class = FinalConcentratedSampleVolumeListSerializer
-
-
-class ConcentrationTypeSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = ConcentrationType
-        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-
-
-class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-
-    class Meta:
-        model = FinalSampleMeanConcentration
-        fields = ('id', 'sample_mean_concentration', 'sample_mean_concentration_sci', 'sample', 'target',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 ######

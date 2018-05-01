@@ -1,6 +1,8 @@
+from decimal import Decimal
 from datetime import date
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator
 from django.conf import settings
 from simple_history.models import HistoricalRecords
 
@@ -9,6 +11,11 @@ from simple_history.models import HistoricalRecords
 # Default fields of the core User model: username, first_name, last_name, email, password, groups, user_permissions,
 # is_staff, is_active, is_superuser, last_login, date_joined
 # For more information, see: https://docs.djangoproject.com/en/1.11/ref/contrib/auth/#user
+
+
+DECIMAL_PRECISION_100 = Decimal('1E-100')
+MINVAL_DECIMAL_100 = MinValueValidator(DECIMAL_PRECISION_100)
+MINVAL_ZERO = MinValueValidator(0)
 
 
 ######
@@ -256,6 +263,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
     sample = models.OneToOneField('Sample', related_name='final_concentrated_sample_volume')
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
     final_concentrated_sample_volume = models.FloatField()
+    # final_concentrated_sample_volume = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True, validators=[MinValueValidator(0.000000000000000000001)])
     notes = models.TextField(blank=True, default='')
 
     def __str__(self):
@@ -484,8 +492,8 @@ class ReverseTranscription(HistoryModel):
     """
 
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
-    template_volume = models.FloatField()
-    reaction_volume = models.FloatField()
+    template_volume = models.FloatField(default=8.6)
+    reaction_volume = models.FloatField(default=50)
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
     re_rt_notes = models.TextField(blank=True, default='')

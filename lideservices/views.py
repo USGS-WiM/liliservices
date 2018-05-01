@@ -165,8 +165,17 @@ class FreezerViewSet(HistoryViewSet):
 
 
 class FinalConcentratedSampleVolumeViewSet(HistoryViewSet):
-    queryset = FinalConcentratedSampleVolume.objects.all()
     serializer_class = FinalConcentratedSampleVolumeSerializer
+
+    # override the default queryset to allow filtering by URL arguments
+    def get_queryset(self):
+        queryset = FinalConcentratedSampleVolume.objects.all()
+        # filter by sample ID, exact list
+        sample = self.request.query_params.get('sample', None)
+        if sample is not None:
+            sample_list = sample.split(',')
+            queryset = queryset.filter(sample__in=sample_list)
+        return queryset
 
     def get_serializer(self, *args, **kwargs):
         if 'data' in kwargs:
