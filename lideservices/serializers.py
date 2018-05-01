@@ -396,13 +396,7 @@ class SampleSerializer(serializers.ModelSerializer):
     sampler_name_string = serializers.StringRelatedField(source='sampler_name')
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
-    # final_concentrated_sample_volume_type = FinalConcentratedSampleVolumeSerializer()
-    # final_concentrated_sample_volume = serializers.FloatField(
-    #     source='final_concentrated_sample_volume.final_concentrated_sample_volume', read_only=True)
-    # final_concentrated_sample_volume_type = serializers.StringRelatedField(
-    #     source='final_concentrated_sample_volume.concentration_type.name', read_only=True)
-    # final_concentrated_sample_volume_notes = serializers.CharField(
-    #     source='final_concentrated_sample_volume.notes', read_only=True)
+    final_concentrated_sample_volume = FinalConcentratedSampleVolumeSerializer()
 
     class Meta:
         model = Sample
@@ -416,7 +410,6 @@ class SampleSerializer(serializers.ModelSerializer):
                   'secondary_concentration_flag', 'elution_notes', 'technician_initials', 'dissolution_volume',
                   'post_dilution_volume', 'analysisbatches', 'samplegroups', 'record_type', 'peg_neg',
                   'peg_neg_targets_extracted', 'final_concentrated_sample_volume', 'aliquots',
-                  # 'final_concentrated_sample_volume_type', 'final_concentrated_sample_volume_notes',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
