@@ -70,13 +70,13 @@ class Sample(HistoryModel):
     matrix = models.ForeignKey('Matrix', related_name='samples')
     filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
-    study_site_name = models.CharField(max_length=128, blank=True, default='')
+    study_site_name = models.CharField(max_length=128, blank=True)
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
-    sampler_name = models.CharField(max_length=128, blank=True, default='')
-    sample_notes = models.TextField(blank=True, default='')
+    sampler_name = models.CharField(max_length=128, blank=True)
+    sample_notes = models.TextField(blank=True)
     sample_description = models.TextField(blank=True)
     arrival_date = models.DateField(null=True, blank=True)
-    arrival_notes = models.TextField(blank=True, default='')
+    arrival_notes = models.TextField(blank=True)
     collection_start_date = models.DateField()
     collection_start_time = models.TimeField(null=True, blank=True)
     collection_end_date = models.DateField(null=True, blank=True)
@@ -92,8 +92,8 @@ class Sample(HistoryModel):
     filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
-    elution_notes = models.TextField(blank=True, default='')
-    technician_initials = models.CharField(max_length=128, blank=True, default='')
+    elution_notes = models.TextField(blank=True)
+    technician_initials = models.CharField(max_length=128, blank=True)
     dissolution_volume = models.FloatField(null=True, blank=True)
     post_dilution_volume = models.FloatField(null=True, blank=True)
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
@@ -264,7 +264,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
     final_concentrated_sample_volume = models.FloatField()
     # final_concentrated_sample_volume = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True, validators=[MinValueValidator(0.000000000000000000001)])
-    notes = models.TextField(blank=True, default='')
+    notes = models.TextField(blank=True)
 
     def __str__(self):
         return str(self.id)
@@ -403,8 +403,8 @@ class AnalysisBatch(NameModel):
     """
 
     samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
-    analysis_batch_description = models.CharField(max_length=128, blank=True, default='')
-    analysis_batch_notes = models.CharField(max_length=128, blank=True, default='')
+    analysis_batch_description = models.CharField(max_length=128, blank=True)
+    analysis_batch_notes = models.CharField(max_length=128, blank=True)
 
     def __str__(self):
         return str(self.id)
@@ -463,7 +463,7 @@ class ExtractionBatch(HistoryModel):
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
-    re_extraction_notes = models.TextField(blank=True, default='')
+    re_extraction_notes = models.TextField(blank=True)
     extraction_number = models.IntegerField()
     extraction_volume = models.FloatField()
     extraction_date = models.DateField(default=date.today, db_index=True)
@@ -496,7 +496,7 @@ class ReverseTranscription(HistoryModel):
     reaction_volume = models.FloatField(default=50)
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
-    re_rt_notes = models.TextField(blank=True, default='')
+    re_rt_notes = models.TextField(blank=True)
     rt_pos_cq_value = models.FloatField(null=True, blank=True)
     rt_pos_gc_reaction = models.FloatField(null=True, blank=True)
     rt_pos_invalid = models.BooleanField(default=True)
@@ -535,7 +535,7 @@ class PCRReplicateBatch(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
     replicate_number = models.IntegerField()
-    notes = models.TextField(blank=True, default='')
+    notes = models.TextField(blank=True)
     ext_neg_cq_value = models.FloatField(null=True, blank=True)
     ext_neg_gc_reaction = models.FloatField(null=True, blank=True)
     ext_neg_invalid = models.BooleanField(default=True)
@@ -708,7 +708,7 @@ class Target(NameModel):
 
     code = models.CharField(max_length=128, unique=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
-    notes = models.TextField(blank=True, default='')
+    notes = models.TextField(blank=True)
 
     def __str__(self):
         return self.name

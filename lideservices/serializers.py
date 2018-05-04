@@ -398,7 +398,7 @@ class SampleSerializer(serializers.ModelSerializer):
     sampler_name_string = serializers.StringRelatedField(source='sampler_name')
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
-    final_concentrated_sample_volume = FinalConcentratedSampleVolumeSerializer()
+    final_concentrated_sample_volume = FinalConcentratedSampleVolumeSerializer(read_only=True)
 
     class Meta:
         model = Sample
