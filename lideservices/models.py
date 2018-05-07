@@ -88,7 +88,6 @@ class Sample(HistoryModel):
     total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')
     total_volume_or_mass_sampled = models.FloatField()
     sample_volume_initial = models.FloatField(null=True, blank=True)
-    sample_volume_filtered = models.FloatField(null=True, blank=True)
     filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)

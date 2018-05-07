@@ -408,10 +408,10 @@ class SampleSerializer(serializers.ModelSerializer):
                   'arrival_notes', 'collection_start_date', 'collection_start_time', 'collection_end_date',
                   'collection_end_time', 'meter_reading_initial', 'meter_reading_final', 'meter_reading_unit',
                   'total_volume_sampled_initial', 'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled',
-                  'sample_volume_initial', 'sample_volume_filtered', 'filter_born_on_date', 'filter_flag',
-                  'secondary_concentration_flag', 'elution_notes', 'technician_initials', 'dissolution_volume',
-                  'post_dilution_volume', 'analysisbatches', 'samplegroups', 'record_type', 'peg_neg',
-                  'peg_neg_targets_extracted', 'final_concentrated_sample_volume', 'aliquots',
+                  'sample_volume_initial', 'filter_born_on_date', 'filter_flag', 'secondary_concentration_flag',
+                  'elution_notes', 'technician_initials', 'dissolution_volume', 'post_dilution_volume',
+                  'analysisbatches', 'samplegroups', 'record_type', 'peg_neg', 'peg_neg_targets_extracted',
+                  'final_concentrated_sample_volume', 'aliquots',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
