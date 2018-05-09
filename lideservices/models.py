@@ -237,14 +237,14 @@ class FreezerLocationManager(models.Manager):
                 row__exact=max_row['row__max'], spot__exact=max_spot['spot__max']).first()
         else:
             # ignore all freezers that do not yet have locations used by aliquots
-            freezer_ids = Freezer.objects.all().values_list('id')
+            freezer_ids = list(Freezer.objects.all().values_list('id', flat=True))
             freezer_ids.sort()
             freezer_id = 0
             count_locations = 0
             while count_locations == 0:
                 freezer_id = freezer_ids.pop()
                 count_locations = self.filter(freezer__exact=freezer_id).count()
-            max_freezer = self.filter(freezer__exact=freezer_id)
+            max_freezer = Freezer.objects.filter(id=freezer_id).first()
 
             max_rack = self.filter(
                 freezer__exact=max_freezer).aggregate(models.Max('rack'))
