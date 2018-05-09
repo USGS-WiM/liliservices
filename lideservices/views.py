@@ -178,8 +178,8 @@ class FreezerLocationViewSet(HistoryViewSet):
                                 next_empty_box = "There are no more empty boxes after this box in any freezer!"
                     # there is still room for another box in this rack, so just increment the box number
                     else:
-                        next_empty_box['rack'] = next_spot.rack
-                        next_empty_box['box'] = next_spot.box + 1
+                        next_empty_box['rack'] = next_spot['rack']
+                        next_empty_box['box'] = next_spot['box'] + 1
                         next_empty_box['row'] = 1
                         next_empty_box['spot'] = 1
                         next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
