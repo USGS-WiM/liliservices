@@ -291,7 +291,7 @@ class FreezerLocationManager(models.Manager):
         if next_occupied_spot_in_row is not None:
             # there are occupied spots in the same row after this model instance (record),
             # so calculate the simple difference between the next occupied spot and this model instance (record)
-            available_spots = next_occupied_spot_in_row['spot'] - freezer_location.spot - 1
+            available_spots = next_occupied_spot_in_row.spot - freezer_location.spot - 1
         # else there are no other occupied spots after this model instance (record) in the row
         else:
             # check if there are any occupied spots in rows after the row of this model instance (record)
@@ -301,9 +301,9 @@ class FreezerLocationManager(models.Manager):
             if next_occupied_spot_in_box is not None:
                 # there are occupied spots in rows after this model instance (record),
                 # so calculate the simple difference between the next occupied spot and this model instance (record)
-                empty_rows_between_studies = (next_occupied_spot_in_box['row'] - freezer_location.row) - 1
+                empty_rows_between_studies = (next_occupied_spot_in_box.row - freezer_location.row) - 1
                 empty_row_spots = empty_rows_between_studies * spots_in_row
-                empty_spots_in_row_next_spot = next_occupied_spot_in_box['spot'] - 1
+                empty_spots_in_row_next_spot = next_occupied_spot_in_box.spot - 1
                 empty_spots_in_row_last_spot = spots_in_row - freezer_location.spot
                 available_spots = empty_spots_in_row_last_spot + empty_row_spots + empty_spots_in_row_next_spot
             # else there are no occupied spots in rows after this model instance (record)
