@@ -137,29 +137,35 @@ class AliquotListSerializer(serializers.ListSerializer):
     # ensure either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is included in request data
     def validate(self, data):
         if self.context['request'].method == 'POST':
-            d = data[0]
-            if 'sample' not in d:
-                pass
-            if 'samples' not in d:
-                message = "A list of sample IDs is required"
-                raise serializers.ValidationError(message)
-            if 'freezer_location' not in d:
-                if 'freezer' not in d or 'rack' not in d or 'box' not in d or 'row' not in d or 'spot' not in d:
-                    message = "Either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is required"
-                    raise serializers.ValidationError(message)
-            if 'freezer' in d and 'rack' in d and 'box' in d and 'row' in d and 'spot' in d:
-                freezer_object = Freezer.objects.filter(id=d['freezer']).first()
-                if freezer_object:
-                    if (d['rack'] > freezer_object.racks or d['box'] > freezer_object.boxes
-                            or d['row'] > freezer_object.rows or d['spot'] > freezer_object.spots):
-                        message = "The submitted freezer location (rack: " + str(d['rack']) + ", box: " + str(d['box'])
-                        message += ", row: " + str(d['row']) + ", spot: " + str(d['spot']) + ") does not exist in the "
-                        message += "submitted freezer (" + str(d['freezer']) + ") whose maximum dimensions are (rack: "
-                        message += str(freezer_object.racks) + ", box: " + str(freezer_object.boxes) + ", row: "
-                        message += str(freezer_object.rows) + ", spot: " + str(freezer_object.spots) + ")."
-                        raise serializers.ValidationError(message)
-                else:
-                    raise serializers.ValidationError("The submitted freezer (" + d['freezer'] + ") does not exist!")
+            is_valid = True
+            details = []
+            for item in data:
+                if 'sample' not in item:
+                    pass
+                if 'samples' not in item:
+                    is_valid = False
+                    details.append("A list of sample IDs is required")
+                if 'freezer_location' not in item:
+                    if ('freezer' not in item or 'rack' not in item or 'box' not in item or 'row' not in item
+                            or 'spot' not in item):
+                        message = "A freezer_location ID or coordinates (freezer, rack, box, row, spot) is required"
+                        details.append(message)
+                if 'freezer' in item and 'rack' in item and 'box' in item and 'row' in item and 'spot' in item:
+                    freezer_object = Freezer.objects.filter(id=item['freezer']).first()
+                    if freezer_object:
+                        if (item['rack'] > freezer_object.racks or item['box'] > freezer_object.boxes
+                                or item['row'] > freezer_object.rows or item['spot'] > freezer_object.spots):
+                            message = "The submitted freezer location (rack: " + str(item['rack']) + ", box: "
+                            message += str(item['box']) + ", row: " + str(item['row']) + ", spot: " + str(item['spot'])
+                            message += ") does not exist in the submitted freezer (" + str(item['freezer'])
+                            message += ") whose maximum dimensions are (rack: " + str(freezer_object.racks) + ", box: "
+                            message += str(freezer_object.boxes) + ", row: " + str(freezer_object.rows) + ", spot: "
+                            message += str(freezer_object.spots) + ")."
+                            details.append(message)
+                    else:
+                        details.append("The submitted freezer (" + item['freezer'] + ") does not exist!")
+            if not is_valid:
+                raise serializers.ValidationError(details)
         elif self.context['request'].method == 'PUT':
             is_valid = True
             details = []
@@ -183,86 +189,106 @@ class AliquotListSerializer(serializers.ListSerializer):
 
     # bulk create
     def create(self, validated_data):
-        validated_data = validated_data[0]
-
-        # pull out the freezer location fields from the request
-        if 'freezer_location' in validated_data:
-            freezer_location_id = validated_data['freezer_location'].id
-            freezer_location = FreezerLocation.objects.filter(id=freezer_location_id).first()
-            if freezer_location:
-                freezer = freezer_location.freezer.id
-                rack = freezer_location.rack
-                box = freezer_location.box
-                row = freezer_location.row
-                spot = freezer_location.spot
-            else:
-                raise serializers.ValidationError("No Freezer Location exists with ID: " + str(freezer_location_id))
-        else:
-            freezer = validated_data.pop('freezer')
-            rack = validated_data.pop('rack')
-            box = validated_data.pop('box')
-            row = validated_data.pop('row')
-            spot = validated_data.pop('spot')
-
-        # pull out aliquot count from the request
-        if 'aliquot_count' in validated_data:
-            aliquot_count = validated_data.pop('aliquot_count')
-        else:
-            aliquot_count = 1
-
-        # pull out sample IDs from the request
-        sample_ids = validated_data.pop('samples')
-
         aliquots = []
-        sample_count = 0
-        freezer_object = Freezer.objects.filter(id=freezer).first()
-        for sample_id in sample_ids:
-            sample = Sample.objects.get(id=sample_id)
-            for count_num in range(0, aliquot_count):
-                validated_data['sample'] = sample
+        for validated_item in validated_data:
 
-                # first determine if any aliquots exist for the parent sample
-                prev_aliquots = Aliquot.objects.filter(sample=sample_id)
-                if prev_aliquots:
-                    max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
+            # pull out the freezer location fields from the request
+            if 'freezer_location' in validated_item:
+                freezer_location_id = validated_item['freezer_location'].id
+                freezer_location = FreezerLocation.objects.filter(id=freezer_location_id).first()
+                if freezer_location:
+                    freezer = freezer_location.freezer.id
+                    rack = freezer_location.rack
+                    box = freezer_location.box
+                    row = freezer_location.row
+                    spot = freezer_location.spot
                 else:
-                    max_aliquot_number = 0
-                # then assign the proper aliquot_number
-                validated_data['aliquot_number'] = max_aliquot_number + 1
+                    raise serializers.ValidationError("No Freezer Location exists with ID: " + str(freezer_location_id))
+            else:
+                freezer = validated_item.pop('freezer')
+                rack = validated_item.pop('rack')
+                box = validated_item.pop('box')
+                row = validated_item.pop('row')
+                spot = validated_item.pop('spot')
 
-                # next create the freezer location for this aliquot to use
-                # use the existing freezer location if it was submitted and the aliquot count is exactly 1
-                if 'freezer_location' in validated_data and len(sample_ids) == 1 and aliquot_count == 1:
-                    validated_data['freezer_location'] = freezer_location
-                # otherwise create a new freezer location for all other aliquots
-                # ensure that all locations are real (i.e., no spot 10 when there can only be 9 spots)
+            # pull out aliquot count from the request
+            if 'aliquot_count' in validated_item:
+                aliquot_count = validated_item.pop('aliquot_count')
+            else:
+                aliquot_count = 1
+
+            # pull out sample IDs from the request
+            sample_ids = validated_item.pop('samples')
+
+            sample_count = 0
+            freezer_object = Freezer.objects.filter(id=freezer).first()
+
+            # check that the total number of aliquots (length of sample_id * aliquot_count) can fit in the box
+            # containing the initial specified location and that no already-occupied spaces can be taken
+            total_aliquot_count = len(sample_ids) * aliquot_count
+            if spot == 1:
+                if row == 1:
+                    avail_spots = freezer_object.rows * freezer_object.spots
                 else:
-                    if freezer_object:
-                        if (sample_count == 0 and count_num != 0) or sample_count != 0:
-                            spot += 1
-                        if spot > freezer_object.spots:
-                            spot = 1
-                            row += 1
-                            if row > freezer_object.rows:
-                                row = 1
-                                box += 1
-                                if box > freezer_object.boxes:
-                                    box = 1
-                                    rack += 1
-                                    if rack > freezer_object.racks:
-                                        message = "This freezer is full! No more spots can be allocated. Aborting."
+                    init_row = row - 1
+                    init_spot = freezer_object.spots
+                    initial_location = FreezerLocation.objects.filter(freezer=freezer_object, rack=rack, box=box,
+                                                                      row=init_row, spot=init_spot)
+                    avail_spots = FreezerLocation.objects.get_available_spots_in_box(initial_location)
+            else:
+                init_spot = spot - 1
+                initial_location = FreezerLocation.objects.filter(freezer=freezer_object, rack=rack, box=box,
+                                                                  row=row, spot=init_spot)
+                avail_spots = FreezerLocation.objects.get_available_spots_in_box(initial_location)
+
+            if total_aliquot_count <= avail_spots:
+                for sample_id in sample_ids:
+                    sample = Sample.objects.get(id=sample_id)
+                    for count_num in range(0, aliquot_count):
+                        validated_item['sample'] = sample
+
+                        # first determine if any aliquots exist for the parent sample
+                        prev_aliquots = Aliquot.objects.filter(sample=sample_id)
+                        if prev_aliquots:
+                            max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
+                        else:
+                            max_aliquot_number = 0
+                        # then assign the proper aliquot_number
+                        validated_item['aliquot_number'] = max_aliquot_number + 1
+
+                        # next create the freezer location for this aliquot to use
+                        # use the existing freezer location if it was submitted and the aliquot count is exactly 1
+                        if 'freezer_location' in validated_item and len(sample_ids) == 1 and aliquot_count == 1:
+                            validated_item['freezer_location'] = freezer_location
+                        # otherwise create a new freezer location for all other aliquots
+                        # ensure that all locations are real (i.e., no spot 10 when there can only be 9 spots)
+                        else:
+                            if freezer_object:
+                                if (sample_count == 0 and count_num != 0) or sample_count != 0:
+                                    spot += 1
+                                if spot > freezer_object.spots:
+                                    spot = 1
+                                    row += 1
+                                    if row > freezer_object.rows:
+                                        message = "This box is full! No more spots can be allocated. Aborting."
                                         raise serializers.ValidationError(message)
 
-                        user = self.context['request'].user
-                        fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row,
-                                                            spot=spot, created_by=user, modified_by=user)
-                        validated_data['freezer_location'] = fl
-                    else:
-                        raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
+                                user = self.context['request'].user
+                                fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row,
+                                                                    spot=spot, created_by=user, modified_by=user)
+                                validated_item['freezer_location'] = fl
+                            else:
+                                raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
 
-                aliquot = Aliquot.objects.create(**validated_data)
-                aliquots.append(aliquot)
-            sample_count += 1
+                        aliquot = Aliquot.objects.create(**validated_item)
+                        aliquots.append(aliquot)
+                    sample_count += 1
+            else:
+                message = "More freezer locations have been requested (" + str(total_aliquot_count)
+                message += ") than are available in the box (" + str(avail_spots)
+                message += ") of the starting location indicated (freezer: " + str(freezer) + ", rack: " + str(rack)
+                message += ", box: " + str(box) + ", row: " + str(row) + ", spot: " + str(spot) + ")"
+                raise serializers.ValidationError(message)
 
         return aliquots
 
@@ -708,7 +734,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 target_id = replicate['target']
                 target = Target.objects.filter(id=target_id).first()
                 if target:
-                    for x in range(1, replicate['count']):
+                    rep_range_max = replicate['count'] + 1
+                    for x in range(1, rep_range_max):
                         PCRReplicateBatch.objects.create(extraction_batch=extr_batch, target=target, replicate_number=x)
                 else:
                     raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
@@ -982,7 +1009,8 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
     def get_all_parent_controls_uploaded(self, obj):
         data = False
         pcrrep_batch = PCRReplicateBatch.objects.get(id=obj.pcrreplicate_batch_id)
-        if pcrrep_batch.ext_neg_cq_value and pcrrep_batch.rt_neg_cq_value and pcrrep_batch.pcr_neg_cq_value:
+        if (pcrrep_batch.ext_neg_cq_value is not None and pcrrep_batch.rt_neg_cq_value is not None
+                and pcrrep_batch.pcr_neg_cq_value is not None):
             data = True
         return data
 

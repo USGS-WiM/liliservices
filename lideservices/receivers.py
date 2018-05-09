@@ -22,7 +22,7 @@ def pcrreplicate_post_save(sender, **kwargs):
         if (
                 not instance.pcrreplicate_batch.ext_neg_invalid and
                 not instance.pcrreplicate_batch.rt_neg_invalid and
-                not instance.pcr_neg_invalid.pcr_neg_flag and
+                not instance.pcrreplicate_batch.pcr_neg_invalid and
                 instance.cq_value >= 0 and
                 instance.gc_reaction >= 0
         ):

@@ -211,6 +211,148 @@ class Unit(NameModel):
 ######
 
 
+class FreezerLocationManager(models.Manager):
+
+    # get the last occupied location, either in the all freezers regardless of study or for just a particular study
+    def get_last_occupied_spot(self, study_id=None):
+        if study_id is not None:
+            sample_ids = Sample.objects.filter(study__exact=study_id).values_list('id')
+            aliquot_ids = Aliquot.objects.filter(sample__in=sample_ids).values_list('id')
+            max_freezer = self.filter(aliquot__in=aliquot_ids).aggregate(models.Max('freezer'))
+            max_rack = self.filter(
+                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max']).aggregate(models.Max('rack'))
+            max_box = self.filter(
+                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                rack__exact=max_rack['rack__max']).aggregate(models.Max('box'))
+            max_row = self.filter(
+                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                rack__exact=max_rack['rack__max'], box__exact=max_box['box__max']).aggregate(models.Max('row'))
+            max_spot = self.filter(
+                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                rack__exact=max_rack['rack__max'], box__exact=max_box['box__max'],
+                row__exact=max_row['row__max']).aggregate(models.Max('spot'))
+            last_spot = self.filter(
+                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                rack__exact=max_rack['rack__max'], box__exact=max_box['box__max'],
+                row__exact=max_row['row__max'], spot__exact=max_spot['spot__max']).first()
+        else:
+            # ignore all freezers that do not yet have locations used by aliquots
+            freezer_ids = Freezer.objects.all().values_list('id')
+            freezer_ids.sort()
+            freezer_id = 0
+            count_locations = 0
+            while count_locations == 0:
+                freezer_id = freezer_ids.pop()
+                count_locations = self.filter(freezer__exact=freezer_id).count()
+            max_freezer = self.filter(freezer__exact=freezer_id)
+
+            max_rack = self.filter(
+                freezer__exact=max_freezer).aggregate(models.Max('rack'))
+            max_box = self.filter(
+                freezer__exact=max_freezer, rack__exact=max_rack['rack__max']).aggregate(models.Max('box'))
+            max_row = self.filter(
+                freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
+                box__exact=max_box['box__max']).aggregate(models.Max('row'))
+            max_spot = self.filter(
+                freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
+                box__exact=max_box['box__max'], row__exact=max_row['row__max']).aggregate(models.Max('spot'))
+            last_spot = self.filter(
+                freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
+                box__exact=max_box['box__max'], row__exact=max_row['row__max'],
+                spot__exact=max_spot['spot__max']).first()
+        return last_spot
+
+    # get the next available location, given a particular last spot
+    def get_next_available_spot(self, last_spot):
+        avail_spots = self.get_available_spots_in_box(last_spot)
+        next_spot = {'freezer': last_spot.freezer.id}
+        if avail_spots > 0:
+            spots_in_row = last_spot.freezer.spots
+            next_spot['rack'] = last_spot.rack
+            next_spot['box'] = last_spot.box
+            next_spot['row'] = last_spot.row if last_spot.spot < spots_in_row else last_spot.row + 1
+            next_spot['spot'] = last_spot.spot + 1 if last_spot.spot < spots_in_row else 1
+            next_spot['available_spots_in_box'] = avail_spots
+        else:
+            next_spot = self.get_next_empty_box()
+        return next_spot
+
+    # get the count of contiguous available spots left in a box after the spot occupied by this model instance (record)
+    def get_available_spots_in_box(self, freezer_location):
+        # get dimensions of a box being used in the freezer that contains the current model instance (record)
+        rows_in_box = freezer_location.freezer.rows
+        spots_in_row = freezer_location.freezer.spots
+        spots_in_box = rows_in_box * spots_in_row
+
+        # check if there are any occupied spots after this model instance (record) in the same row
+        next_occupied_spot_in_row = self.filter(freezer__exact=freezer_location.freezer,
+                                                rack__exact=freezer_location.rack, box__exact=freezer_location.box,
+                                                row__exact=freezer_location.row, spot__gt=freezer_location.spot).first()
+        if next_occupied_spot_in_row is not None:
+            # there are occupied spots in the same row after this model instance (record),
+            # so calculate the simple difference between the next occupied spot and this model instance (record)
+            available_spots = next_occupied_spot_in_row['spot'] - freezer_location.spot - 1
+        # else there are no other occupied spots after this model instance (record) in the row
+        else:
+            # check if there are any occupied spots in rows after the row of this model instance (record)
+            next_occupied_spot_in_box = self.filter(freezer__exact=freezer_location.freezer,
+                                                    rack__exact=freezer_location.rack, box__exact=freezer_location.box,
+                                                    row__gt=freezer_location.row).first()
+            if next_occupied_spot_in_box is not None:
+                # there are occupied spots in rows after this model instance (record),
+                # so calculate the simple difference between the next occupied spot and this model instance (record)
+                empty_rows_between_studies = (next_occupied_spot_in_box['row'] - freezer_location.row) - 1
+                empty_row_spots = empty_rows_between_studies * spots_in_row
+                empty_spots_in_row_next_spot = next_occupied_spot_in_box['spot'] - 1
+                empty_spots_in_row_last_spot = spots_in_row - freezer_location.spot
+                available_spots = empty_spots_in_row_last_spot + empty_row_spots + empty_spots_in_row_next_spot
+            # else there are no occupied spots in rows after this model instance (record)
+            else:
+                # calculate the simple difference between total box spots and this model instance (record)
+                occupied_spots = ((freezer_location.row - 1) * spots_in_row) + freezer_location.spot
+                available_spots = spots_in_box - occupied_spots
+        return available_spots
+
+    # get the next box with no occupied spots
+    def get_next_empty_box(self):
+        # if no last spot was found or adding another rack will exceed the number of racks allowed in any freezer,
+        # next_empty_box should return None
+        next_empty_box = None
+        last_spot = self.get_last_occupied_spot()
+        if last_spot is not None:
+            # start building the next empty box object
+            next_empty_box = {'freezer': last_spot.freezer.id}
+            # check if adding another box will exceed the number of boxes allowed per rack in this freezer
+            if last_spot.box + 1 > last_spot.freezer.boxes:
+                # check if there is still room for another rack in this freezer,
+                # and if so just increment the rack number
+                if last_spot.rack + 1 <= last_spot.freezer.racks:
+                    next_empty_box['rack'] = last_spot.rack + 1
+                    next_empty_box['box'] = 1
+                    next_empty_box['row'] = 1
+                    next_empty_box['spot'] = 1
+                    next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
+                # otherwise check if there is another freezer,
+                # and if so return the first location in that entire freezer
+                else:
+                    next_freezer = Freezer.objects.filter(id=(last_spot.freezer.id + 1)).first()
+                    if next_freezer is not None:
+                        next_empty_box['freezer'] = next_freezer.id
+                        next_empty_box['rack'] = 1
+                        next_empty_box['box'] = 1
+                        next_empty_box['row'] = 1
+                        next_empty_box['spot'] = 1
+                        next_empty_box['available_spots_in_box'] = next_freezer.rows * next_freezer.spots
+            # there is still room for another box in this rack, so just increment the box number
+            else:
+                next_empty_box['rack'] = last_spot.rack
+                next_empty_box['box'] = last_spot.box + 1
+                next_empty_box['row'] = 1
+                next_empty_box['spot'] = 1
+                next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
+        return next_empty_box
+
+
 class FreezerLocation(HistoryModel):
     """
     Freezer Location
@@ -221,6 +363,7 @@ class FreezerLocation(HistoryModel):
     box = models.IntegerField()
     row = models.IntegerField()
     spot = models.IntegerField()
+    objects = FreezerLocationManager()
 
     def __str__(self):
         return str(self.id)
