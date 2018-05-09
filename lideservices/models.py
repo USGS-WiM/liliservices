@@ -4,6 +4,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.conf import settings
+from django.dispatch import receiver
+from django.db.models.signals import pre_save, post_save
 from simple_history.models import HistoricalRecords
 
 
@@ -14,7 +16,9 @@ from simple_history.models import HistoricalRecords
 
 
 DECIMAL_PRECISION_100 = Decimal('1E-100')
+DECIMAL_PRECISION_10 = Decimal('1E-10')
 MINVAL_DECIMAL_100 = MinValueValidator(DECIMAL_PRECISION_100)
+MINVAL_DECIMAL_10 = MinValueValidator(DECIMAL_PRECISION_10)
 MINVAL_ZERO = MinValueValidator(0)
 
 
@@ -81,20 +85,27 @@ class Sample(HistoryModel):
     collection_start_time = models.TimeField(null=True, blank=True)
     collection_end_date = models.DateField(null=True, blank=True)
     collection_end_time = models.TimeField(null=True, blank=True)
-    meter_reading_initial = models.FloatField(null=True, blank=True)
-    meter_reading_final = models.FloatField(null=True, blank=True)
+    meter_reading_initial = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    meter_reading_final = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     meter_reading_unit = models.ForeignKey('Unit', null=True, related_name='samples_meter_units')
-    total_volume_sampled_initial = models.FloatField(null=True, blank=True)
+    total_volume_sampled_initial = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')
-    total_volume_or_mass_sampled = models.FloatField()
-    sample_volume_initial = models.FloatField(null=True, blank=True)
+    total_volume_or_mass_sampled = models.DecimalField(
+        max_digits=20, decimal_places=10, validators=[MINVAL_ZERO])
+    sample_volume_initial = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
     elution_notes = models.TextField(blank=True)
     technician_initials = models.CharField(max_length=128, blank=True)
-    dissolution_volume = models.FloatField(null=True, blank=True)
-    post_dilution_volume = models.FloatField(null=True, blank=True)
+    dissolution_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_DECIMAL_10])
+    post_dilution_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_DECIMAL_10])
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
@@ -120,7 +131,7 @@ class Aliquot(HistoryModel):
     aliquot_string = property(_concat_ids)
     sample = models.ForeignKey('Sample', related_name='aliquots')
     freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
-    aliquot_number = models.IntegerField()
+    aliquot_number = models.IntegerField(validators=[MINVAL_ZERO])
     frozen = models.BooleanField(default=True)
 
     def __str__(self):
@@ -359,10 +370,10 @@ class FreezerLocation(HistoryModel):
     """
 
     freezer = models.ForeignKey('Freezer', related_name='freezerlocations')
-    rack = models.IntegerField()
-    box = models.IntegerField()
-    row = models.IntegerField()
-    spot = models.IntegerField()
+    rack = models.IntegerField(validators=[MINVAL_ZERO])
+    box = models.IntegerField(validators=[MINVAL_ZERO])
+    row = models.IntegerField(validators=[MINVAL_ZERO])
+    spot = models.IntegerField(validators=[MINVAL_ZERO])
     objects = FreezerLocationManager()
 
     def __str__(self):
@@ -378,10 +389,10 @@ class Freezer(NameModel):
     Freezer
     """
 
-    racks = models.IntegerField()
-    boxes = models.IntegerField()
-    rows = models.IntegerField()
-    spots = models.IntegerField()
+    racks = models.IntegerField(validators=[MINVAL_ZERO])
+    boxes = models.IntegerField(validators=[MINVAL_ZERO])
+    rows = models.IntegerField(validators=[MINVAL_ZERO])
+    spots = models.IntegerField(validators=[MINVAL_ZERO])
 
     def __str__(self):
         return str(self.id)
@@ -404,8 +415,8 @@ class FinalConcentratedSampleVolume(HistoryModel):
 
     sample = models.OneToOneField('Sample', related_name='final_concentrated_sample_volume')
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
-    final_concentrated_sample_volume = models.FloatField()
-    # final_concentrated_sample_volume = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True, validators=[MinValueValidator(0.000000000000000000001)])
+    final_concentrated_sample_volume = models.DecimalField(
+        max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
     notes = models.TextField(blank=True)
 
     def __str__(self):
@@ -439,7 +450,8 @@ class FinalSampleMeanConcentration(HistoryModel):
             sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
         return sci_val
 
-    sample_mean_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    sample_mean_concentration = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     sample_mean_concentration_sci = property(_get_sample_mean_concentration_sci)
     sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
     target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
@@ -449,7 +461,7 @@ class FinalSampleMeanConcentration(HistoryModel):
         valid_reps_with_null_cq_value = []
         exts = SampleExtraction.objects.filter(sample=self.sample)
         for ext in exts:
-            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            reps = PCRReplicate.objects.filter(sample_extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
                 if rep.cq_value is None and rep.invalid is False:
                     valid_reps_with_null_cq_value.append(rep.id)
@@ -458,15 +470,15 @@ class FinalSampleMeanConcentration(HistoryModel):
     # Calculate sample mean concentration for all samples whose target replicates are now in the database
     def calc_sample_mean_conc(self):
         reps_count = 0
-        pos_gc_reactions = []
+        pos_replicate_concentration = []
         exts = SampleExtraction.objects.filter(sample=self.sample)
         for ext in exts:
-            reps = PCRReplicate.objects.filter(extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            reps = PCRReplicate.objects.filter(sample_extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
-                if rep.gc_reaction >= 0 and rep.invalid is False:
+                if rep.replicate_concentration >= 0 and rep.invalid is False:
                     reps_count = reps_count + 1
-                    pos_gc_reactions.append(rep.gc_reaction)
-        smc = sum(pos_gc_reactions) / reps_count if reps_count > 0 else 0
+                    pos_replicate_concentration.append(rep.replicate_concentration)
+        smc = sum(pos_replicate_concentration) / reps_count if reps_count > 0 else 0
         self.sample_mean_concentration = smc
         self.save()
 
@@ -563,8 +575,10 @@ class AnalysisBatchTemplate(NameModel):
 
     target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
     description = models.TextField(blank=True)
-    extraction_volume = models.FloatField()
-    elution_volume = models.FloatField()
+    extraction_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, validators=[MINVAL_ZERO])
+    elution_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, validators=[MINVAL_DECIMAL_10])
 
     def __str__(self):
         return self.name
@@ -606,16 +620,22 @@ class ExtractionBatch(HistoryModel):
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
     re_extraction_notes = models.TextField(blank=True)
-    extraction_number = models.IntegerField()
-    extraction_volume = models.FloatField()
+    extraction_number = models.IntegerField(validators=[MINVAL_ZERO])
+    extraction_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, validators=[MINVAL_ZERO])
     extraction_date = models.DateField(default=date.today, db_index=True)
     pcr_date = models.DateField(default=date.today, db_index=True)
-    qpcr_template_volume = models.FloatField(default=6)
-    elution_volume = models.FloatField()
-    sample_dilution_factor = models.IntegerField()
-    qpcr_reaction_volume = models.FloatField(default=20)
-    ext_pos_cq_value = models.FloatField(null=True, blank=True)
-    ext_pos_gc_reaction = models.FloatField(null=True, blank=True)
+    qpcr_template_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, default=6, validators=[MINVAL_ZERO])
+    elution_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, validators=[MINVAL_DECIMAL_10])
+    sample_dilution_factor = models.IntegerField(validators=[MINVAL_ZERO])
+    qpcr_reaction_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, default=20, validators=[MINVAL_DECIMAL_10])
+    ext_pos_cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    ext_pos_gc_reaction = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     ext_pos_invalid = models.BooleanField(default=True)
 
     def __str__(self):
@@ -628,19 +648,51 @@ class ExtractionBatch(HistoryModel):
         #  TODO: reassess extraction_number assignment logic for cases of re_extraction and re-use of extraction_number
 
 
+# listen for updated extraction batch instances
+@receiver(post_save, sender=ExtractionBatch)
+def extractionbatch_post_save(sender, **kwargs):
+    instance = kwargs['instance']
+
+    # if the invalid is true, invalidate all child replicates
+    if instance.ext_pos_invalid:
+        for sampleextraction in instance.sampleextractions:
+            for pcrreplicate in sampleextraction.pcrreplicates:
+                pcrreplicate.update(invalid=True)
+
+                # determine if all replicates for a given sample-target combo are now in the database or not
+                # and calculate sample mean concentration if yes or set to null if no
+                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
+                fsmc = FinalSampleMeanConcentration.objects.filter(
+                    sample=sampleextraction.sample, target=pcrrepbatch.target).first()
+                # if the sample-target combo (fsmc) does not exist, create it
+                if not fsmc:
+                    fsmc = FinalSampleMeanConcentration.objects.create(
+                        sample=sampleextraction.sample, target=pcrrepbatch.target)
+                # if all the valid related reps have gc_reaction values, calculate sample mean concentration
+                if fsmc.all_sample_target_reps_uploaded():
+                    fsmc.calc_sample_mean_conc()
+                # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
+                else:
+                    fsmc.update(sample_mean_concentration=None)
+
+
 class ReverseTranscription(HistoryModel):
     """
     Reverse Transcription
     """
 
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
-    template_volume = models.FloatField(default=8.6)
-    reaction_volume = models.FloatField(default=50)
+    template_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, default=8.6, validators=[MINVAL_ZERO])
+    reaction_volume = models.DecimalField(
+        max_digits=20, decimal_places=10, default=50, validators=[MINVAL_DECIMAL_10])
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
     re_rt_notes = models.TextField(blank=True)
-    rt_pos_cq_value = models.FloatField(null=True, blank=True)
-    rt_pos_gc_reaction = models.FloatField(null=True, blank=True)
+    rt_pos_cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    rt_pos_gc_reaction = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     rt_pos_invalid = models.BooleanField(default=True)
 
     def __str__(self):
@@ -649,6 +701,35 @@ class ReverseTranscription(HistoryModel):
     class Meta:
         db_table = "lide_reversetranscription"
         unique_together = ("extraction_batch", "re_rt")
+
+
+# listen for updated reverse transcription instances
+@receiver(post_save, sender=ReverseTranscription)
+def reversetranscription_post_save(sender, **kwargs):
+    instance = kwargs['instance']
+
+    # if the invalid is true, invalidate all child replicates
+    if instance.rt_pos_invalid:
+        extraction_batch = ExtractionBatch.objects.get(id=instance.extraction_batch)
+        for sampleextraction in extraction_batch.sampleextractions:
+            for pcrreplicate in sampleextraction.pcrreplicates:
+                pcrreplicate.update(invalid=True)
+
+                # determine if all replicates for a given sample-target combo are now in the database or not
+                # and calculate sample mean concentration if yes or set to null if no
+                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
+                fsmc = FinalSampleMeanConcentration.objects.filter(
+                    sample=sampleextraction.sample, target=pcrrepbatch.target).first()
+                # if the sample-target combo (fsmc) does not exist, create it
+                if not fsmc:
+                    fsmc = FinalSampleMeanConcentration.objects.create(
+                        sample=sampleextraction.sample, target=pcrrepbatch.target)
+                # if all the valid related reps have gc_reaction values, calculate sample mean concentration
+                if fsmc.all_sample_target_reps_uploaded():
+                    fsmc.calc_sample_mean_conc()
+                # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
+                else:
+                    fsmc.update(sample_mean_concentration=None)
 
 
 class SampleExtraction(HistoryModel):
@@ -676,19 +757,27 @@ class PCRReplicateBatch(HistoryModel):
 
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
-    replicate_number = models.IntegerField()
+    replicate_number = models.IntegerField(validators=[MINVAL_ZERO])
     notes = models.TextField(blank=True)
-    ext_neg_cq_value = models.FloatField(null=True, blank=True)
-    ext_neg_gc_reaction = models.FloatField(null=True, blank=True)
+    ext_neg_cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    ext_neg_gc_reaction = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     ext_neg_invalid = models.BooleanField(default=True)
-    rt_neg_cq_value = models.FloatField(null=True, blank=True)
-    rt_neg_gc_reaction = models.FloatField(null=True, blank=True)
+    rt_neg_cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    rt_neg_gc_reaction = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     rt_neg_invalid = models.BooleanField(default=True)
-    pcr_neg_cq_value = models.FloatField(null=True, blank=True)
-    pcr_neg_gc_reaction = models.FloatField(null=True, blank=True)
+    pcr_neg_cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    pcr_neg_gc_reaction = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     pcr_neg_invalid = models.BooleanField(default=True)
-    pcr_pos_cq_value = models.FloatField(null=True, blank=True)
-    pcr_pos_gc_reaction = models.FloatField(null=True, blank=True)
+    pcr_pos_cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    pcr_pos_gc_reaction = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     pcr_pos_invalid = models.BooleanField(default=True)
     re_pcr = models.ForeignKey('self', null=True, related_name='pcrreplicatebatches')
 
@@ -722,19 +811,22 @@ class PCRReplicate(HistoryModel):
 
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
-    cq_value = models.FloatField(null=True, blank=True)
-    gc_reaction = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    cq_value = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    gc_reaction = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     gc_reaction_sci = property(_get_gc_reaction_sci)
-    replicate_concentration = models.DecimalField(max_digits=120, decimal_places=100, null=True, blank=True)
+    replicate_concentration = models.DecimalField(
+        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_DECIMAL_100])
     replicate_concentration_sci = property(_get_replicate_concentration_sci)
     concentration_unit = models.ForeignKey('Unit', related_name='pcrreplicates')
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
 
     # override the save method to update enter the correct (and required) concentration unit value
-    def save(self, *args, **kwargs):
-        self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
-        super(PCRReplicate, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
+    #     super(PCRReplicate, self).save(*args, **kwargs)
 
     # get the concentration_unit
     def get_conc_unit(self, sample_id):
@@ -745,9 +837,10 @@ class PCRReplicate(HistoryModel):
             conc_unit = Unit.objects.get(name='Liter')
         return conc_unit
 
-    # Calculate replicate_concentration
+    # TODO: ask what to do about zeros
+    # Calculate replicate_concentration, but only if gc_reaction is a positive number
     def calc_rep_conc(self):
-        if self.gc_reaction is not None:
+        if self.gc_reaction is not None and self.gc_reaction > 0:
             nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
             extr = self.sample_extraction
             eb = self.sample_extraction.extraction_batch
@@ -805,16 +898,75 @@ class PCRReplicate(HistoryModel):
         unique_together = ("sample_extraction", "pcrreplicate_batch")
 
 
+# listen for updated pcrreplicate instances
+@receiver(pre_save, sender=PCRReplicate)
+def pcrreplicate_pre_save(sender, **kwargs):
+    instance = kwargs['instance']
+    instance.concentration_unit = instance.get_conc_unit(instance.sample_extraction.sample.id)
+
+
+# listen for updated pcrreplicate instances
+@receiver(post_save, sender=PCRReplicate)
+def pcrreplicate_post_save(sender, **kwargs):
+    instance = kwargs['instance']
+
+    # if there is a gc_reaction value, calculate the replicate_concentration and set the concentration_unit
+    if instance.gc_reaction is not None:
+        # calculate their replicate_concentration
+        instance.replicate_conentration = instance.calc_rep_conc()
+
+    # assess the invalid flags
+    # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
+    #     1. all parent controls exist
+    #     2. all parent control flags are False (i.e., the controls are valid)
+    #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
+    if instance.invalid_override is None:
+        print("in post_save validation: ", str(instance.id))
+        print(instance.invalid)
+        if (
+                not instance.pcrreplicate_batch.ext_neg_invalid and
+                not instance.pcrreplicate_batch.rt_neg_invalid and
+                not instance.pcrreplicate_batch.pcr_neg_invalid and
+                instance.cq_value >= 0 and
+                instance.gc_reaction >= 0
+        ):
+            instance.invalid = False
+        else:
+            instance.invalid = True
+        print(instance.invalid)
+
+    instance.save(update_fields=['replicate_concentration', 'invalid'])
+
+    # determine if all replicates for a given sample-target combo are now in the database or not
+    # and calculate sample mean concentration if yes or set to null if no
+    pcrrepbatch = PCRReplicateBatch.objects.get(id=instance.pcrreplicate_batch.id)
+    fsmc = FinalSampleMeanConcentration.objects.filter(
+        sample=instance.sample_extraction.sample, target=pcrrepbatch.target).first()
+    # if the sample-target combo (fsmc) does not exist, create it
+    if not fsmc:
+        fsmc = FinalSampleMeanConcentration.objects.create(
+            sample=instance.sample_extraction.sample, target=pcrrepbatch.target)
+    # if all the valid related reps have gc_reaction values, calculate sample mean concentration
+    if fsmc.all_sample_target_reps_uploaded():
+        fsmc.calc_sample_mean_conc()
+    # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
+    else:
+        fsmc.sample_mean_concentration = None
+        fsmc.save(update_fields=['sample_mean_concentration'])
+
+
+# TODO: this whole class needs to be reviewed when the time comes
 class StandardCurve(HistoryModel):
     """
     Standard Curve
     """
 
-    r_value = models.FloatField(null=True, blank=True)
-    slope = models.FloatField(null=True, blank=True)
-    efficiency = models.FloatField(null=True, blank=True)
-    pos_ctrl_cq = models.FloatField(null=True, blank=True)
-    pos_ctrl_cq_range = models.FloatField(null=True, blank=True)
+    r_value = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    slope = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    efficiency = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    pos_ctrl_cq = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    pos_ctrl_cq_range = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     # QUESTION: should there be an active or inactive/superseded field?
 
     def __str__(self):
@@ -833,7 +985,7 @@ class Inhibition(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='inhibitions')
     inhibition_date = models.DateField(default=date.today, db_index=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
-    dilution_factor = models.IntegerField(null=True, blank=True)
+    dilution_factor = models.IntegerField(null=True, blank=True, validators=[MINVAL_ZERO])
 
     def __str__(self):
         return str(self.id)

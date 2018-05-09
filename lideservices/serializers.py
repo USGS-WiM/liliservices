@@ -1200,7 +1200,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             instance.pcr_pos_invalid = pcr_pos_flag
             instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
             instance.modified_by = user
-            valid_data.append('pcrrepbatch')
 
             # next ensure the submitted pcr replicates exist in the DB
             for pcrreplicate in updated_pcrreplicates:
@@ -1280,12 +1279,10 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             response_errors.append({"updated_pcrreplicates": message})
         if is_valid:
             # now that all items are proven valid, save and return them to the user
+            instance.save()
             for item in valid_data:
-                if item == 'pcrrepbatch':
-                    instance.save()
-                else:
-                    # this save will also calculate sample mean concentrations if applicable
-                    item.save()
+                # this save will also calculate sample mean concentrations if applicable
+                item.save()
             return instance
         else:
             raise serializers.ValidationError(response_errors)
