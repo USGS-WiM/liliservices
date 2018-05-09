@@ -152,11 +152,11 @@ class FreezerLocationViewSet(HistoryViewSet):
                     # start building the next empty box object
                     next_empty_box = {"freezer": last_spot.freezer.id}
                     # check if adding another box will exceed the number of boxes allowed per rack in this freezer
-                    if next_spot.box + 1 > last_spot.freezer.boxes:
+                    if next_spot['box'] + 1 > last_spot.freezer.boxes:
                         # check if there is still room for another rack in this freezer,
                         # and if so just increment the rack number
-                        if next_spot.rack + 1 <= last_spot.freezer.racks:
-                            next_empty_box['rack'] = next_spot.rack + 1
+                        if next_spot['rack'] + 1 <= last_spot.freezer.racks:
+                            next_empty_box['rack'] = next_spot['rack'] + 1
                             next_empty_box['box'] = 1
                             next_empty_box['row'] = 1
                             next_empty_box['spot'] = 1
