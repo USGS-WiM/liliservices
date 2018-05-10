@@ -4,16 +4,6 @@ from rest_framework import serializers
 from lideservices.models import *
 
 
-# class NormalizeDecimalField(serializers.DecimalField):
-#     def to_representation(self, value):
-#         normalized = value.normalize()
-#         sign, digits, exponent = normalized.as_tuple()
-#         if exponent > 0:
-#             return Decimal((sign, digits + (0,) * exponent, 0))
-#         else:
-#             return normalized
-
-
 class RStrip100DecimalField(serializers.DecimalField):
     def to_representation(self, value):
         s = "{:.100f}".format(value)
@@ -63,20 +53,13 @@ class FinalConcentratedSampleVolumeSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     concentration_type_string = serializers.StringRelatedField(source='concentration_type')
-    # fcsv_no_coerce_to_string = serializers.DecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100, coerce_to_string=False)
-    # fcsv_round = serializers.DecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100, coerce_to_string=False, rounding=ROUND_HALF_UP)
-    # fcsv_round_custom = RoundingDecimalField(source='final_concentrated_sample_volume', max_digits=21, decimal_places=14)
-    # fcsv_normalized = NormalizeDecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100)
-    # fcsv_rstripped = RStrip100DecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100)
+    # final_concentrated_sample_volume = RStrip100DecimalField(source='final_concentrated_sample_volume', max_digits=120, decimal_places=100)
 
     class Meta:
         model = FinalConcentratedSampleVolume
         fields = ('id', 'sample', 'concentration_type', 'concentration_type_string', 'final_concentrated_sample_volume',
                   'notes', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = FinalConcentratedSampleVolumeListSerializer
-        # extra_kwargs = {
-        #     'final_concentrated_sample_volume': {'max_digits': 20, 'decimal_places': 10}
-        # }
 
 
 class ConcentrationTypeSerializer(serializers.ModelSerializer):
@@ -94,7 +77,7 @@ class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FinalSampleMeanConcentration
-        fields = ('id', 'sample_mean_concentration', 'sample_mean_concentration_sci', 'sample', 'target',
+        fields = ('id', 'final_sample_mean_concentration', 'final_sample_mean_concentration_sci', 'sample', 'target',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

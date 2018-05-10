@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.conf import settings
 from django.dispatch import receiver
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import post_save
 from simple_history.models import HistoricalRecords
 
 
@@ -21,6 +21,18 @@ MINVAL_DECIMAL_100 = MinValueValidator(DECIMAL_PRECISION_100)
 MINVAL_DECIMAL_10 = MinValueValidator(DECIMAL_PRECISION_10)
 MINVAL_ZERO = MinValueValidator(0)
 
+
+def get_sci_val(decimal_val):
+    """
+    returns the scientific notation for a decimal value
+    :param decimal_val: the decimal value to be converted
+    :return: the scientific notation of the decimal value
+    """
+    sci_val = ''
+    if decimal_val:
+        sci_val = '{0: E}'.format(decimal_val)
+        sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+    return sci_val
 
 ######
 #
@@ -124,11 +136,12 @@ class Aliquot(HistoryModel):
     Aliquot
     """
 
-    def _concat_ids(self):
+    @property
+    def aliquot_string(self):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.sample, self.aliquot_number)
 
-    aliquot_string = property(_concat_ids)
+    # aliquot_string = property(_concat_ids)
     sample = models.ForeignKey('Sample', related_name='aliquots')
     freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
     aliquot_number = models.IntegerField(validators=[MINVAL_ZERO])
@@ -443,16 +456,19 @@ class FinalSampleMeanConcentration(HistoryModel):
     Final Sample Mean Concentration
     """
 
-    def _get_sample_mean_concentration_sci(self):
-        sci_val = self.sample_mean_concentration
-        if sci_val:
-            sci_val = '{0: E}'.format(sci_val)
-            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
-        return sci_val
+    # def _get_final_sample_mean_concentration_sci(self):
+    #     sci_val = self.final_sample_mean_concentration
+    #     if sci_val:
+    #         sci_val = '{0: E}'.format(sci_val)
+    #         sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+    #     return sci_val
+    @property
+    def final_sample_mean_concentration_sci(self):
+        return get_sci_val(self.final_sample_mean_concentration)
 
-    sample_mean_concentration = models.DecimalField(
+    final_sample_mean_concentration = models.DecimalField(
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
-    sample_mean_concentration_sci = property(_get_sample_mean_concentration_sci)
+    # final_sample_mean_concentration_sci = property(get_sci_val(final_sample_mean_concentration))
     sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
     target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
 
@@ -478,9 +494,8 @@ class FinalSampleMeanConcentration(HistoryModel):
                 if rep.replicate_concentration >= 0 and rep.invalid is False:
                     reps_count = reps_count + 1
                     pos_replicate_concentration.append(rep.replicate_concentration)
-        smc = sum(pos_replicate_concentration) / reps_count if reps_count > 0 else 0
-        self.sample_mean_concentration = smc
-        self.save()
+        fsmc = sum(pos_replicate_concentration) / reps_count if reps_count > 0 else 0
+        return fsmc
 
     def __str__(self):
         return str(self.id)
@@ -611,11 +626,12 @@ class ExtractionBatch(HistoryModel):
     Extraction Batch
     """
 
-    def _concat_ids(self):
+    @property
+    def extraction_string(self):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.analysis_batch, self.extraction_number)
 
-    extraction_string = property(_concat_ids)
+    # extraction_string = property(_concat_ids)
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
@@ -670,10 +686,10 @@ def extractionbatch_post_save(sender, **kwargs):
                         sample=sampleextraction.sample, target=pcrrepbatch.target)
                 # if all the valid related reps have gc_reaction values, calculate sample mean concentration
                 if fsmc.all_sample_target_reps_uploaded():
-                    fsmc.calc_sample_mean_conc()
+                    fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
                 # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
                 else:
-                    fsmc.update(sample_mean_concentration=None)
+                    fsmc.update(final_sample_mean_concentration=None)
 
 
 class ReverseTranscription(HistoryModel):
@@ -726,7 +742,7 @@ def reversetranscription_post_save(sender, **kwargs):
                         sample=sampleextraction.sample, target=pcrrepbatch.target)
                 # if all the valid related reps have gc_reaction values, calculate sample mean concentration
                 if fsmc.all_sample_target_reps_uploaded():
-                    fsmc.calc_sample_mean_conc()
+                    fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
                 # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
                 else:
                     fsmc.update(sample_mean_concentration=None)
@@ -795,19 +811,13 @@ class PCRReplicate(HistoryModel):
     Polymerase Chain Reaction Replicate
     """
 
-    def _get_gc_reaction_sci(self):
-        sci_val = self.gc_reaction
-        if sci_val:
-            sci_val = '{0: E}'.format(sci_val)
-            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
-        return sci_val
+    @property
+    def gc_reaction_sci(self):
+        return get_sci_val(self.gc_reaction)
 
-    def _get_replicate_concentration_sci(self):
-        sci_val = self.replicate_concentration
-        if sci_val:
-            sci_val = '{0: E}'.format(sci_val)
-            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
-        return sci_val
+    @property
+    def replicate_concentration_sci(self):
+        return get_sci_val(self.replicate_concentration)
 
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
@@ -815,18 +825,42 @@ class PCRReplicate(HistoryModel):
         max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     gc_reaction = models.DecimalField(
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
-    gc_reaction_sci = property(_get_gc_reaction_sci)
+    # gc_reaction_sci = property(_get_gc_reaction_sci)
     replicate_concentration = models.DecimalField(
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_DECIMAL_100])
-    replicate_concentration_sci = property(_get_replicate_concentration_sci)
+    # replicate_concentration_sci = property(_get_replicate_concentration_sci)
     concentration_unit = models.ForeignKey('Unit', related_name='pcrreplicates')
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
 
-    # override the save method to update enter the correct (and required) concentration unit value
-    # def save(self, *args, **kwargs):
-    #     self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
-    #     super(PCRReplicate, self).save(*args, **kwargs)
+    # override the save method to assign or calculate concentration_unit, replicate_concentration, and invalid flag
+    def save(self, *args, **kwargs):
+        # assign the correct (and required) concentration unit value
+        self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
+
+        # if there is a gc_reaction value, calculate the replicate_concentration and set the concentration_unit
+        if self.gc_reaction is not None:
+            # calculate their replicate_concentration
+            self.replicate_concentration = self.calc_rep_conc()
+
+        # assess the invalid flags
+        # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
+        #     1. all parent controls exist
+        #     2. all parent control flags are False (i.e., the controls are valid)
+        #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
+        if self.invalid_override is None:
+            if (
+                    not self.pcrreplicate_batch.ext_neg_invalid and
+                    not self.pcrreplicate_batch.rt_neg_invalid and
+                    not self.pcrreplicate_batch.pcr_neg_invalid and
+                    self.cq_value >= 0 and
+                    self.gc_reaction >= 0
+            ):
+                self.invalid = False
+            else:
+                self.invalid = True
+
+        super(PCRReplicate, self).save(*args, **kwargs)
 
     # get the concentration_unit
     def get_conc_unit(self, sample_id):
@@ -899,43 +933,9 @@ class PCRReplicate(HistoryModel):
 
 
 # listen for updated pcrreplicate instances
-@receiver(pre_save, sender=PCRReplicate)
-def pcrreplicate_pre_save(sender, **kwargs):
-    instance = kwargs['instance']
-    instance.concentration_unit = instance.get_conc_unit(instance.sample_extraction.sample.id)
-
-
-# listen for updated pcrreplicate instances
 @receiver(post_save, sender=PCRReplicate)
 def pcrreplicate_post_save(sender, **kwargs):
     instance = kwargs['instance']
-
-    # if there is a gc_reaction value, calculate the replicate_concentration and set the concentration_unit
-    if instance.gc_reaction is not None:
-        # calculate their replicate_concentration
-        instance.replicate_conentration = instance.calc_rep_conc()
-
-    # assess the invalid flags
-    # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
-    #     1. all parent controls exist
-    #     2. all parent control flags are False (i.e., the controls are valid)
-    #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
-    if instance.invalid_override is None:
-        print("in post_save validation: ", str(instance.id))
-        print(instance.invalid)
-        if (
-                not instance.pcrreplicate_batch.ext_neg_invalid and
-                not instance.pcrreplicate_batch.rt_neg_invalid and
-                not instance.pcrreplicate_batch.pcr_neg_invalid and
-                instance.cq_value >= 0 and
-                instance.gc_reaction >= 0
-        ):
-            instance.invalid = False
-        else:
-            instance.invalid = True
-        print(instance.invalid)
-
-    instance.save(update_fields=['replicate_concentration', 'invalid'])
 
     # determine if all replicates for a given sample-target combo are now in the database or not
     # and calculate sample mean concentration if yes or set to null if no
@@ -948,14 +948,13 @@ def pcrreplicate_post_save(sender, **kwargs):
             sample=instance.sample_extraction.sample, target=pcrrepbatch.target)
     # if all the valid related reps have gc_reaction values, calculate sample mean concentration
     if fsmc.all_sample_target_reps_uploaded():
-        fsmc.calc_sample_mean_conc()
+        fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
     # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
     else:
-        fsmc.sample_mean_concentration = None
-        fsmc.save(update_fields=['sample_mean_concentration'])
+        fsmc.update(final_sample_mean_concentration=None)
 
 
-# TODO: this whole class needs to be reviewed when the time comes
+# TODO: this whole StandardCurve class needs to be reviewed when the time comes
 class StandardCurve(HistoryModel):
     """
     Standard Curve
