@@ -620,6 +620,44 @@ class ExtractionMethodSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class ExtractionBatchListSerializer(serializers.ListSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    extraction_number = serializers.IntegerField(read_only=True, default=0)
+    sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    rt_pos_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
+
+    # bulk update
+    def update(self, instance, validated_data):
+        # Maps for id->instance and id->data item.
+        eb_mapping = {eb.id: eb for eb in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+
+        # Perform updates but ignore insertions
+        ret = []
+        for eb_id, data in data_mapping.items():
+            eb = eb_mapping.get(eb_id, None)
+            if eb is not None:
+                # if rt_pos_cq_value is included, update the related RT record
+                if 'rt_pos_cq_value' in validated_data:
+                    rt = ReverseTranscription.objects.filter(extraction_batch=eb_id, re_rt=None)
+                    rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
+                    rt.save()
+                data['modified_by'] = self.context['request'].user
+                ret.append(self.child.update(eb, data))
+
+        return ret
+
+    class Meta:
+        model = ExtractionBatch
+        fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
+                  're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
+                  'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
+                  'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_invalid', 'sampleextractions', 'inhibitions',
+                  'rt_pos_cq_value', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class ExtractionBatchSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -629,6 +667,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     new_rt = serializers.JSONField(write_only=True, required=False)
     new_replicates = serializers.ListField(write_only=True, required=False)
     new_sample_extractions = serializers.ListField(write_only=True, required=False)
+    rt_pos_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
 
     def validate(self, data):
         if self.context['request'].method == 'POST':
@@ -693,21 +732,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         else:
             max_extraction_number = 0
         validated_data['extraction_number'] = max_extraction_number + 1
-
-        # if the positive control is included and equal to zero, mark the whole record as valid
-        # of if it is included but null, set it to zero and mark the whole record as valid
-        if 'ext_pos_cq_value' in validated_data:
-            if validated_data['ext_pos_cq_value'] == 0:
-                validated_data['ext_pos_invalid'] = False
-            elif validated_data['ext_pos_cq_value'] is None:
-                validated_data['ext_pos_cq_value'] = 0
-                validated_data['ext_pos_invalid'] = False
-        if 'ext_pos_gc_reaction' in validated_data:
-            if validated_data['ext_pos_gc_reaction'] == 0:
-                validated_data['ext_pos_invalid'] = False
-            elif validated_data['ext_pos_gc_reaction'] is None:
-                validated_data['ext_pos_gc_reaction'] = 0
-                validated_data['ext_pos_invalid'] = False
 
         extr_batch = ExtractionBatch.objects.create(**validated_data)
 
@@ -827,20 +851,11 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # if 'extraction_number' in validated_data and validated_data['extraction_number'] == 0:
         #     validated_data['extraction_number'] = instance.extraction_number
 
-        # if the positive control is included and equal to zero, mark the whole record as valid
-        # of if it is included but null, set it to zero and mark the whole record as valid
-        if 'ext_pos_cq_value' in validated_data:
-            if validated_data['ext_pos_cq_value'] == 0:
-                validated_data['ext_pos_invalid'] = False
-            elif validated_data['ext_pos_cq_value'] is None:
-                validated_data['ext_pos_cq_value'] = 0
-                validated_data['ext_pos_invalid'] = False
-        if 'ext_pos_gc_reaction' in validated_data:
-            if validated_data['ext_pos_gc_reaction'] == 0:
-                validated_data['ext_pos_invalid'] = False
-            elif validated_data['ext_pos_gc_reaction'] is None:
-                validated_data['ext_pos_gc_reaction'] = 0
-                validated_data['ext_pos_invalid'] = False
+        # if the positive control is included but null, set it to zero
+        if 'ext_pos_cq_value' in validated_data and validated_data['ext_pos_cq_value'] is None:
+            validated_data['ext_pos_cq_value'] = 0
+        if 'ext_pos_gc_reaction' in validated_data and validated_data['ext_pos_gc_reaction'] is None:
+            validated_data['ext_pos_gc_reaction'] = 0
 
         # update the Extraction Batch object
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
@@ -861,23 +876,54 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.modified_by = self.context['request'].user
         instance.save()
 
-        return instance
+        # if rt_pos_cq_value is included, update the related RT record
+        if 'rt_pos_cq_value' in validated_data:
+            rt = ReverseTranscription.objects.filter(extraction_batch=instance.id, re_rt=None)
+            rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
+            rt.save()
 
-    # # extraction_method
-    # def get_extraction_method(self, obj):
-    #     extraction_method_id = obj.extraction_method_id
-    #     extraction_method = ExtractionMethod.objects.get(id=extraction_method_id)
-    #     extraction_method_name = extraction_method.name
-    #     data = {"id": extraction_method_id, "name": extraction_method_name}
-    #     return data
+        return instance
 
     class Meta:
         model = ExtractionBatch
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'sampleextractions', 'inhibitions', 'ext_pos_cq_value', 'ext_pos_gc_reaction',
-                  'ext_pos_invalid', 'new_rt', 'new_replicates', 'new_sample_extractions',
+                  'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_invalid', 'sampleextractions', 'inhibitions',
+                   'rt_pos_cq_value', 'new_rt', 'new_replicates', 'new_sample_extractions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = ExtractionBatchListSerializer
+
+
+class ReverseTranscriptionListSerializer(serializers.ListSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    # bulk create
+    def create(self, validated_data):
+        rts = [ReverseTranscription(**item) for item in validated_data]
+        return ReverseTranscription.objects.bulk_create(rts)
+
+    # bulk update
+    def update(self, instance, validated_data):
+        # Maps for id->instance and id->data item.
+        rt_mapping = {rt.id: rt for rt in instance}
+        data_mapping = {item['id']: item for item in validated_data}
+
+        # Perform updates but ignore insertions
+        ret = []
+        for rt_id, data in data_mapping.items():
+            rt = rt_mapping.get(rt_id, None)
+            if rt is not None:
+                data['modified_by'] = self.context['request'].user
+                ret.append(self.child.update(rt, data))
+
+        return ret
+
+    class Meta:
+        model = ReverseTranscription
+        fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_notes',
+                  'rt_pos_cq_value', 'rt_pos_gc_reaction', 'rt_pos_invalid',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -886,38 +932,24 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
 
     def create(self, validated_data):
-        # if the positive control is included and equal to zero, mark the whole record as valid
-        # of if it is included but null, set it to zero and mark the whole record as valid
-        if 'rt_pos_cq_value' in validated_data:
-            if validated_data['rt_pos_cq_value'] == 0:
-                validated_data['rt_pos_invalid'] = False
-            elif validated_data['rt_pos_cq_value'] is None:
-                validated_data['rt_pos_cq_value'] = 0
-                validated_data['rt_pos_invalid'] = False
-        if 'rt_pos_gc_reaction' in validated_data:
-            if validated_data['rt_pos_gc_reaction'] == 0:
-                validated_data['rt_pos_invalid'] = False
-            elif validated_data['rt_pos_gc_reaction'] is None:
-                validated_data['rt_pos_gc_reaction'] = 0
-                validated_data['rt_pos_invalid'] = False
+        # commenting out the below block of code because it might be possible that a user submits
+        # a new record with a null control value inadvertently, such as from a web form that always submits
+        # every field of an object in the JSON regardless of whether the user set a value for a field
+
+        # # if the positive control is included but null, set it to zero
+        # if 'rt_pos_cq_value' in validated_data and validated_data['rt_pos_cq_value'] is None:
+        #     validated_data['rt_pos_cq_value'] = 0
+        # if 'rt_pos_gc_reaction' in validated_data and validated_data['rt_pos_gc_reaction'] is None:
+        #     validated_data['rt_pos_gc_reaction'] = 0
 
         return ReverseTranscription.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
-        # if the positive control is included and equal to zero, mark the whole record as valid
-        # of if it is included but null, set it to zero and mark the whole record as valid
-        if 'rt_pos_cq_value' in validated_data:
-            if validated_data['rt_pos_cq_value'] == 0:
-                validated_data['rt_pos_invalid'] = False
-            elif validated_data['rt_pos_cq_value'] is None:
-                validated_data['rt_pos_cq_value'] = 0
-                validated_data['rt_pos_invalid'] = False
-        if 'rt_pos_gc_reaction' in validated_data:
-            if validated_data['rt_pos_gc_reaction'] == 0:
-                validated_data['rt_pos_invalid'] = False
-            elif validated_data['rt_pos_gc_reaction'] is None:
-                validated_data['rt_pos_gc_reaction'] = 0
-                validated_data['rt_pos_invalid'] = False
+        # if the positive control is included but null, set it to zero
+        if 'rt_pos_cq_value' in validated_data and validated_data['rt_pos_cq_value'] is None:
+            validated_data['rt_pos_cq_value'] = 0
+        if 'rt_pos_gc_reaction' in validated_data and validated_data['rt_pos_gc_reaction'] is None:
+            validated_data['rt_pos_gc_reaction'] = 0
 
         # update the Reverse Transcription object
         instance.extraction_batch = validated_data.get('extraction_batch', instance.extraction_batch)
@@ -939,6 +971,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_batch', 'template_volume', 'reaction_volume', 'rt_date', 're_rt', 're_rt_notes',
                   'rt_pos_cq_value', 'rt_pos_gc_reaction', 'rt_pos_invalid',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
+        list_serializer_class = ReverseTranscriptionListSerializer
 
 
 class SampleExtractionSerializer(serializers.ModelSerializer):
@@ -1137,7 +1170,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         updated_pcrreplicates = validated_data.get('updated_pcrreplicates', None)
         existing_reps = PCRReplicate.objects.filter(pcrreplicate_batch=instance.id)
         if len(existing_reps) == len(updated_pcrreplicates):
-            # first validate the controls
             # if the cq and gc_reaction values are not present, set them to 0
             extneg_cq = validated_data.get('ext_neg_cq_value', 0)
             rtneg_cq = validated_data.get('rt_neg_cq_value', 0)
@@ -1148,39 +1180,20 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             pcrneg_gcr = validated_data.get('pcr_neg_gc_reaction', 0)
             pcrpos_gcr = validated_data.get('pcr_pos_gc_reaction', 0)
             # if the cq and gc_reaction values are null, set them to 0
-            extneg_cq = 0 if extneg_cq is None else extneg_cq
-            rtneg_cq = 0 if rtneg_cq is None else rtneg_cq
-            pcrneg_cq = 0 if pcrneg_cq is None else pcrneg_cq
-            pcrpos_cq = 0 if pcrpos_cq is None else pcrpos_cq
-            extneg_gcr = 0 if extneg_gcr is None else extneg_gcr
-            rtneg_gcr = 0 if rtneg_gcr is None else rtneg_gcr
-            pcrneg_gcr = 0 if pcrneg_gcr is None else pcrneg_gcr
-            pcrpos_gcr = 0 if pcrpos_gcr is None else pcrpos_gcr
-            # now validate the controls
-            ext_neg_flag = False if extneg_cq == 0 else True
-            rt_neg_flag = False if rtneg_cq == 0 else True
-            pcr_neg_flag = False if pcrneg_cq == 0 else True
-            # validating the pcr_pos will come in a later release of the software
-            # sc = validated_data.get('standard_curve', None)
-            pcr_pos_flag = False
+            instance.ext_neg_cq_value = 0 if extneg_cq is None else extneg_cq
+            instance.rt_neg_cq_value = 0 if rtneg_cq is None else rtneg_cq
+            instance.pcr_neg_cq_value = 0 if pcrneg_cq is None else pcrneg_cq
+            instance.pcr_pos_cq_value = 0 if pcrpos_cq is None else pcrpos_cq
+            instance.ext_neg_gc_reaction = 0 if extneg_gcr is None else extneg_gcr
+            instance.rt_neg_gc_reaction = 0 if rtneg_gcr is None else rtneg_gcr
+            instance.pcr_neg_gc_reaction = 0 if pcrneg_gcr is None else pcrneg_gcr
+            instance.pcr_pos_gc_reaction = 0 if pcrpos_gcr is None else pcrpos_gcr
 
             # then update the instance, but do not save until all child replicates are valid
             eb = validated_data.get('extraction_batch', instance.extraction_batch)
             target = validated_data.get('target', instance.target)
             # rn = validated_data.get('replicate_number', instance.replicate_number)
             instance.notes = validated_data.get('notes', instance.notes)
-            instance.ext_neg_cq_value = extneg_cq
-            instance.ext_neg_gc_reaction = extneg_gcr
-            instance.ext_neg_invalid = ext_neg_flag
-            instance.rt_neg_cq_value = rtneg_cq
-            instance.rt_neg_gc_reaction = rtneg_gcr
-            instance.rt_neg_invalid = rt_neg_flag
-            instance.pcr_neg_cq_value = pcrneg_cq
-            instance.pcr_neg_gc_reaction = pcrneg_gcr
-            instance.pcr_neg_invalid = pcr_neg_flag
-            instance.pcr_pos_cq_value = pcrpos_cq
-            instance.pcr_pos_gc_reaction = pcrpos_gcr
-            instance.pcr_pos_invalid = pcr_pos_flag
             instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
             instance.modified_by = user
 
@@ -1270,16 +1283,16 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError(response_errors)
 
-    def calc_flag(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
-        invalid = True
-        if cq_value is None:
-            if rtneg_cq is not None:
-                if extneg_cq == 0 and rtneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
-                    invalid = False
-            else:
-                if extneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
-                    invalid = False
-        return invalid
+    # def calc_flag(self, cq_value, extneg_cq, rtneg_cq, pcrneg_cq, gc_reaction):
+    #     invalid = True
+    #     if cq_value is None:
+    #         if rtneg_cq is not None:
+    #             if extneg_cq == 0 and rtneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
+    #                 invalid = False
+    #         else:
+    #             if extneg_cq == 0 and pcrneg_cq == 0 and gc_reaction >= 0:
+    #                 invalid = False
+    #     return invalid
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()

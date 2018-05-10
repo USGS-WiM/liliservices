@@ -654,6 +654,15 @@ class ExtractionBatch(HistoryModel):
         max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
     ext_pos_invalid = models.BooleanField(default=True)
 
+    # override the save method to calculate invalid flag
+    def save(self, *args, **kwargs):
+        # assess the invalid flag
+        # invalid flag defaults to True (i.e., the extraction batch is invalid)
+        # and can only be set to False if the cq_value of this extraction batch is equal to zero
+        self.ext_pos_invalid = False if self.ext_pos_cq_value == 0 else True
+
+        super(ExtractionBatch, self).save(*args, **kwargs)
+
     def __str__(self):
         return self.extraction_string
 
@@ -710,6 +719,15 @@ class ReverseTranscription(HistoryModel):
     rt_pos_gc_reaction = models.DecimalField(
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     rt_pos_invalid = models.BooleanField(default=True)
+
+    # override the save method to calculate invalid flag
+    def save(self, *args, **kwargs):
+        # assess the invalid flag
+        # invalid flag defaults to True (i.e., the RT is invalid)
+        # and can only be set to False if the cq_value of this RT is equal to zero
+        self.rt_pos_invalid = False if self.rt_pos_cq_value == 0 else True
+
+        super(ReverseTranscription, self).save(*args, **kwargs)
 
     def __str__(self):
         return str(self.id)
@@ -796,6 +814,20 @@ class PCRReplicateBatch(HistoryModel):
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
     pcr_pos_invalid = models.BooleanField(default=True)
     re_pcr = models.ForeignKey('self', null=True, related_name='pcrreplicatebatches')
+
+    # override the save method to calculate and invalid flags
+    def save(self, *args, **kwargs):
+        # assess the invalid flags
+        # invalid flags default to True (i.e., the rep is invalid)
+        # and can only be set to False if the cq_values of this rep batch are equal to zero
+        self.ext_neg_invalid = False if self.ext_neg_cq_value == 0 else True
+        self.rt_neg_invalid = False if self.rt_neg_cq_value == 0 else True
+        self.pcr_neg_invalid = False if self.pcr_neg_cq_value == 0 else True
+        # validating the pcr_pos will come in a later release of the software
+        # sc = validated_data.get('standard_curve', None)
+        self.pcr_pos_invalid = False
+
+        super(PCRReplicateBatch, self).save(*args, **kwargs)
 
     def __str__(self):
         return str(self.id)

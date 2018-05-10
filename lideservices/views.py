@@ -398,10 +398,132 @@ class ExtractionBatchViewSet(HistoryViewSet):
         else:
             return ExtractionBatchSerializer
 
+    def get_serializer(self, *args, **kwargs):
+        if 'data' in kwargs:
+            data = kwargs['data']
+
+            # check if many is required
+            if isinstance(data, list):
+                kwargs['many'] = True
+
+        return super(ExtractionBatchViewSet, self).get_serializer(*args, **kwargs)
+
+    # override the default PATCH method to allow bulk processing
+    def patch(self, request, pk=None):
+        request_data = JSONParser().parse(request)
+        # if there is no pk, assume this is a bulk request
+        if not pk:
+            is_valid = True
+            response_data = []
+            valid_data = []
+            response_errors = []
+            for item in request_data:
+                # ensure the id field is present, otherwise nothing can be updated
+                if not item.get('id'):
+                    is_valid = False
+                    response_errors.append({"id": "This field is required."})
+                else:
+                    eb_id = item.pop('id')
+                    eb = ExtractionBatch.objects.filter(id=eb_id).first()
+                    if eb:
+                        serializer = self.serializer_class(eb, data=item, partial=True)
+                        # if this item is valid, temporarily hold it until all items are proven valid, then save all
+                        # if even one item is invalid, none will be saved, and the user will be returned the error(s)
+                        if serializer.is_valid():
+                            valid_data.append(serializer)
+                        else:
+                            is_valid = False
+                            response_errors.append(serializer.errors)
+                    else:
+                        is_valid = False
+                        response_errors.append({"extractionbatch": "No ExtractionBatch exists with this ID: " + eb_id})
+            if is_valid:
+                # now that all items are proven valid, save and return them to the user
+                for item in valid_data:
+                    item.save()
+                    response_data.append(item.data)
+                return JsonResponse(response_data, safe=False, status=200)
+            else:
+                return JsonResponse(response_errors, safe=False, status=400)
+        # otherwise, if there is a pk, update the instance indicated by the pk
+        else:
+            rep = ExtractionBatch.objects.filter(id=pk).first()
+            if rep:
+                serializer = self.serializer_class(rep, data=request_data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data, status=200)
+                else:
+                    return Response(serializer.errors, status=400)
+            else:
+                return JsonResponse({"extractionbatch": "No ExtractionBatch exists with this ID: " + pk}, status=400)
+
 
 class ReverseTranscriptionViewSet(HistoryViewSet):
     queryset = ReverseTranscription.objects.all()
     serializer_class = ReverseTranscriptionSerializer
+
+    def get_serializer(self, *args, **kwargs):
+        if 'data' in kwargs:
+            data = kwargs['data']
+
+            # check if many is required
+            if isinstance(data, list):
+                kwargs['many'] = True
+
+        return super(ReverseTranscriptionViewSet, self).get_serializer(*args, **kwargs)
+
+    # override the default PATCH method to allow bulk processing
+    def patch(self, request, pk=None):
+        request_data = JSONParser().parse(request)
+        # if there is no pk, assume this is a bulk request
+        if not pk:
+            is_valid = True
+            response_data = []
+            valid_data = []
+            response_errors = []
+            for item in request_data:
+                # ensure the id field is present, otherwise nothing can be updated
+                if not item.get('id'):
+                    is_valid = False
+                    response_errors.append({"id": "This field is required."})
+                else:
+                    rt_id = item.pop('id')
+                    rt = ReverseTranscription.objects.filter(id=rt_id).first()
+                    if rt:
+                        serializer = self.serializer_class(rt, data=item, partial=True)
+                        # if this item is valid, temporarily hold it until all items are proven valid, then save all
+                        # if even one item is invalid, none will be saved, and the user will be returned the error(s)
+                        if serializer.is_valid():
+                            valid_data.append(serializer)
+                        else:
+                            is_valid = False
+                            response_errors.append(serializer.errors)
+                    else:
+                        is_valid = False
+                        response_errors.append(
+                            {"reversetranscription": "No ReverseTranscription exists with this ID: " + rt_id})
+            if is_valid:
+                # now that all items are proven valid, save and return them to the user
+                for item in valid_data:
+                    item.save()
+                    response_data.append(item.data)
+                return JsonResponse(response_data, safe=False, status=200)
+            else:
+                return JsonResponse(response_errors, safe=False, status=400)
+        # otherwise, if there is a pk, update the instance indicated by the pk
+        else:
+            rep = ReverseTranscription.objects.filter(id=pk).first()
+            if rep:
+                serializer = self.serializer_class(rep, data=request_data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data, status=200)
+                else:
+                    return Response(serializer.errors, status=400)
+            else:
+                return JsonResponse(
+                    {"reversetranscription": "No ReverseTranscription exists with this ID: " + pk}, status=400)
 
 
 class SampleExtractionViewSet(HistoryViewSet):
