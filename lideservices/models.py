@@ -472,30 +472,23 @@ class FinalSampleMeanConcentration(HistoryModel):
     sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
     target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
 
-    # Determine if all valid replicates for a given sample-target combo are now in the database or not
-    def all_sample_target_reps_uploaded(self):
-        valid_reps_with_null_cq_value = []
-        exts = SampleExtraction.objects.filter(sample=self.sample)
-        for ext in exts:
-            reps = PCRReplicate.objects.filter(sample_extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
-            for rep in reps:
-                if rep.cq_value is None and rep.invalid is False:
-                    valid_reps_with_null_cq_value.append(rep.id)
-        return True if len(valid_reps_with_null_cq_value) == 0 else False
-
     # Calculate sample mean concentration for all samples whose target replicates are now in the database
     def calc_sample_mean_conc(self):
         reps_count = 0
-        pos_replicate_concentration = []
-        exts = SampleExtraction.objects.filter(sample=self.sample)
+        pos_replicate_concentrations = []
+        exts = SampleExtraction.objects.filter(sample=self.sample.id, target=self.target.id)
         for ext in exts:
-            reps = PCRReplicate.objects.filter(sample_extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
-            for rep in reps:
-                if rep.replicate_concentration >= 0 and rep.invalid is False:
-                    reps_count = reps_count + 1
-                    pos_replicate_concentration.append(rep.replicate_concentration)
-        fsmc = sum(pos_replicate_concentration) / reps_count if reps_count > 0 else 0
-        return fsmc
+            for rep in ext.reps:
+                # ignore invalid reps and redos
+                if rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None:
+                    if rep.replicate_concentration is None:
+                        # this rep has no replicate_concentration
+                        # therefore not all sample-target combos are in the DB, so set this FSMC to null
+                        return None
+                    if rep.replicate_concentration >= 0:
+                        reps_count += 1
+                        pos_replicate_concentrations.append(rep.replicate_concentration)
+        return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else None
 
     def __str__(self):
         return str(self.id)
@@ -693,12 +686,10 @@ def extractionbatch_post_save(sender, **kwargs):
                 if not fsmc:
                     fsmc = FinalSampleMeanConcentration.objects.create(
                         sample=sampleextraction.sample, target=pcrrepbatch.target)
-                # if all the valid related reps have gc_reaction values, calculate sample mean concentration
-                if fsmc.all_sample_target_reps_uploaded():
-                    fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
-                # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
-                else:
-                    fsmc.update(final_sample_mean_concentration=None)
+                # update final sample mean concentration
+                # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+                # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
+                fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
 
 
 class ReverseTranscription(HistoryModel):
@@ -758,12 +749,10 @@ def reversetranscription_post_save(sender, **kwargs):
                 if not fsmc:
                     fsmc = FinalSampleMeanConcentration.objects.create(
                         sample=sampleextraction.sample, target=pcrrepbatch.target)
-                # if all the valid related reps have gc_reaction values, calculate sample mean concentration
-                if fsmc.all_sample_target_reps_uploaded():
-                    fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
-                # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
-                else:
-                    fsmc.update(sample_mean_concentration=None)
+                # update final sample mean concentration
+                # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+                # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
+                fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
 
 
 class SampleExtraction(HistoryModel):
@@ -881,7 +870,24 @@ class PCRReplicate(HistoryModel):
         #     2. all parent control flags are False (i.e., the controls are valid)
         #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
         if self.invalid_override is None:
+            # first check related peg_neg validity
+            # assume no related peg_neg, in which case this control does not apply
+            # but if there is a related peg_neg, check the validity of its reps with the same target as this data rep
+            any_peg_neg_invalid = False
+            peg_neg_id = self.sample_extraction.sample.peg_neg
+            if peg_neg_id is not None:
+                peg_neg_invalid_flags = []
+                target_id = self.pcrreplicate_batch.target.id
+                # only check sample extractions with the same target as this data rep
+                peg_neg_exts = SampleExtraction.objects.filter(sample=peg_neg_id, target=target_id)
+                for ext in peg_neg_exts:
+                    # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
+                    for rep in ext.peg_neg_reps:
+                        peg_neg_invalid_flags.append(rep.invalid)
+                any_peg_neg_invalid = any(peg_neg_invalid_flags)
+            # then check all controls applicable to this rep
             if (
+                    not any_peg_neg_invalid and
                     not self.pcrreplicate_batch.ext_neg_invalid and
                     not self.pcrreplicate_batch.rt_neg_invalid and
                     not self.pcrreplicate_batch.pcr_neg_invalid and
@@ -978,12 +984,10 @@ def pcrreplicate_post_save(sender, **kwargs):
     if not fsmc:
         fsmc = FinalSampleMeanConcentration.objects.create(
             sample=instance.sample_extraction.sample, target=pcrrepbatch.target)
-    # if all the valid related reps have gc_reaction values, calculate sample mean concentration
-    if fsmc.all_sample_target_reps_uploaded():
-        fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
-    # otherwise not all valid related reps have gc_reacion values, so set sample mean concentration to null
-    else:
-        fsmc.update(final_sample_mean_concentration=None)
+    # update final sample mean concentration
+    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+    # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
+    fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
 
 
 # TODO: this whole StandardCurve class needs to be reviewed when the time comes
