@@ -1195,7 +1195,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
 
             # then update the instance, but do not save until all child replicates are valid
             eb = validated_data.get('extraction_batch', instance.extraction_batch)
-            target = validated_data.get('target', instance.target)
             # rn = validated_data.get('replicate_number', instance.replicate_number)
             instance.notes = validated_data.get('notes', instance.notes)
             instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
@@ -1247,9 +1246,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                                 # skip to the next item in the loop
                                 continue
                             # that particular sample volume exists, so finish updating this rep
-                            # ensure target is a Target object, not an integer
-                            if isinstance(target, int):
-                                target = Target.objects.get(id=target).first()
                             new_data = {'pcrreplicate_batch': instance.id, 'cq_value': cq_value,
                                         'gc_reaction': gc_reaction, 'modified_by': user}
                             serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)

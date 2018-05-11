@@ -476,9 +476,10 @@ class FinalSampleMeanConcentration(HistoryModel):
     def calc_sample_mean_conc(self):
         reps_count = 0
         pos_replicate_concentrations = []
-        exts = SampleExtraction.objects.filter(sample=self.sample.id, target=self.target.id)
+        exts = SampleExtraction.objects.filter(sample=self.sample.id)
         for ext in exts:
-            for rep in ext.reps:
+            reps = PCRReplicate.objects.filter(sample_extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+            for rep in reps:
                 # ignore invalid reps and redos
                 if rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None:
                     if rep.replicate_concentration is None:
@@ -689,7 +690,8 @@ def extractionbatch_post_save(sender, **kwargs):
                 # update final sample mean concentration
                 # if all the valid related reps have replicate_concentration values the FSMC will be calculated
                 # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
-                fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
+                fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+                fsmc.save()
 
 
 class ReverseTranscription(HistoryModel):
@@ -752,7 +754,8 @@ def reversetranscription_post_save(sender, **kwargs):
                 # update final sample mean concentration
                 # if all the valid related reps have replicate_concentration values the FSMC will be calculated
                 # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
-                fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
+                fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+                fsmc.save()
 
 
 class SampleExtraction(HistoryModel):
@@ -987,7 +990,8 @@ def pcrreplicate_post_save(sender, **kwargs):
     # update final sample mean concentration
     # if all the valid related reps have replicate_concentration values the FSMC will be calculated
     # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
-    fsmc.update(final_sample_mean_concentration=fsmc.calc_sample_mean_conc())
+    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+    fsmc.save()
 
 
 # TODO: this whole StandardCurve class needs to be reviewed when the time comes
