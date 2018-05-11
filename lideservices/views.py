@@ -299,7 +299,7 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         # filter by target ID, exact list
         target = self.request.query_params.get('target', None)
         if target is not None:
-            target_list = sample.split(',')
+            target_list = target.split(',')
             queryset = queryset.filter(target__in=target_list)
         # filter by study ID, exact list
         study = self.request.query_params.get('study', None)
