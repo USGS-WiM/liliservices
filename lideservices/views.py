@@ -389,6 +389,7 @@ class ExtractionMethodViewSet(HistoryViewSet):
 
 class ExtractionBatchViewSet(HistoryViewSet):
     queryset = ExtractionBatch.objects.all()
+    serializer_class = ExtractionBatchSerializer
 
     # override the default serializer_class if summary fields are requested
     def get_serializer_class(self):

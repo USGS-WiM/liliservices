@@ -674,7 +674,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     rt_pos_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
 
     def validate(self, data):
-        if self.context['request'].method == 'POST':
+        if 'request' in self.context and self.context['request'].method == 'POST':
             # if 'new_rt' not in data:
             #     raise serializers.ValidationError("new_rt is a required field")
             if 'new_sample_extractions' not in data:
@@ -877,12 +877,15 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.ext_pos_cq_value = validated_data.get('ext_pos_cq_value', instance.ext_pos_cq_value)
         instance.ext_pos_gc_reaction = validated_data.get('ext_pos_gc_reaction', instance.ext_pos_gc_reaction)
         instance.ext_pos_invalid = validated_data.get('ext_pos_invalid', instance.ext_pos_invalid)
-        instance.modified_by = self.context['request'].user
+        if 'request' in self.context and 'user' in self.context['request']:
+            instance.modified_by = self.context['request'].user
+        else:
+            instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
 
         # if rt_pos_cq_value is included, update the related RT record
         if 'rt_pos_cq_value' in validated_data:
-            rt = ReverseTranscription.objects.filter(extraction_batch=instance.id, re_rt=None)
+            rt = ReverseTranscription.objects.filter(extraction_batch=instance.id, re_rt=None).first()
             rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
             rt.save()
 
@@ -965,7 +968,10 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
         instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
         instance.rt_pos_invalid = validated_data.get('rt_pos_invalid', instance.rt_pos_invalid)
-        instance.modified_by = self.context['request'].user
+        if 'request' in self.context and 'user' in self.context['request']:
+            instance.modified_by = self.context['request'].user
+        else:
+            instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
 
         return instance

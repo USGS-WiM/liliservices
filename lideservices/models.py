@@ -674,15 +674,18 @@ def extractionbatch_post_save(sender, **kwargs):
 
     # if the invalid is true, invalidate all child replicates
     if instance.ext_pos_invalid:
-        for sampleextraction in instance.sampleextractions:
-            for pcrreplicate in sampleextraction.pcrreplicates:
-                pcrreplicate.update(invalid=True)
+        sampleextractions = SampleExtraction.objects.filter(extraction_batch=instance.id)
+        for sampleextraction in sampleextractions:
+            pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
+            for pcrreplicate in pcrreplicates:
+                pcrreplicate.invalid = True
+                pcrreplicate.save()
 
                 # determine if all replicates for a given sample-target combo are now in the database or not
                 # and calculate sample mean concentration if yes or set to null if no
-                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
+                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
                 fsmc = FinalSampleMeanConcentration.objects.filter(
-                    sample=sampleextraction.sample, target=pcrrepbatch.target).first()
+                    sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
                 # if the sample-target combo (fsmc) does not exist, create it
                 if not fsmc:
                     fsmc = FinalSampleMeanConcentration.objects.create(
@@ -737,16 +740,18 @@ def reversetranscription_post_save(sender, **kwargs):
 
     # if the invalid is true, invalidate all child replicates
     if instance.rt_pos_invalid:
-        extraction_batch = ExtractionBatch.objects.get(id=instance.extraction_batch)
-        for sampleextraction in extraction_batch.sampleextractions:
-            for pcrreplicate in sampleextraction.pcrreplicates:
-                pcrreplicate.update(invalid=True)
+        sampleextractions = SampleExtraction.objects.filter(extraction_batch=instance.extraction_batch.id)
+        for sampleextraction in sampleextractions:
+            pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
+            for pcrreplicate in pcrreplicates:
+                pcrreplicate.invalid = True
+                pcrreplicate.save()
 
                 # determine if all replicates for a given sample-target combo are now in the database or not
                 # and calculate sample mean concentration if yes or set to null if no
-                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch)
+                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
                 fsmc = FinalSampleMeanConcentration.objects.filter(
-                    sample=sampleextraction.sample, target=pcrrepbatch.target).first()
+                    sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
                 # if the sample-target combo (fsmc) does not exist, create it
                 if not fsmc:
                     fsmc = FinalSampleMeanConcentration.objects.create(
@@ -873,31 +878,34 @@ class PCRReplicate(HistoryModel):
         #     2. all parent control flags are False (i.e., the controls are valid)
         #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
         if self.invalid_override is None:
-            # first check related peg_neg validity
-            # assume no related peg_neg, in which case this control does not apply
-            # but if there is a related peg_neg, check the validity of its reps with the same target as this data rep
-            any_peg_neg_invalid = False
-            peg_neg_id = self.sample_extraction.sample.peg_neg
-            if peg_neg_id is not None:
-                peg_neg_invalid_flags = []
-                target_id = self.pcrreplicate_batch.target.id
-                # only check sample extractions with the same target as this data rep
-                peg_neg_exts = SampleExtraction.objects.filter(sample=peg_neg_id, target=target_id)
-                for ext in peg_neg_exts:
-                    # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                    for rep in ext.peg_neg_reps:
-                        peg_neg_invalid_flags.append(rep.invalid)
-                any_peg_neg_invalid = any(peg_neg_invalid_flags)
-            # then check all controls applicable to this rep
-            if (
-                    not any_peg_neg_invalid and
-                    not self.pcrreplicate_batch.ext_neg_invalid and
-                    not self.pcrreplicate_batch.rt_neg_invalid and
-                    not self.pcrreplicate_batch.pcr_neg_invalid and
-                    self.cq_value >= 0 and
-                    self.gc_reaction >= 0
-            ):
-                self.invalid = False
+            if self.cq_value is not None and self.gc_reaction is not None:
+                # first check related peg_neg validity
+                # assume no related peg_neg, in which case this control does not apply
+                # but if there is a related peg_neg, check the validity of its reps with the same target as this data rep
+                any_peg_neg_invalid = False
+                peg_neg_id = self.sample_extraction.sample.peg_neg
+                if peg_neg_id is not None:
+                    peg_neg_invalid_flags = []
+                    target_id = self.pcrreplicate_batch.target.id
+                    # only check sample extractions with the same target as this data rep
+                    peg_neg_exts = SampleExtraction.objects.filter(sample=peg_neg_id, target=target_id)
+                    for ext in peg_neg_exts:
+                        # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
+                        for rep in ext.peg_neg_reps:
+                            peg_neg_invalid_flags.append(rep.invalid)
+                    any_peg_neg_invalid = any(peg_neg_invalid_flags)
+                # then check all controls applicable to this rep
+                if (
+                        not any_peg_neg_invalid and
+                        not self.pcrreplicate_batch.ext_neg_invalid and
+                        not self.pcrreplicate_batch.rt_neg_invalid and
+                        not self.pcrreplicate_batch.pcr_neg_invalid and
+                        self.cq_value >= 0 and
+                        self.gc_reaction >= 0
+                ):
+                    self.invalid = False
+                else:
+                    self.invalid = True
             else:
                 self.invalid = True
 
@@ -982,7 +990,7 @@ def pcrreplicate_post_save(sender, **kwargs):
     # and calculate sample mean concentration if yes or set to null if no
     pcrrepbatch = PCRReplicateBatch.objects.get(id=instance.pcrreplicate_batch.id)
     fsmc = FinalSampleMeanConcentration.objects.filter(
-        sample=instance.sample_extraction.sample, target=pcrrepbatch.target).first()
+        sample=instance.sample_extraction.sample.id, target=pcrrepbatch.target.id).first()
     # if the sample-target combo (fsmc) does not exist, create it
     if not fsmc:
         fsmc = FinalSampleMeanConcentration.objects.create(
