@@ -34,6 +34,42 @@ def get_sci_val(decimal_val):
         sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
     return sci_val
 
+
+class NonnegativeIntegerField(models.IntegerField):
+    def __init__(self, *args, **kwargs):
+        super(NonnegativeIntegerField, self).__init__(validators=[MINVAL_ZERO], *args, **kwargs)
+
+
+class NullableNonnegativeDecimalField120100(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        super(NullableNonnegativeDecimalField120100, self).__init__(
+            max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO], *args, **kwargs)
+
+
+class NonnegativeDecimalField2010(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        super(NonnegativeDecimalField2010, self).__init__(
+            max_digits=20, decimal_places=10, validators=[MINVAL_ZERO], *args, **kwargs)
+
+
+class NonzeroDecimalField2010(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        super(NonzeroDecimalField2010, self).__init__(
+            max_digits=20, decimal_places=10, validators=[MINVAL_DECIMAL_10], *args, **kwargs)
+
+
+class NullableNonnegativeDecimalField2010(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        super(NullableNonnegativeDecimalField2010, self).__init__(
+            max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO], *args, **kwargs)
+
+
+class NullableNonzeroDecimalField2010(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        super(NullableNonzeroDecimalField2010, self).__init__(
+            max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_DECIMAL_10], *args, **kwargs)
+
+
 ######
 #
 #  Abstract Base Classes
@@ -97,27 +133,20 @@ class Sample(HistoryModel):
     collection_start_time = models.TimeField(null=True, blank=True)
     collection_end_date = models.DateField(null=True, blank=True)
     collection_end_time = models.TimeField(null=True, blank=True)
-    meter_reading_initial = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    meter_reading_final = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    meter_reading_initial = NullableNonnegativeDecimalField2010()
+    meter_reading_final = NullableNonnegativeDecimalField2010()
     meter_reading_unit = models.ForeignKey('Unit', null=True, related_name='samples_meter_units')
-    total_volume_sampled_initial = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    total_volume_sampled_initial = NullableNonnegativeDecimalField2010()
     total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')
-    total_volume_or_mass_sampled = models.DecimalField(
-        max_digits=20, decimal_places=10, validators=[MINVAL_ZERO])
-    sample_volume_initial = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    total_volume_or_mass_sampled = NonnegativeDecimalField2010()
+    sample_volume_initial = NullableNonnegativeDecimalField2010()
     filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
     elution_notes = models.TextField(blank=True)
     technician_initials = models.CharField(max_length=128, blank=True)
-    dissolution_volume = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_DECIMAL_10])
-    post_dilution_volume = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_DECIMAL_10])
+    dissolution_volume = NullableNonzeroDecimalField2010()
+    post_dilution_volume = NullableNonzeroDecimalField2010()
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
@@ -141,10 +170,9 @@ class Aliquot(HistoryModel):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.sample, self.aliquot_number)
 
-    # aliquot_string = property(_concat_ids)
     sample = models.ForeignKey('Sample', related_name='aliquots')
     freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
-    aliquot_number = models.IntegerField(validators=[MINVAL_ZERO])
+    aliquot_number = NonnegativeIntegerField()
     frozen = models.BooleanField(default=True)
 
     def __str__(self):
@@ -383,10 +411,10 @@ class FreezerLocation(HistoryModel):
     """
 
     freezer = models.ForeignKey('Freezer', related_name='freezerlocations')
-    rack = models.IntegerField(validators=[MINVAL_ZERO])
-    box = models.IntegerField(validators=[MINVAL_ZERO])
-    row = models.IntegerField(validators=[MINVAL_ZERO])
-    spot = models.IntegerField(validators=[MINVAL_ZERO])
+    rack = NonnegativeIntegerField()
+    box = NonnegativeIntegerField()
+    row = NonnegativeIntegerField()
+    spot = NonnegativeIntegerField()
     objects = FreezerLocationManager()
 
     def __str__(self):
@@ -402,10 +430,10 @@ class Freezer(NameModel):
     Freezer
     """
 
-    racks = models.IntegerField(validators=[MINVAL_ZERO])
-    boxes = models.IntegerField(validators=[MINVAL_ZERO])
-    rows = models.IntegerField(validators=[MINVAL_ZERO])
-    spots = models.IntegerField(validators=[MINVAL_ZERO])
+    racks = NonnegativeIntegerField()
+    boxes = NonnegativeIntegerField()
+    rows = NonnegativeIntegerField()
+    spots = NonnegativeIntegerField()
 
     def __str__(self):
         return str(self.id)
@@ -425,6 +453,10 @@ class FinalConcentratedSampleVolume(HistoryModel):
     """
     Final Concentrated Sample Volume
     """
+
+    @property
+    def final_concentrated_sample_volume_sci(self):
+        return get_sci_val(self.final_concentrated_sample_volume)
 
     sample = models.OneToOneField('Sample', related_name='final_concentrated_sample_volume')
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
@@ -456,19 +488,11 @@ class FinalSampleMeanConcentration(HistoryModel):
     Final Sample Mean Concentration
     """
 
-    # def _get_final_sample_mean_concentration_sci(self):
-    #     sci_val = self.final_sample_mean_concentration
-    #     if sci_val:
-    #         sci_val = '{0: E}'.format(sci_val)
-    #         sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
-    #     return sci_val
     @property
     def final_sample_mean_concentration_sci(self):
         return get_sci_val(self.final_sample_mean_concentration)
 
-    final_sample_mean_concentration = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
-    # final_sample_mean_concentration_sci = property(get_sci_val(final_sample_mean_concentration))
+    final_sample_mean_concentration = NullableNonnegativeDecimalField120100()
     sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
     target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
 
@@ -584,10 +608,8 @@ class AnalysisBatchTemplate(NameModel):
 
     target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
     description = models.TextField(blank=True)
-    extraction_volume = models.DecimalField(
-        max_digits=20, decimal_places=10, validators=[MINVAL_ZERO])
-    elution_volume = models.DecimalField(
-        max_digits=20, decimal_places=10, validators=[MINVAL_DECIMAL_10])
+    extraction_volume = NonnegativeDecimalField2010()
+    elution_volume = NonzeroDecimalField2010()
 
     def __str__(self):
         return self.name
@@ -625,27 +647,22 @@ class ExtractionBatch(HistoryModel):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.analysis_batch, self.extraction_number)
 
-    # extraction_string = property(_concat_ids)
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
     re_extraction_notes = models.TextField(blank=True)
-    extraction_number = models.IntegerField(validators=[MINVAL_ZERO])
-    extraction_volume = models.DecimalField(
-        max_digits=20, decimal_places=10, validators=[MINVAL_ZERO])
+    extraction_number = NonnegativeIntegerField()
+    extraction_volume = NonnegativeDecimalField2010()
     extraction_date = models.DateField(default=date.today, db_index=True)
     pcr_date = models.DateField(default=date.today, db_index=True)
     qpcr_template_volume = models.DecimalField(
         max_digits=20, decimal_places=10, default=6, validators=[MINVAL_ZERO])
-    elution_volume = models.DecimalField(
-        max_digits=20, decimal_places=10, validators=[MINVAL_DECIMAL_10])
-    sample_dilution_factor = models.IntegerField(validators=[MINVAL_ZERO])
+    elution_volume = NonzeroDecimalField2010()
+    sample_dilution_factor = NonnegativeIntegerField()
     qpcr_reaction_volume = models.DecimalField(
         max_digits=20, decimal_places=10, default=20, validators=[MINVAL_DECIMAL_10])
-    ext_pos_cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    ext_pos_gc_reaction = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    ext_pos_cq_value = NullableNonnegativeDecimalField2010()
+    ext_pos_gc_reaction = NullableNonnegativeDecimalField120100()
     ext_pos_invalid = models.BooleanField(default=True)
 
     # override the save method to calculate invalid flag
@@ -702,6 +719,10 @@ class ReverseTranscription(HistoryModel):
     Reverse Transcription
     """
 
+    @property
+    def rt_pos_gc_reaction_sci(self):
+        return get_sci_val(self.rt_pos_gc_reaction)
+
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
     template_volume = models.DecimalField(
         max_digits=20, decimal_places=10, default=8.6, validators=[MINVAL_ZERO])
@@ -710,10 +731,8 @@ class ReverseTranscription(HistoryModel):
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
     re_rt_notes = models.TextField(blank=True)
-    rt_pos_cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    rt_pos_gc_reaction = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
+    rt_pos_cq_value = NullableNonnegativeDecimalField2010()
+    rt_pos_gc_reaction = NullableNonnegativeDecimalField120100()
     rt_pos_invalid = models.BooleanField(default=True)
 
     # override the save method to calculate invalid flag
@@ -786,29 +805,37 @@ class PCRReplicateBatch(HistoryModel):
     Polymerase Chain Reaction Replicate Batch
     """
 
+    @property
+    def ext_neg_gc_reaction_sci(self):
+        return get_sci_val(self.ext_neg_gc_reaction)
+
+    @property
+    def rt_neg_gc_reaction_sci(self):
+        return get_sci_val(self.rt_neg_gc_reaction)
+
+    @property
+    def pcr_neg_gc_reaction_sci(self):
+        return get_sci_val(self.pcr_neg_gc_reaction)
+
+    @property
+    def pcr_pos_gc_reaction_sci(self):
+        return get_sci_val(self.pcr_pos_gc_reaction)
+
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
-    replicate_number = models.IntegerField(validators=[MINVAL_ZERO])
+    replicate_number = NonnegativeIntegerField()
     notes = models.TextField(blank=True)
-    ext_neg_cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    ext_neg_gc_reaction = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
+    ext_neg_cq_value = NullableNonnegativeDecimalField2010()
+    ext_neg_gc_reaction = NullableNonnegativeDecimalField120100()
     ext_neg_invalid = models.BooleanField(default=True)
-    rt_neg_cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    rt_neg_gc_reaction = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
+    rt_neg_cq_value = NullableNonnegativeDecimalField2010()
+    rt_neg_gc_reaction = NullableNonnegativeDecimalField120100()
     rt_neg_invalid = models.BooleanField(default=True)
-    pcr_neg_cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    pcr_neg_gc_reaction = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
+    pcr_neg_cq_value = NullableNonnegativeDecimalField2010()
+    pcr_neg_gc_reaction = NullableNonnegativeDecimalField120100()
     pcr_neg_invalid = models.BooleanField(default=True)
-    pcr_pos_cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    pcr_pos_gc_reaction = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
+    pcr_pos_cq_value = NullableNonnegativeDecimalField2010()
+    pcr_pos_gc_reaction = NullableNonnegativeDecimalField120100()
     pcr_pos_invalid = models.BooleanField(default=True)
     re_pcr = models.ForeignKey('self', null=True, related_name='pcrreplicatebatches')
 
@@ -850,14 +877,10 @@ class PCRReplicate(HistoryModel):
 
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
-    cq_value = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    gc_reaction = models.DecimalField(
-        max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO])
-    # gc_reaction_sci = property(_get_gc_reaction_sci)
+    cq_value = NullableNonnegativeDecimalField2010()
+    gc_reaction = NullableNonnegativeDecimalField120100()
     replicate_concentration = models.DecimalField(
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_DECIMAL_100])
-    # replicate_concentration_sci = property(_get_replicate_concentration_sci)
     concentration_unit = models.ForeignKey('Unit', related_name='pcrreplicates')
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
@@ -881,7 +904,7 @@ class PCRReplicate(HistoryModel):
             if self.cq_value is not None and self.gc_reaction is not None:
                 # first check related peg_neg validity
                 # assume no related peg_neg, in which case this control does not apply
-                # but if there is a related peg_neg, check the validity of its reps with the same target as this data rep
+                # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
                 any_peg_neg_invalid = False
                 peg_neg_id = self.sample_extraction.sample.peg_neg
                 if peg_neg_id is not None:
@@ -900,8 +923,8 @@ class PCRReplicate(HistoryModel):
                         not self.pcrreplicate_batch.ext_neg_invalid and
                         not self.pcrreplicate_batch.rt_neg_invalid and
                         not self.pcrreplicate_batch.pcr_neg_invalid and
-                        self.cq_value >= 0 and
-                        self.gc_reaction >= 0
+                        self.cq_value >= Decimal('0') and
+                        self.gc_reaction >= Decimal('0')
                 ):
                     self.invalid = False
                 else:
@@ -923,7 +946,7 @@ class PCRReplicate(HistoryModel):
     # TODO: ask what to do about zeros
     # Calculate replicate_concentration, but only if gc_reaction is a positive number
     def calc_rep_conc(self):
-        if self.gc_reaction is not None and self.gc_reaction > 0:
+        if self.gc_reaction is not None and self.gc_reaction > Decimal('0'):
             nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
             extr = self.sample_extraction
             eb = self.sample_extraction.extraction_batch
@@ -1008,12 +1031,11 @@ class StandardCurve(HistoryModel):
     Standard Curve
     """
 
-    r_value = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    slope = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    efficiency = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    pos_ctrl_cq = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
-    pos_ctrl_cq_range = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO])
+    r_value = NullableNonnegativeDecimalField2010()
+    slope = NullableNonnegativeDecimalField2010()
+    efficiency = NullableNonnegativeDecimalField2010()
+    pos_ctrl_cq = NullableNonnegativeDecimalField2010()
+    pos_ctrl_cq_range = NullableNonnegativeDecimalField2010()
     # QUESTION: should there be an active or inactive/superseded field?
 
     def __str__(self):
