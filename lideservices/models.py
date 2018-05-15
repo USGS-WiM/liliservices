@@ -35,39 +35,69 @@ def get_sci_val(decimal_val):
     return sci_val
 
 
+class BlankableCharField128(models.CharField):
+    def __init__(self, *args, **kwargs):
+        kwargs['max_length'] = 128
+        kwargs['blank'] = True
+        super(BlankableCharField128, self).__init__(*args, **kwargs)
+
+
+class BlankableTextField(models.TextField):
+    def __init__(self, *args, **kwargs):
+        kwargs['blank'] = True
+        super(BlankableTextField, self).__init__(*args, **kwargs)
+
+
 class NonnegativeIntegerField(models.IntegerField):
     def __init__(self, *args, **kwargs):
-        super(NonnegativeIntegerField, self).__init__(validators=[MINVAL_ZERO], *args, **kwargs)
+        kwargs['validators'] = [MINVAL_ZERO]
+        super(NonnegativeIntegerField, self).__init__(*args, **kwargs)
 
 
 class NullableNonnegativeDecimalField120100(models.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(NullableNonnegativeDecimalField120100, self).__init__(
-            max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_ZERO], *args, **kwargs)
+        kwargs['max_digits'] = 120
+        kwargs['decimal_places'] = 100
+        kwargs['null'] = True
+        kwargs['blank'] = True
+        kwargs['validators'] = [MINVAL_ZERO]
+        super(NullableNonnegativeDecimalField120100, self).__init__(*args, **kwargs)
 
 
 class NonnegativeDecimalField2010(models.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(NonnegativeDecimalField2010, self).__init__(
-            max_digits=20, decimal_places=10, validators=[MINVAL_ZERO], *args, **kwargs)
+        kwargs['max_digits'] = 20
+        kwargs['decimal_places'] = 10
+        kwargs['validators'] = [MINVAL_ZERO]
+        super(NonnegativeDecimalField2010, self).__init__(*args, **kwargs)
 
 
 class NonzeroDecimalField2010(models.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(NonzeroDecimalField2010, self).__init__(
-            max_digits=20, decimal_places=10, validators=[MINVAL_DECIMAL_10], *args, **kwargs)
+        kwargs['max_digits'] = 20
+        kwargs['decimal_places'] = 10
+        kwargs['validators'] = [MINVAL_DECIMAL_10]
+        super(NonzeroDecimalField2010, self).__init__(*args, **kwargs)
 
 
 class NullableNonnegativeDecimalField2010(models.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(NullableNonnegativeDecimalField2010, self).__init__(
-            max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_ZERO], *args, **kwargs)
+        kwargs['max_digits'] = 20
+        kwargs['decimal_places'] = 10
+        kwargs['null'] = True
+        kwargs['blank'] = True
+        kwargs['validators'] = [MINVAL_ZERO]
+        super(NullableNonnegativeDecimalField2010, self).__init__(*args, **kwargs)
 
 
 class NullableNonzeroDecimalField2010(models.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(NullableNonzeroDecimalField2010, self).__init__(
-            max_digits=20, decimal_places=10, null=True, blank=True, validators=[MINVAL_DECIMAL_10], *args, **kwargs)
+        kwargs['max_digits'] = 20
+        kwargs['decimal_places'] = 10
+        kwargs['null'] = True
+        kwargs['blank'] = True
+        kwargs['validators'] = [MINVAL_DECIMAL_10]
+        super(NullableNonzeroDecimalField2010, self).__init__(*args, **kwargs)
 
 
 ######
@@ -122,13 +152,13 @@ class Sample(HistoryModel):
     matrix = models.ForeignKey('Matrix', related_name='samples')
     filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
     study = models.ForeignKey('Study', related_name='samples')
-    study_site_name = models.CharField(max_length=128, blank=True)
+    study_site_name = BlankableCharField128
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
-    sampler_name = models.CharField(max_length=128, blank=True)
-    sample_notes = models.TextField(blank=True)
-    sample_description = models.TextField(blank=True)
+    sampler_name = BlankableCharField128
+    sample_notes = BlankableTextField()
+    sample_description = BlankableTextField()
     arrival_date = models.DateField(null=True, blank=True)
-    arrival_notes = models.TextField(blank=True)
+    arrival_notes = BlankableTextField()
     collection_start_date = models.DateField()
     collection_start_time = models.TimeField(null=True, blank=True)
     collection_end_date = models.DateField(null=True, blank=True)
@@ -143,8 +173,8 @@ class Sample(HistoryModel):
     filter_born_on_date = models.DateField(null=True, blank=True)
     filter_flag = models.BooleanField(default=False)
     secondary_concentration_flag = models.BooleanField(default=False)
-    elution_notes = models.TextField(blank=True)
-    technician_initials = models.CharField(max_length=128, blank=True)
+    elution_notes = BlankableTextField()
+    technician_initials = BlankableCharField128
     dissolution_volume = NullableNonzeroDecimalField2010()
     post_dilution_volume = NullableNonzeroDecimalField2010()
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
@@ -231,7 +261,7 @@ class Study(NameModel):
     Study
     """
 
-    description = models.TextField(blank=True)
+    description = BlankableTextField()
 
     def __str__(self):
         return self.name
@@ -247,7 +277,7 @@ class Unit(NameModel):
     """
 
     symbol = models.CharField(max_length=128, unique=True)
-    description = models.TextField(blank=True)
+    description = BlankableTextField()
 
     def __str__(self):
         return self.name
@@ -462,7 +492,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
     concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
     final_concentrated_sample_volume = models.DecimalField(
         max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
-    notes = models.TextField(blank=True)
+    notes = BlankableTextField()
 
     def __str__(self):
         return str(self.id)
@@ -551,7 +581,7 @@ class SampleGroup(NameModel):
     Terms or keywords used to describe, categorize, or group similar Samples for easier searching and reporting.
     """
 
-    description = models.TextField(blank=True)
+    description = BlankableTextField()
 
     def __str__(self):
         return self.name
@@ -590,8 +620,8 @@ class AnalysisBatch(NameModel):
     """
 
     samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
-    analysis_batch_description = models.CharField(max_length=128, blank=True)
-    analysis_batch_notes = models.CharField(max_length=128, blank=True)
+    analysis_batch_description = BlankableCharField128
+    analysis_batch_notes = BlankableCharField128
 
     def __str__(self):
         return str(self.id)
@@ -607,7 +637,7 @@ class AnalysisBatchTemplate(NameModel):
     """
 
     target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
-    description = models.TextField(blank=True)
+    description = BlankableTextField()
     extraction_volume = NonnegativeDecimalField2010()
     elution_volume = NonzeroDecimalField2010()
 
@@ -650,7 +680,7 @@ class ExtractionBatch(HistoryModel):
     analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
     extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
     re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
-    re_extraction_notes = models.TextField(blank=True)
+    re_extraction_notes = BlankableTextField()
     extraction_number = NonnegativeIntegerField()
     extraction_volume = NonnegativeDecimalField2010()
     extraction_date = models.DateField(default=date.today, db_index=True)
@@ -730,7 +760,7 @@ class ReverseTranscription(HistoryModel):
         max_digits=20, decimal_places=10, default=50, validators=[MINVAL_DECIMAL_10])
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
-    re_rt_notes = models.TextField(blank=True)
+    re_rt_notes = BlankableTextField()
     rt_pos_cq_value = NullableNonnegativeDecimalField2010()
     rt_pos_gc_reaction = NullableNonnegativeDecimalField120100()
     rt_pos_invalid = models.BooleanField(default=True)
@@ -824,7 +854,7 @@ class PCRReplicateBatch(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
     target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
     replicate_number = NonnegativeIntegerField()
-    notes = models.TextField(blank=True)
+    notes = BlankableTextField()
     ext_neg_cq_value = NullableNonnegativeDecimalField2010()
     ext_neg_gc_reaction = NullableNonnegativeDecimalField120100()
     ext_neg_invalid = models.BooleanField(default=True)
@@ -1071,7 +1101,7 @@ class Target(NameModel):
 
     code = models.CharField(max_length=128, unique=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
-    notes = models.TextField(blank=True)
+    notes = BlankableTextField()
 
     def __str__(self):
         return self.name
@@ -1133,8 +1163,8 @@ class OtherAnalysis(HistoryModel):
     Other Analysis
     """
 
-    description = models.TextField(blank=True)
-    data = models.TextField(blank=True)
+    description = BlankableTextField()
+    data = BlankableTextField()
 
     def __str__(self):
         return str(self.id)
