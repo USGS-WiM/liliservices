@@ -4,18 +4,48 @@ from rest_framework import serializers
 from lideservices.models import *
 
 
-class RStrip100DecimalField(serializers.DecimalField):
+class NullableRStrip100DecimalField(serializers.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(RStrip100DecimalField, self).__init__(max_digits=120, decimal_places=100, *args, **kwargs)
+        kwargs['max_digits'] = 120
+        kwargs['decimal_places'] = 100
+        kwargs['allow_null'] = True
+        kwargs['required'] = False
+        super(NullableRStrip100DecimalField, self).__init__(*args, **kwargs)
 
     def to_representation(self, value):
         s = "{:.100f}".format(value)
         return s.rstrip('0').rstrip('.') if '.' in s else s
 
 
+class RStrip100DecimalField(serializers.DecimalField):
+    def __init__(self, *args, **kwargs):
+        kwargs['max_digits'] = 120
+        kwargs['decimal_places'] = 100
+        super(RStrip100DecimalField, self).__init__(*args, **kwargs)
+
+    def to_representation(self, value):
+        s = "{:.100f}".format(value)
+        return s.rstrip('0').rstrip('.') if '.' in s else s
+
+
+class NullableRStrip10DecimalField(serializers.DecimalField):
+    def __init__(self, *args, **kwargs):
+        kwargs['max_digits'] = 20
+        kwargs['decimal_places'] = 10
+        kwargs['allow_null'] = True
+        kwargs['required'] = False
+        super(NullableRStrip10DecimalField, self).__init__(*args, **kwargs)
+
+    def to_representation(self, value):
+        s = "{:.10f}".format(value)
+        return s.rstrip('0').rstrip('.') if '.' in s else s
+
+
 class RStrip10DecimalField(serializers.DecimalField):
     def __init__(self, *args, **kwargs):
-        super(RStrip10DecimalField, self).__init__(max_digits=20, decimal_places=10, *args, **kwargs)
+        kwargs['max_digits'] = 20
+        kwargs['decimal_places'] = 10
+        super(RStrip10DecimalField, self).__init__(*args, **kwargs)
 
     def to_representation(self, value):
         s = "{:.10f}".format(value)
@@ -88,7 +118,7 @@ class ConcentrationTypeSerializer(serializers.ModelSerializer):
 class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    final_sample_mean_concentration = RStrip100DecimalField()
+    final_sample_mean_concentration = NullableRStrip100DecimalField()
     target_string = serializers.StringRelatedField(source='target')
     collaborator_sample_id = serializers.CharField(source='sample.collaborator_sample_id', read_only=True)
     collection_start_date = serializers.DateField(source='sample.collection_start_date', read_only=True)
@@ -424,13 +454,13 @@ class SampleSerializer(serializers.ModelSerializer):
     filter_type_string = serializers.StringRelatedField(source='filter_type')
     study_string = serializers.StringRelatedField(source='study')
     sampler_name_string = serializers.StringRelatedField(source='sampler_name')
-    meter_reading_initial = RStrip10DecimalField()
-    meter_reading_final = RStrip10DecimalField()
-    total_volume_sampled_initial = RStrip10DecimalField()
+    meter_reading_initial = NullableRStrip10DecimalField()
+    meter_reading_final = NullableRStrip10DecimalField()
+    total_volume_sampled_initial = NullableRStrip10DecimalField()
     total_volume_or_mass_sampled = RStrip10DecimalField()
-    sample_volume_initial = RStrip10DecimalField()
-    dissolution_volume = RStrip10DecimalField()
-    post_dilution_volume = RStrip10DecimalField()
+    sample_volume_initial = NullableRStrip10DecimalField()
+    dissolution_volume = NullableRStrip10DecimalField()
+    post_dilution_volume = NullableRStrip10DecimalField()
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
     final_concentrated_sample_volume = FinalConcentratedSampleVolumeSerializer(read_only=True)
@@ -656,8 +686,8 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
     qpcr_template_volume = RStrip10DecimalField()
     elution_volume = RStrip10DecimalField()
     qpcr_reaction_volume = RStrip10DecimalField()
-    ext_pos_cq_value = RStrip10DecimalField()
-    ext_pos_gc_reaction = RStrip10DecimalField()
+    ext_pos_cq_value = NullableRStrip10DecimalField()
+    ext_pos_gc_reaction = NullableRStrip100DecimalField()
     sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     rt_pos_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
@@ -700,8 +730,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     qpcr_template_volume = RStrip10DecimalField()
     elution_volume = RStrip10DecimalField()
     qpcr_reaction_volume = RStrip10DecimalField()
-    ext_pos_cq_value = RStrip10DecimalField()
-    ext_pos_gc_reaction = RStrip100DecimalField()
+    ext_pos_cq_value = NullableRStrip10DecimalField()
+    ext_pos_gc_reaction = NullableRStrip100DecimalField()
     sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     new_rt = serializers.JSONField(write_only=True, required=False)
@@ -943,8 +973,8 @@ class ReverseTranscriptionListSerializer(serializers.ListSerializer):
     modified_by = serializers.StringRelatedField()
     template_volume = RStrip10DecimalField()
     reaction_volume = RStrip10DecimalField()
-    rt_pos_cq_value = RStrip10DecimalField()
-    rt_pos_gc_reaction = RStrip100DecimalField()
+    rt_pos_cq_value = NullableRStrip10DecimalField()
+    rt_pos_gc_reaction = NullableRStrip100DecimalField()
 
     # bulk create
     def create(self, validated_data):
@@ -979,8 +1009,8 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     template_volume = RStrip10DecimalField()
     reaction_volume = RStrip10DecimalField()
-    rt_pos_cq_value = RStrip10DecimalField()
-    rt_pos_gc_reaction = RStrip100DecimalField()
+    rt_pos_cq_value = NullableRStrip10DecimalField()
+    rt_pos_gc_reaction = NullableRStrip100DecimalField()
 
     def create(self, validated_data):
         # commenting out the below block of code because it might be possible that a user submits
@@ -1148,8 +1178,8 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    cq_value = RStrip10DecimalField()
-    gc_reaction = RStrip100DecimalField()
+    cq_value = NullableRStrip10DecimalField()
+    gc_reaction = NullableRStrip100DecimalField()
     replicate_concentration = RStrip100DecimalField()
     sample = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample', read_only=True)
     peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
@@ -1349,14 +1379,14 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    ext_neg_cq_value = RStrip10DecimalField()
-    ext_neg_gc_reaction = RStrip100DecimalField()
-    rt_neg_cq_value = RStrip10DecimalField()
-    rt_neg_gc_reaction = RStrip100DecimalField()
-    pcr_neg_cq_value = RStrip10DecimalField()
-    pcr_neg_gc_reaction = RStrip100DecimalField()
-    pcr_pos_cq_value = RStrip10DecimalField()
-    pcr_pos_gc_reaction = RStrip100DecimalField()
+    ext_neg_cq_value = NullableRStrip10DecimalField()
+    ext_neg_gc_reaction = NullableRStrip100DecimalField()
+    rt_neg_cq_value = NullableRStrip10DecimalField()
+    rt_neg_gc_reaction = NullableRStrip100DecimalField()
+    pcr_neg_cq_value = NullableRStrip10DecimalField()
+    pcr_neg_gc_reaction = NullableRStrip100DecimalField()
+    pcr_pos_cq_value = NullableRStrip10DecimalField()
+    pcr_pos_gc_reaction = NullableRStrip100DecimalField()
     updated_pcrreplicates = serializers.ListField(write_only=True)
     extraction_batch = ExtractionBatchSerializer(required=False)
     pcrreplicates = PCRReplicateSerializer(many=True, read_only=True)
@@ -1378,11 +1408,11 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
 class StandardCurveSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    r_value = RStrip10DecimalField()
-    slope = RStrip10DecimalField()
-    efficiency = RStrip10DecimalField()
-    pos_ctrl_cq = RStrip10DecimalField()
-    pos_ctrl_cq_range = RStrip10DecimalField()
+    r_value = NullableRStrip10DecimalField()
+    slope = NullableRStrip10DecimalField()
+    efficiency = NullableRStrip10DecimalField()
+    pos_ctrl_cq = NullableRStrip10DecimalField()
+    pos_ctrl_cq_range = NullableRStrip10DecimalField()
 
     class Meta:
         model = StandardCurve
