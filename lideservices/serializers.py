@@ -235,12 +235,12 @@ class AliquotListSerializer(serializers.ListSerializer):
                     init_row = row - 1
                     init_spot = freezer_object.spots
                     initial_location = FreezerLocation.objects.filter(freezer=freezer_object, rack=rack, box=box,
-                                                                      row=init_row, spot=init_spot)
+                                                                      row=init_row, spot=init_spot).first()
                     avail_spots = FreezerLocation.objects.get_available_spots_in_box(initial_location)
             else:
                 init_spot = spot - 1
                 initial_location = FreezerLocation.objects.filter(freezer=freezer_object, rack=rack, box=box,
-                                                                  row=row, spot=init_spot)
+                                                                  row=row, spot=init_spot).first()
                 avail_spots = FreezerLocation.objects.get_available_spots_in_box(initial_location)
 
             if total_aliquot_count <= avail_spots:
