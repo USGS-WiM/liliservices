@@ -564,6 +564,9 @@ class PCRReplicateViewSet(HistoryViewSet):
                     rep_id = item.pop('id')
                     rep = PCRReplicate.objects.filter(id=rep_id).first()
                     if rep:
+                        new_invalid = item.get('invalid', None)
+                        if new_invalid is not None and new_invalid != rep.invalid:
+                            item['invalid_override'] = request.user.id
                         serializer = self.serializer_class(rep, data=item, partial=True)
                         # if this item is valid, temporarily hold it until all items are proven valid, then save all
                         # if even one item is invalid, none will be saved, and the user will be returned the error(s)
@@ -587,6 +590,10 @@ class PCRReplicateViewSet(HistoryViewSet):
         else:
             rep = PCRReplicate.objects.filter(id=pk).first()
             if rep:
+                new_invalid = request_data.get('invalid', None)
+                if new_invalid is not None and new_invalid != rep.invalid:
+                    if request_data.get('invalid_override', None) is None:
+                        request_data['invalid_override'] = request.user.id
                 serializer = self.serializer_class(rep, data=request_data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
