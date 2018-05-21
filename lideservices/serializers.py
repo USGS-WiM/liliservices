@@ -1646,10 +1646,11 @@ class SimpleSampleSerializer(serializers.ModelSerializer):
     sample_type = serializers.SerializerMethodField()
     matrix = serializers.SerializerMethodField()
     study = serializers.SerializerMethodField()
+    inhibitions = InhibitionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sample
-        fields = ('id', 'sample_type', 'matrix', 'study', 'collaborator_sample_id', 'sample_description',
+        fields = ('id', 'sample_type', 'matrix', 'study', 'inhibitions', 'collaborator_sample_id', 'sample_description',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1657,32 +1658,32 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
-    def get_inhibitions(self, obj):
-        inhibitions = {}
-        sample_extractions = obj.sampleextractions.values()
-
-        if sample_extractions is not None:
-            for sample_extraction in sample_extractions:
-                sample_id = sample_extraction.get('sample_id')
-                if sample_id is not None:
-                    sample = Sample.objects.get(id=sample_id)
-                    sample_inhibitions = sample.inhibitions.values()
-                    if sample_inhibitions is not None:
-                        for inhibition in sample_inhibitions:
-                            creator = User.objects.get(id=inhibition['created_by_id'])
-                            modifier = User.objects.get(id=inhibition['modified_by_id'])
-                            data = {"id": inhibition['id'], "sample": inhibition['sample_id'],
-                                    "extraction_batch": inhibition['extraction_batch_id'],
-                                    "inhibition_date": inhibition['inhibition_date'],
-                                    "nucleic_acid_type_id": inhibition['nucleic_acid_type_id'],
-                                    "dilution_factor": inhibition['dilution_factor'],
-                                    "created_date": inhibition['created_date'],
-                                    "created_by": creator.username if creator is not None else None,
-                                    "modified_date": inhibition['modified_date'],
-                                    "modified_by": modifier.username if modifier is not None else None}
-                            inhibitions[inhibition['id']] = data
-
-        return inhibitions.values()
+    # def get_inhibitions(self, obj):
+    #     inhibitions = {}
+    #     sample_extractions = obj.sampleextractions.values()
+    #
+    #     if sample_extractions is not None:
+    #         for sample_extraction in sample_extractions:
+    #             sample_id = sample_extraction.get('sample_id')
+    #             if sample_id is not None:
+    #                 sample = Sample.objects.get(id=sample_id)
+    #                 sample_inhibitions = sample.inhibitions.values()
+    #                 if sample_inhibitions is not None:
+    #                     for inhibition in sample_inhibitions:
+    #                         creator = User.objects.get(id=inhibition['created_by_id'])
+    #                         modifier = User.objects.get(id=inhibition['modified_by_id'])
+    #                         data = {"id": inhibition['id'], "sample": inhibition['sample_id'],
+    #                                 "extraction_batch": inhibition['extraction_batch_id'],
+    #                                 "inhibition_date": inhibition['inhibition_date'],
+    #                                 "nucleic_acid_type_id": inhibition['nucleic_acid_type_id'],
+    #                                 "dilution_factor": inhibition['dilution_factor'],
+    #                                 "created_date": inhibition['created_date'],
+    #                                 "created_by": creator.username if creator is not None else None,
+    #                                 "modified_date": inhibition['modified_date'],
+    #                                 "modified_by": modifier.username if modifier is not None else None}
+    #                         inhibitions[inhibition['id']] = data
+    #
+    #     return inhibitions.values()
 
     def get_reverse_transcriptions(self, obj):
         reverse_transcriptions = {}
@@ -1735,7 +1736,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         return data
 
     sampleextractions = SampleExtractionSerializer(many=True, read_only=True)
-    inhibitions = serializers.SerializerMethodField()
+    # inhibitions = serializers.SerializerMethodField()
     reverse_transcriptions = serializers.SerializerMethodField()
     targets = serializers.SerializerMethodField()
     extraction_method = serializers.SerializerMethodField()
@@ -1745,7 +1746,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'sampleextractions', 'inhibitions', 'reverse_transcriptions', 'targets',
+                  'sampleextractions', 'reverse_transcriptions', 'targets',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
