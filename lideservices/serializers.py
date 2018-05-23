@@ -422,7 +422,7 @@ class SampleSerializer(serializers.ModelSerializer):
                 details.append("dissolution_volume is a required field for the solid manure matrix")
             if not is_valid:
                 raise serializers.ValidationError(details)
-        if ('meter_reading_initial' in data and data ['meter_reading_initial']
+        if ('meter_reading_initial' in data and data['meter_reading_initial']
                 and 'meter_reading_final' in data and data['meter_reading_final']):
             if data['meter_reading_initial'] > data['meter_reading_final']:
                 raise serializers.ValidationError("meter_reading_final must be larger than meter_reading_initial")
@@ -606,9 +606,11 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
         # create a Sample Analysis Batch object for each sample ID submitted
         if new_samples:
+            user = self.context['request'].user
             for sample_id in new_samples:
                 sample = Sample.objects.get(id=sample_id)
-                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, sample=sample)
+                SampleAnalysisBatch.objects.create(analysis_batch=analysis_batch, sample=sample,
+                                                   created_by=user, modified_by=user)
 
         return analysis_batch
 
@@ -805,6 +807,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         validated_data['extraction_number'] = max_extraction_number + 1
 
         extr_batch = ExtractionBatch.objects.create(**validated_data)
+        user = self.context['request'].user
 
         # create the child replicate batches for this extraction batch
         if replicates is not None:
@@ -814,7 +817,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 if target:
                     rep_range_max = replicate['count'] + 1
                     for x in range(1, rep_range_max):
-                        PCRReplicateBatch.objects.create(extraction_batch=extr_batch, target=target, replicate_number=x)
+                        PCRReplicateBatch.objects.create(extraction_batch=extr_batch, target=target, replicate_number=x,
+                                                         created_by=user, modified_by=user)
                 else:
                     raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
@@ -825,7 +829,6 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                 sample = Sample.objects.filter(id=sample_id).first()
                 sample_extraction['sample'] = sample
                 if sample_extraction:
-                    user = self.context['request'].user
                     sample_extraction['created_by'] = user
                     sample_extraction['modified_by'] = user
                     if 'inhibition_dna' in sample_extraction:
@@ -889,7 +892,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                     rep_batch = PCRReplicateBatch.objects.get(
                                         extraction_batch=extr_batch, target=target, replicate_number=x)
                                     PCRReplicate.objects.create(
-                                        sample_extraction=new_extr, pcrreplicate_batch=rep_batch)
+                                        sample_extraction=new_extr, pcrreplicate_batch=rep_batch,
+                                        created_by=user, modified_by=user)
                             else:
                                 raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
 
@@ -900,7 +904,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         if rt is not None:
             if rt['rt_date'] == "":
                 rt['rt_date'] = None
-            ReverseTranscription.objects.create(extraction_batch=extr_batch, **rt)
+            ReverseTranscription.objects.create(extraction_batch=extr_batch, created_by=user, modified_by=user, **rt)
 
         return extr_batch
 

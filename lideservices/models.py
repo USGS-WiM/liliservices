@@ -4,8 +4,6 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.conf import settings
-from django.dispatch import receiver
-from django.db.models.signals import post_save
 from simple_history.models import HistoricalRecords
 
 
@@ -517,9 +515,9 @@ class FinalSampleMeanConcentration(HistoryModel):
     def calc_sample_mean_conc(self):
         reps_count = 0
         pos_replicate_concentrations = []
-        exts = SampleExtraction.objects.filter(sample=self.sample.id)
-        for ext in exts:
-            reps = PCRReplicate.objects.filter(sample_extraction=ext.id, pcrreplicate_batch__target__exact=self.target)
+        ext_ids = SampleExtraction.objects.filter(sample=self.sample.id).values_list('id', flat=True)
+        for ext_id in ext_ids:
+            reps = PCRReplicate.objects.filter(sample_extraction=ext_id, pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
                 # ignore invalid reps and redos
                 if rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None:
@@ -691,6 +689,30 @@ class ExtractionBatch(HistoryModel):
 
         super(ExtractionBatch, self).save(*args, **kwargs)
 
+        if self.ext_pos_invalid:
+            sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.id)
+            for sampleextraction in sampleextractions:
+                pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
+                for pcrreplicate in pcrreplicates:
+                    pcrreplicate.invalid = True
+                    pcrreplicate.save()
+
+                    # determine if all replicates for a given sample-target combo are now in the database or not
+                    # and calculate sample mean concentration if yes or set to null if no
+                    pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
+                    fsmc = FinalSampleMeanConcentration.objects.filter(
+                        sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
+                    # if the sample-target combo (fsmc) does not exist, create it
+                    if not fsmc:
+                        fsmc = FinalSampleMeanConcentration.objects.create(
+                            sample=sampleextraction.sample, target=pcrrepbatch.target,
+                            created_by=self.created_by, modified_by=self.modified_by)
+                    # update final sample mean concentration
+                    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+                    # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
+                    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+                    fsmc.save()
+
     def __str__(self):
         return self.extraction_string
 
@@ -699,36 +721,6 @@ class ExtractionBatch(HistoryModel):
         unique_together = ("analysis_batch", "extraction_number", "re_extraction")
         verbose_name_plural = "extractionbatches"
         #  TODO: reassess extraction_number assignment logic for cases of re_extraction and re-use of extraction_number
-
-
-# listen for updated extraction batch instances
-@receiver(post_save, sender=ExtractionBatch)
-def extractionbatch_post_save(sender, **kwargs):
-    instance = kwargs['instance']
-
-    # if the invalid is true, invalidate all child replicates
-    if instance.ext_pos_invalid:
-        sampleextractions = SampleExtraction.objects.filter(extraction_batch=instance.id)
-        for sampleextraction in sampleextractions:
-            pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
-            for pcrreplicate in pcrreplicates:
-                pcrreplicate.invalid = True
-                pcrreplicate.save()
-
-                # determine if all replicates for a given sample-target combo are now in the database or not
-                # and calculate sample mean concentration if yes or set to null if no
-                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
-                fsmc = FinalSampleMeanConcentration.objects.filter(
-                    sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
-                # if the sample-target combo (fsmc) does not exist, create it
-                if not fsmc:
-                    fsmc = FinalSampleMeanConcentration.objects.create(
-                        sample=sampleextraction.sample, target=pcrrepbatch.target)
-                # update final sample mean concentration
-                # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-                # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
-                fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-                fsmc.save()
 
 
 class ReverseTranscription(HistoryModel):
@@ -761,42 +753,37 @@ class ReverseTranscription(HistoryModel):
 
         super(ReverseTranscription, self).save(*args, **kwargs)
 
+        if self.rt_pos_invalid:
+            sampleextractions = SampleExtraction.objects.filter(
+                extraction_batch=self.extraction_batch)
+            for sampleextraction in sampleextractions:
+                pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
+                for pcrreplicate in pcrreplicates:
+                    pcrreplicate.invalid = True
+                    pcrreplicate.save()
+
+                    # determine if all replicates for a given sample-target combo are now in the database or not
+                    # and calculate sample mean concentration if yes or set to null if no
+                    pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
+                    fsmc = FinalSampleMeanConcentration.objects.filter(
+                        sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
+                    # if the sample-target combo (fsmc) does not exist, create it
+                    if not fsmc:
+                        fsmc = FinalSampleMeanConcentration.objects.create(
+                            sample=sampleextraction.sample, target=pcrrepbatch.target,
+                            created_by=self.created_by, modified_by=self.modified_by)
+                    # update final sample mean concentration
+                    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+                    # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
+                    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+                    fsmc.save()
+
     def __str__(self):
         return str(self.id)
 
     class Meta:
         db_table = "lide_reversetranscription"
         unique_together = ("extraction_batch", "re_rt")
-
-
-# listen for updated reverse transcription instances
-@receiver(post_save, sender=ReverseTranscription)
-def reversetranscription_post_save(sender, **kwargs):
-    instance = kwargs['instance']
-
-    # if the invalid is true, invalidate all child replicates
-    if instance.rt_pos_invalid:
-        sampleextractions = SampleExtraction.objects.filter(extraction_batch=instance.extraction_batch.id)
-        for sampleextraction in sampleextractions:
-            pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
-            for pcrreplicate in pcrreplicates:
-                pcrreplicate.invalid = True
-                pcrreplicate.save()
-
-                # determine if all replicates for a given sample-target combo are now in the database or not
-                # and calculate sample mean concentration if yes or set to null if no
-                pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
-                fsmc = FinalSampleMeanConcentration.objects.filter(
-                    sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
-                # if the sample-target combo (fsmc) does not exist, create it
-                if not fsmc:
-                    fsmc = FinalSampleMeanConcentration.objects.create(
-                        sample=sampleextraction.sample, target=pcrrepbatch.target)
-                # update final sample mean concentration
-                # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-                # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
-                fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-                fsmc.save()
 
 
 class SampleExtraction(HistoryModel):
@@ -951,6 +938,22 @@ class PCRReplicate(HistoryModel):
 
         super(PCRReplicate, self).save(*args, **kwargs)
 
+        # determine if all replicates for a given sample-target combo are now in the database or not
+        # and calculate sample mean concentration if yes or set to null if no
+        pcrrepbatch = PCRReplicateBatch.objects.get(id=self.pcrreplicate_batch.id)
+        fsmc = FinalSampleMeanConcentration.objects.filter(
+            sample=self.sample_extraction.sample.id, target=pcrrepbatch.target.id).first()
+        # if the sample-target combo (fsmc) does not exist, create it
+        if not fsmc:
+            fsmc = FinalSampleMeanConcentration.objects.create(
+                sample=self.sample_extraction.sample, target=pcrrepbatch.target,
+                created_by=self.created_by, modified_by=self.modified_by)
+        # update final sample mean concentration
+        # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+        # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
+        fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+        fsmc.save()
+
     # get the concentration_unit
     def get_conc_unit(self, sample_id):
         sample = Sample.objects.get(id=sample_id)
@@ -1019,27 +1022,6 @@ class PCRReplicate(HistoryModel):
     class Meta:
         db_table = "lide_pcrreplicate"
         unique_together = ("sample_extraction", "pcrreplicate_batch")
-
-
-# listen for updated pcrreplicate instances
-@receiver(post_save, sender=PCRReplicate)
-def pcrreplicate_post_save(sender, **kwargs):
-    instance = kwargs['instance']
-
-    # determine if all replicates for a given sample-target combo are now in the database or not
-    # and calculate sample mean concentration if yes or set to null if no
-    pcrrepbatch = PCRReplicateBatch.objects.get(id=instance.pcrreplicate_batch.id)
-    fsmc = FinalSampleMeanConcentration.objects.filter(
-        sample=instance.sample_extraction.sample.id, target=pcrrepbatch.target.id).first()
-    # if the sample-target combo (fsmc) does not exist, create it
-    if not fsmc:
-        fsmc = FinalSampleMeanConcentration.objects.create(
-            sample=instance.sample_extraction.sample, target=pcrrepbatch.target)
-    # update final sample mean concentration
-    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-    # otherwise not all valid related reps have replicate_concentration values, so FSMC will be set to null
-    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-    fsmc.save()
 
 
 # TODO: this whole StandardCurve class needs to be reviewed when the time comes
