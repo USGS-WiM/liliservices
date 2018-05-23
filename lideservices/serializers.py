@@ -422,7 +422,8 @@ class SampleSerializer(serializers.ModelSerializer):
                 details.append("dissolution_volume is a required field for the solid manure matrix")
             if not is_valid:
                 raise serializers.ValidationError(details)
-        if 'meter_reading_initial' in data and 'meter_reading_final' in data:
+        if ('meter_reading_initial' in data and data ['meter_reading_initial']
+                and 'meter_reading_final' in data and data['meter_reading_final']):
             if data['meter_reading_initial'] > data['meter_reading_final']:
                 raise serializers.ValidationError("meter_reading_final must be larger than meter_reading_initial")
         return data
