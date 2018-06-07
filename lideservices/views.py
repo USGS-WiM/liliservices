@@ -79,7 +79,7 @@ class SampleViewSet(HistoryViewSet):
         # filter by study ID, exact list
         study = self.request.query_params.get('study', None)
         if study is not None:
-            study_list = sample.split(',')
+            study_list = study.split(',')
             queryset = queryset.filter(study__in=study_list)
         # filter by collection_start_date, range
         from_collection_start_date = self.request.query_params.get('from_collection_start_date', None)
@@ -95,7 +95,7 @@ class SampleViewSet(HistoryViewSet):
         # filter by collaborator_sample_id, exact list
         collaborator_sample_id = self.request.query_params.get('collaborator_sample_id', None)
         if collaborator_sample_id is not None:
-            collaborator_sample_id_list = sample.split(',')
+            collaborator_sample_id_list = collaborator_sample_id.split(',')
             queryset = queryset.filter(collaborator_sample_id__in=collaborator_sample_id_list)
         # filter by sample type, exact list
         sample_type = self.request.query_params.get('sample_type', None)
