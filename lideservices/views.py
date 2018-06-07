@@ -58,17 +58,29 @@ class HistoryViewSet(viewsets.ModelViewSet):
 class SampleViewSet(HistoryViewSet):
     serializer_class = SampleSerializer
 
+    @action(detail=False)
+    def get_count(self, request):
+        # Sample.objects.filter(matrix__in=matrix_list).count()
+        query_params = self.request.query_params
+        return Response({"count": self.build_queryset(query_params).count()})
+
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
+        query_params = self.request.query_params
+        return self.build_queryset(query_params)
+
+    # build a queryset using query_params
+    # NOTE: this is being done in its own method to adhere to the DRY Principle
+    def build_queryset(self, query_params):
         queryset = Sample.objects.all()
         # filter by sample IDs, exact list
-        sample = self.request.query_params.get('id', None)
+        sample = query_params.get('id', None)
         if sample is not None:
             sample_list = sample.split(',')
             queryset = queryset.filter(id__in=sample_list)
         # filter by sample ID, range
-        from_sample = self.request.query_params.get('from_id', None)
-        to_sample = self.request.query_params.get('to_id', None)
+        from_sample = query_params.get('from_id', None)
+        to_sample = query_params.get('to_id', None)
         if from_sample is not None and to_sample is not None:
             # the filter below using __range is value-inclusive
             queryset = queryset.filter(id__range=(from_sample, to_sample))
@@ -77,13 +89,13 @@ class SampleViewSet(HistoryViewSet):
         elif from_sample is not None:
             queryset = queryset.filter(id__gte=from_sample)
         # filter by study ID, exact list
-        study = self.request.query_params.get('study', None)
+        study = query_params.get('study', None)
         if study is not None:
             study_list = study.split(',')
             queryset = queryset.filter(study__in=study_list)
         # filter by collection_start_date, range
-        from_collection_start_date = self.request.query_params.get('from_collection_start_date', None)
-        to_collection_start_date = self.request.query_params.get('to_collection_start_date', None)
+        from_collection_start_date = query_params.get('from_collection_start_date', None)
+        to_collection_start_date = query_params.get('to_collection_start_date', None)
         if from_collection_start_date is not None and to_collection_start_date is not None:
             # the filter below using __range is value-inclusive
             queryset = queryset.filter(collection_start_date__range=(
@@ -93,17 +105,17 @@ class SampleViewSet(HistoryViewSet):
         elif from_collection_start_date is not None:
             queryset = queryset.filter(collection_start_date__gte=from_collection_start_date)
         # filter by collaborator_sample_id, exact list
-        collaborator_sample_id = self.request.query_params.get('collaborator_sample_id', None)
+        collaborator_sample_id = query_params.get('collaborator_sample_id', None)
         if collaborator_sample_id is not None:
             collaborator_sample_id_list = collaborator_sample_id.split(',')
             queryset = queryset.filter(collaborator_sample_id__in=collaborator_sample_id_list)
         # filter by sample type, exact list
-        sample_type = self.request.query_params.get('sample_type', None)
+        sample_type = query_params.get('sample_type', None)
         if sample_type is not None:
             sample_type_list = sample_type.split(',')
             queryset = queryset.filter(sample_type__in=sample_type_list)
         # filter by matrix, exact list
-        matrix = self.request.query_params.get('matrix', None)
+        matrix = query_params.get('matrix', None)
         if matrix is not None:
             matrix_list = matrix.split(',')
             queryset = queryset.filter(matrix__in=matrix_list)
