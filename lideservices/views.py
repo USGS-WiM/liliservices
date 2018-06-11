@@ -119,6 +119,11 @@ class SampleViewSet(HistoryViewSet):
         if matrix is not None:
             matrix_list = matrix.split(',')
             queryset = queryset.filter(matrix__in=matrix_list)
+        # filter by record_type, exact list
+        record_type = query_params.get('record_type', None)
+        if record_type is not None:
+            record_type_list = record_type.split(',')
+            queryset = queryset.filter(record_type__in=record_type_list)
         return queryset
 
 
@@ -179,7 +184,7 @@ class FreezerLocationViewSet(HistoryViewSet):
     queryset = FreezerLocation.objects.all()
     serializer_class = FreezerLocationSerializer
 
-    @action(detail=False)
+    @action(methods=['list'], detail=False)
     def get_next_available(self, request):
         # get the next empty box in the any freezer
         next_empty_box = FreezerLocation.objects.get_next_empty_box()
@@ -419,8 +424,43 @@ class AnalysisBatchDetailViewSet(HistoryViewSet):
 
 
 class AnalysisBatchSummaryViewSet(HistoryViewSet):
-    queryset = AnalysisBatch.objects.all()
-    serializer_class = AnalysisBatchSummarySerializer	
+    serializer_class = AnalysisBatchSummarySerializer
+
+    @action(detail=False)
+    def get_count(self, request):
+        query_params = self.request.query_params
+        return Response({"count": self.build_queryset(query_params).count()})
+
+    # override the default queryset to allow filtering by URL arguments
+    def get_queryset(self):
+        query_params = self.request.query_params
+        return self.build_queryset(query_params)
+
+    # build a queryset using query_params
+    # NOTE: this is being done in its own method to adhere to the DRY Principle
+    def build_queryset(self, query_params):
+        queryset = AnalysisBatch.objects.all()
+        # filter by batch ID, exact list
+        batch = self.request.query_params.get('id', None)
+        if batch is not None:
+            batch_list = batch.split(',')
+            queryset = queryset.filter(id__in=batch_list)
+        # filter by batch ID, range
+        from_batch = query_params.get('from_id', None)
+        to_batch = query_params.get('to_id', None)
+        if from_batch is not None and to_batch is not None:
+            # the filter below using __range is value-inclusive
+            queryset = queryset.filter(id__range=(from_batch, to_batch))
+        elif to_batch is not None:
+            queryset = queryset.filter(id__lte=to_batch)
+        elif from_batch is not None:
+            queryset = queryset.filter(id__gte=from_batch)
+        # filter by study ID, exact list
+        study = self.request.query_params.get('study', None)
+        if study is not None:
+            study_list = study.split(',')
+            queryset = queryset.filter(samples__study__in=study_list)
+        return queryset
 
 
 class AnalysisBatchTemplateViewSet(HistoryViewSet):
