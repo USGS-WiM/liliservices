@@ -886,7 +886,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             target = Target.objects.filter(id=target_id).first()
                             if target:
                                 # create the child replicates for this sample_extraction
-                                for x in range(1, replicate['count']):
+                                rep_range_max = replicate['count'] + 1
+                                for x in range(1, rep_range_max):
                                     rep_batch = PCRReplicateBatch.objects.get(
                                         extraction_batch=extr_batch, target=target, replicate_number=x)
                                     PCRReplicate.objects.create(
