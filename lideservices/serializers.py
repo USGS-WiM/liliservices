@@ -1713,6 +1713,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         pcrrep_batches = obj.pcrreplicatebatches.values()
 
         if pcrrep_batches is not None:
+            sample_extraction_count = len(obj.sampleextractions.values())
             for pcrrep_batch in pcrrep_batches:
                 target_id = pcrrep_batch.get('target_id')
                 pcrreps = PCRReplicate.objects.filter(pcrreplicate_batch=pcrrep_batch['id'])
@@ -1721,12 +1722,13 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
                 # if the target is already included in our local dict, increment the rep counter
                 if targets.get(target_id, None) is not None:
                     data = targets[target_id]
-                    data['replicates'] += len(pcrreps)
+                    data['replicates'] += int((len(pcrreps) / sample_extraction_count))
                 # otherwise, add the target to our local dict and 'initialize' its rep counter
                 else:
                     target = Target.objects.get(id=target_id)
                     data = {"id": target_id, "code": target.code,
-                            "nucleic_acid_type": target.nucleic_acid_type.id, "replicates": len(pcrreps)}
+                            "nucleic_acid_type": target.nucleic_acid_type.id,
+                            "replicates": int((len(pcrreps) / sample_extraction_count))}
                 targets[target_id] = data
 
         return targets.values()
