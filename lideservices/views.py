@@ -459,7 +459,7 @@ class AnalysisBatchSummaryViewSet(HistoryViewSet):
         study = self.request.query_params.get('study', None)
         if study is not None:
             study_list = study.split(',')
-            queryset = queryset.filter(samples__study__in=study_list)
+            queryset = queryset.filter(samples__study__in=study_list).distinct()
         return queryset
 
 

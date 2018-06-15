@@ -1714,6 +1714,8 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
 
         if pcrrep_batches is not None:
             sample_extraction_count = len(obj.sampleextractions.values())
+            if sample_extraction_count == 0:
+                sample_extraction_count = 1
             for pcrrep_batch in pcrrep_batches:
                 target_id = pcrrep_batch.get('target_id')
                 pcrreps = PCRReplicate.objects.filter(pcrreplicate_batch=pcrrep_batch['id'])
