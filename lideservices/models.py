@@ -144,7 +144,7 @@ class Sample(HistoryModel):
     sample_description = models.TextField(blank=True)
     arrival_date = models.DateField(null=True, blank=True)
     arrival_notes = models.TextField(blank=True)
-    collection_start_date = models.DateField()
+    collection_start_date = models.DateField(db_index=True)
     collection_start_time = models.TimeField(null=True, blank=True)
     collection_end_date = models.DateField(null=True, blank=True)
     collection_end_time = models.TimeField(null=True, blank=True)

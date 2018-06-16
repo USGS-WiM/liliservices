@@ -57,6 +57,7 @@ class HistoryViewSet(viewsets.ModelViewSet):
 
 class SampleViewSet(HistoryViewSet):
     serializer_class = SampleSerializer
+    delimiter = ','
 
     @action(detail=False)
     def get_count(self, request):
@@ -76,8 +77,11 @@ class SampleViewSet(HistoryViewSet):
         # filter by sample IDs, exact list
         sample = query_params.get('id', None)
         if sample is not None:
-            sample_list = sample.split(',')
-            queryset = queryset.filter(id__in=sample_list)
+            if self.delimiter in sample:
+                sample_list = sample.split(self.delimiter)
+                queryset = queryset.filter(id__in=sample_list)
+            else:
+                queryset = queryset.filter(id__exact=sample)
         # filter by sample ID, range
         from_sample = query_params.get('from_id', None)
         to_sample = query_params.get('to_id', None)
@@ -91,8 +95,11 @@ class SampleViewSet(HistoryViewSet):
         # filter by study ID, exact list
         study = query_params.get('study', None)
         if study is not None:
-            study_list = study.split(',')
-            queryset = queryset.filter(study__in=study_list)
+            if self.delimiter in study:
+                study_list = study.split(self.delimiter)
+                queryset = queryset.filter(study__in=study_list)
+            else:
+                queryset = queryset.filter(study__exact=study)
         # filter by collection_start_date, range
         from_collection_start_date = query_params.get('from_collection_start_date', None)
         to_collection_start_date = query_params.get('to_collection_start_date', None)
@@ -107,23 +114,35 @@ class SampleViewSet(HistoryViewSet):
         # filter by collaborator_sample_id, exact list
         collaborator_sample_id = query_params.get('collaborator_sample_id', None)
         if collaborator_sample_id is not None:
-            collaborator_sample_id_list = collaborator_sample_id.split(',')
-            queryset = queryset.filter(collaborator_sample_id__in=collaborator_sample_id_list)
+            if self.delimiter in collaborator_sample_id:
+                collaborator_sample_id_list = collaborator_sample_id.split(self.delimiter)
+                queryset = queryset.filter(collaborator_sample_id__in=collaborator_sample_id_list)
+            else:
+                queryset = queryset.filter(collaborator_sample_id__exact=collaborator_sample_id)
         # filter by sample type, exact list
         sample_type = query_params.get('sample_type', None)
         if sample_type is not None:
-            sample_type_list = sample_type.split(',')
-            queryset = queryset.filter(sample_type__in=sample_type_list)
+            if self.delimiter in sample_type:
+                sample_type_list = sample_type.split(self.delimiter)
+                queryset = queryset.filter(sample_type__in=sample_type_list)
+            else:
+                queryset = queryset.filter(sample_type__exact=sample_type)
         # filter by matrix, exact list
         matrix = query_params.get('matrix', None)
         if matrix is not None:
-            matrix_list = matrix.split(',')
-            queryset = queryset.filter(matrix__in=matrix_list)
+            if self.delimiter in matrix:
+                matrix_list = matrix.split(self.delimiter)
+                queryset = queryset.filter(matrix__in=matrix_list)
+            else:
+                queryset = queryset.filter(matrix__exact=matrix)
         # filter by record_type, exact list
         record_type = query_params.get('record_type', None)
         if record_type is not None:
-            record_type_list = record_type.split(',')
-            queryset = queryset.filter(record_type__in=record_type_list)
+            if self.delimiter in record_type:
+                record_type_list = record_type.split(self.delimiter)
+                queryset = queryset.filter(record_type__in=record_type_list)
+            else:
+                queryset = queryset.filter(record_type__exact=record_type)
         return queryset
 
 
