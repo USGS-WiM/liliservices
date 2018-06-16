@@ -802,6 +802,7 @@ class SampleExtraction(HistoryModel):
     class Meta:
         db_table = "lide_sampleextraction"
         unique_together = ("sample", "extraction_batch")
+        ordering = ['sample', 'id']
 
 
 class PCRReplicateBatch(HistoryModel):
