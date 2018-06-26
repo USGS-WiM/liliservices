@@ -67,6 +67,11 @@ class SampleViewSet(HistoryViewSet):
         query_params = self.request.query_params
         return Response({"count": self.build_queryset(query_params).count()})
 
+    @action(detail=False)
+    def get_sampler_names(self, request):
+        sampler_names = Sample.objects.values_list('sampler_name', flat=True).distinct()
+        return Response({"sampler_names": sampler_names})
+
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
         query_params = self.request.query_params
@@ -466,7 +471,7 @@ class AnalysisBatchSummaryViewSet(HistoryViewSet):
     def build_queryset(self, query_params):
         study = self.request.query_params.get('study', None)
         if study is not None:
-            queryset = AnalysisBatch.objects.select_related('samples').all()
+            queryset = AnalysisBatch.objects.prefetch_related('samples').all()
         else:
             queryset = AnalysisBatch.objects.all()
         # filter by batch ID, exact list
