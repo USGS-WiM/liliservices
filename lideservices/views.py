@@ -210,7 +210,7 @@ class FreezerLocationViewSet(HistoryViewSet):
     queryset = FreezerLocation.objects.all()
     serializer_class = FreezerLocationSerializer
 
-    @action(methods=['list'], detail=False)
+    @action(methods=['get'], detail=False)
     def get_next_available(self, request):
         # get the next empty box in the any freezer
         next_empty_box = FreezerLocation.objects.get_next_empty_box()
@@ -577,7 +577,7 @@ class ExtractionBatchViewSet(HistoryViewSet):
                     response_data.append(item.data)
                 return JsonResponse(response_data, safe=False, status=200)
             else:
-                return JsonResponse(response_errors, safe=False, status=400)
+                return get_next_available(response_errors, safe=False, status=400)
         # otherwise, if there is a pk, update the instance indicated by the pk
         else:
             rep = ExtractionBatch.objects.filter(id=pk).first()
