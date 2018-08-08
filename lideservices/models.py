@@ -915,11 +915,14 @@ class PCRReplicate(HistoryModel):
                 if peg_neg_id is not None:
                     peg_neg_invalid_flags = []
                     target_id = self.pcrreplicate_batch.target.id
-                    # only check sample extractions with the same target as this data rep
-                    peg_neg_exts = SampleExtraction.objects.filter(sample=peg_neg_id, target=target_id)
-                    for ext in peg_neg_exts:
+                    # only check sample extractions with the same peg_neg_id as the sample of this data rep
+                    ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
+                    for ext_id in ext_ids:
+                        # only check reps with the same target as this data rep
+                        reps = PCRReplicate.objects.filter(sample_extraction=ext_id,
+                                                           pcrreplicate_batch__target__exact=target_id)
                         # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                        for rep in ext.peg_neg_reps:
+                        for rep in reps:
                             peg_neg_invalid_flags.append(rep.invalid)
                     any_peg_neg_invalid = any(peg_neg_invalid_flags)
                 # then check all controls applicable to this rep
