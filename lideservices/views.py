@@ -72,6 +72,12 @@ class SampleViewSet(HistoryViewSet):
         sampler_names = Sample.objects.values_list('sampler_name', flat=True).distinct()
         return Response({"sampler_names": sampler_names})
 
+    @action(detail=False)
+    def get_recent_pegnegs(self, request):
+        pegneg_record_type = RecordType.objects.filter(id=2).first()
+        recent_pegnegs = Sample.objects.filter(record_type=pegneg_record_type).order_by('-id')[:20]
+        return Response(self.serializer_class(recent_pegnegs, many=True).data)
+
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
         query_params = self.request.query_params
