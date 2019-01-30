@@ -1176,7 +1176,8 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     def get_all_parent_controls_uploaded(self, obj):
         data = False
         pcrrep_batch = PCRReplicateBatch.objects.get(id=obj.pcrreplicate_batch_id)
-        if pcrrep_batch.ext_neg_cq_value and pcrrep_batch.rt_neg_cq_value and pcrrep_batch.pcr_neg_cq_value:
+        if (pcrrep_batch.ext_neg_cq_value is not None and pcrrep_batch.rt_neg_cq_value is not None
+                and pcrrep_batch.pcr_neg_cq_value is not None):
             data = True
         return data
 
@@ -1300,6 +1301,9 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                         # finally validate the pcr reps and calculate their final replicate concentrations
                         cq_value = pcrreplicate.get('cq_value', 0)
                         gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
+                        # if the cq and gc_reaction values are null, set them to 0
+                        cq_value = 0 if cq_value is None else cq_value
+                        gc_reaction = 0 if gc_reaction is None else gc_reaction
                         pcrrep = PCRReplicate.objects.filter(
                             sample_extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
                         if pcrrep:
