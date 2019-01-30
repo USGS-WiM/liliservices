@@ -882,13 +882,14 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                     inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na).first()
                     if inhib:
                         suggested_dilution_factor = None
-                        if 0 < pos - cq <= 1:
+                        diff = pos - cq
+                        if 0.0 <= diff <= 1.0:
                             suggested_dilution_factor = 1
-                        if cq > pos and cq - pos < 2:
+                        if cq > pos and diff < 2.0:
                             suggested_dilution_factor = 1
-                        if cq - pos >= 2 and cq <= 36:
+                        if diff >= 2.0 and cq <= 36.0:
                             suggested_dilution_factor = 5
-                        if cq > 36 or cq is None:
+                        if cq > 36.0 or cq is None:
                             suggested_dilution_factor = 10
                         new_data = {"id": inhib.id, "sample": sample,
                                     "suggested_dilution_factor": suggested_dilution_factor}

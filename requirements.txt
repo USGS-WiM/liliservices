@@ -1,6 +1,6 @@
-django==1.11.2
+django==1.11.18
 django-cors-headers==2.1.0
 django-simple-history==1.8.2
 djangorestframework==3.8.2
-psycopg2==2.7.1
+psycopg2==2.7.7
 pytz==2017.2
