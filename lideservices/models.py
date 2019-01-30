@@ -515,19 +515,18 @@ class FinalSampleMeanConcentration(HistoryModel):
     def calc_sample_mean_conc(self):
         reps_count = 0
         pos_replicate_concentrations = []
-        ext_ids = SampleExtraction.objects.filter(sample=self.sample.id).values_list('id', flat=True)
-        for ext_id in ext_ids:
-            reps = PCRReplicate.objects.filter(sample_extraction=ext_id, pcrreplicate_batch__target__exact=self.target)
-            for rep in reps:
-                # ignore invalid reps and redos
-                if rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None:
-                    if rep.replicate_concentration is None:
-                        # this rep has no replicate_concentration
-                        # therefore not all sample-target combos are in the DB, so set this FSMC to null
-                        return None
-                    if rep.replicate_concentration >= 0:
-                        reps_count += 1
-                        pos_replicate_concentrations.append(rep.replicate_concentration)
+        reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
+                                           pcrreplicate_batch__target__exact=self.target)
+        for rep in reps:
+            # ignore invalid reps and redos
+            if rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None:
+                if rep.replicate_concentration is None:
+                    # this rep has no replicate_concentration
+                    # therefore not all sample-target combos are in the DB, so set this FSMC to null
+                    return None
+                if rep.replicate_concentration >= 0:
+                    reps_count += 1
+                    pos_replicate_concentrations.append(rep.replicate_concentration)
         return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else None
 
     def __str__(self):
@@ -896,7 +895,7 @@ class PCRReplicate(HistoryModel):
         self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
 
         # if there is a gc_reaction value, calculate the replicate_concentration and set the concentration_unit
-        if self.gc_reaction is not None:
+        if self.gc_reaction is not None and self.gc_reaction > Decimal('0'):
             # calculate their replicate_concentration
             self.replicate_concentration = self.calc_rep_conc()
 
@@ -944,13 +943,12 @@ class PCRReplicate(HistoryModel):
 
         # determine if all replicates for a given sample-target combo are now in the database or not
         # and calculate sample mean concentration if yes or set to null if no
-        pcrrepbatch = PCRReplicateBatch.objects.get(id=self.pcrreplicate_batch.id)
         fsmc = FinalSampleMeanConcentration.objects.filter(
-            sample=self.sample_extraction.sample.id, target=pcrrepbatch.target.id).first()
+            sample=self.sample_extraction.sample.id, target=self.pcrreplicate_batch.target.id).first()
         # if the sample-target combo (fsmc) does not exist, create it
         if not fsmc:
             fsmc = FinalSampleMeanConcentration.objects.create(
-                sample=self.sample_extraction.sample, target=pcrrepbatch.target,
+                sample=self.sample_extraction.sample, target=self.pcrreplicate_batch.target,
                 created_by=self.created_by, modified_by=self.modified_by)
         # update final sample mean concentration
         # if all the valid related reps have replicate_concentration values the FSMC will be calculated

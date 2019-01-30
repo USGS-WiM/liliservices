@@ -1300,7 +1300,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                     if sample_extraction:
                         # finally validate the pcr reps and calculate their final replicate concentrations
                         cq_value = pcrreplicate.get('cq_value', 0)
-                        gc_reaction = pcrreplicate.get('gene_copies_per_reaction', 0)
+                        gc_reaction = pcrreplicate.get('gc_reaction', 0)
                         # if the cq and gc_reaction values are null, set them to 0
                         cq_value = 0 if cq_value is None else cq_value
                         gc_reaction = 0 if gc_reaction is None else gc_reaction

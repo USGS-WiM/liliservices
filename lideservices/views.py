@@ -583,7 +583,7 @@ class ExtractionBatchViewSet(HistoryViewSet):
                     response_data.append(item.data)
                 return JsonResponse(response_data, safe=False, status=200)
             else:
-                return get_next_available(response_errors, safe=False, status=400)
+                return JsonResponse(response_errors, safe=False, status=400)
         # otherwise, if there is a pk, update the instance indicated by the pk
         else:
             rep = ExtractionBatch.objects.filter(id=pk).first()
