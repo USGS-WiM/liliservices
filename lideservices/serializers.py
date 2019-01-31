@@ -335,7 +335,11 @@ class AliquotListSerializer(serializers.ListSerializer):
         for aliquot_id, data in data_mapping.items():
             aliquot = aliquot_mapping.get(aliquot_id, None)
             if aliquot is not None:
-                data['modified_by'] = self.context['request'].user
+                if 'request' in self.context and hasattr(self.context['request'], 'user'):
+                    user = self.context['request'].user
+                else:
+                    user = validated_data.get('modified_by', instance.modified_by)
+                data['modified_by'] = user
                 ret.append(self.child.update(aliquot, data))
 
         return ret
@@ -614,7 +618,10 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
 
     # on update, also update child objects (sample-analysisbacth M:M relates), including additions and deletions
     def update(self, instance, validated_data):
-        user = self.context['request'].user
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
+            user = self.context['request'].user
+        else:
+            user = validated_data.get('modified_by', instance.modified_by)
 
         # get the old (current) sample ID list for this Analysis Batch
         old_samples = Sample.objects.filter(analysisbatches=instance.id)
@@ -709,7 +716,11 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
                     rt = ReverseTranscription.objects.filter(extraction_batch=eb_id, re_rt=None)
                     rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
                     rt.save()
-                data['modified_by'] = self.context['request'].user
+                if 'request' in self.context and hasattr(self.context['request'], 'user'):
+                    user = self.context['request'].user
+                else:
+                    user = validated_data.get('modified_by', instance.modified_by)
+                data['modified_by'] = user
                 ret.append(self.child.update(eb, data))
 
         return ret
@@ -947,7 +958,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.ext_pos_cq_value = validated_data.get('ext_pos_cq_value', instance.ext_pos_cq_value)
         instance.ext_pos_gc_reaction = validated_data.get('ext_pos_gc_reaction', instance.ext_pos_gc_reaction)
         instance.ext_pos_invalid = validated_data.get('ext_pos_invalid', instance.ext_pos_invalid)
-        if 'request' in self.context and 'user' in self.context['request']:
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
             instance.modified_by = self.context['request'].user
         else:
             instance.modified_by = validated_data.get('modified_by', instance.modified_by)
@@ -996,7 +1007,11 @@ class ReverseTranscriptionListSerializer(serializers.ListSerializer):
         for rt_id, data in data_mapping.items():
             rt = rt_mapping.get(rt_id, None)
             if rt is not None:
-                data['modified_by'] = self.context['request'].user
+                if 'request' in self.context and hasattr(self.context['request'], 'user'):
+                    user = self.context['request'].user
+                else:
+                    user = validated_data.get('modified_by', instance.modified_by)
+                data['modified_by'] = user
                 ret.append(self.child.update(rt, data))
 
         return ret
@@ -1046,7 +1061,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         instance.rt_pos_cq_value = validated_data.get('rt_pos_cq_value', instance.rt_pos_cq_value)
         instance.rt_pos_gc_reaction = validated_data.get('rt_pos_gc_reaction', instance.rt_pos_gc_reaction)
         instance.rt_pos_invalid = validated_data.get('rt_pos_invalid', instance.rt_pos_invalid)
-        if 'request' in self.context and 'user' in self.context['request']:
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
             instance.modified_by = self.context['request'].user
         else:
             instance.modified_by = validated_data.get('modified_by', instance.modified_by)
@@ -1091,7 +1106,11 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
         for pcrrep_id, data in data_mapping.items():
             pcrrep = pcrrep_mapping.get(pcrrep_id, None)
             if pcrrep is not None:
-                data['modified_by'] = self.context['request'].user
+                if 'request' in self.context and hasattr(self.context['request'], 'user'):
+                    user = self.context['request'].user
+                else:
+                    user = validated_data.get('modified_by', instance.modified_by)
+                data['modified_by'] = user
                 ret.append(self.child.update(pcrrep, data))
 
         return ret
@@ -1150,7 +1169,7 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         instance.concentration_unit = validated_data.get('concentration_unit', instance.concentration_unit)
         instance.invalid = validated_data.get('invalid', instance.invalid)
         instance.invalid_override = validated_data.get('invalid_override', instance.invalid_override)
-        if 'request' in self.context and 'user' in self.context['request']:
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
             instance.modified_by = self.context['request'].user
         else:
             instance.modified_by = validated_data.get('modified_by', instance.modified_by)
@@ -1254,7 +1273,10 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         return data
 
     def update(self, instance, validated_data):
-        user = self.context['request'].user
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
+            user = self.context['request'].user
+        else:
+            user = validated_data.get('modified_by', instance.modified_by)
         is_valid = True
         valid_data = []
         response_errors = []
@@ -1456,7 +1478,11 @@ class InhibitionListSerializer(serializers.ListSerializer):
         for inhibition_id, data in data_mapping.items():
             inhibition = inhibition_mapping.get(inhibition_id, None)
             if inhibition is not None:
-                data['modified_by'] = self.context['request'].user
+                if 'request' in self.context and hasattr(self.context['request'], 'user'):
+                    user = self.context['request'].user
+                else:
+                    user = validated_data.get('modified_by', instance.modified_by)
+                data['modified_by'] = user
                 ret.append(self.child.update(inhibition, data))
 
         return ret
