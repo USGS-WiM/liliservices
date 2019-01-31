@@ -26,7 +26,7 @@ def get_sci_val(decimal_val):
     :param decimal_val: the decimal value to be converted
     :return: the scientific notation of the decimal value
     """
-    sci_val = ''
+    sci_val = '0'
     if decimal_val:
         sci_val = '{0: E}'.format(decimal_val)
         sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]

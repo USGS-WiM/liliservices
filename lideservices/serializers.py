@@ -936,11 +936,14 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # if 'extraction_number' in validated_data and validated_data['extraction_number'] == 0:
         #     validated_data['extraction_number'] = instance.extraction_number
 
-        # if the positive control is included but null, set it to zero
-        if 'ext_pos_cq_value' in validated_data and validated_data['ext_pos_cq_value'] is None:
-            validated_data['ext_pos_cq_value'] = 0
-        if 'ext_pos_gc_reaction' in validated_data and validated_data['ext_pos_gc_reaction'] is None:
-            validated_data['ext_pos_gc_reaction'] = 0
+        # commenting out the below block of code because we want to prevent setting the values to zero if the user
+        # is simply editing other fields of the record (not cq_value or gc_reaction); instead we expect the user
+        # to always submit exactly the values they intend the fields to have
+        # # if the positive control is included but null, set it to zero
+        # if 'ext_pos_cq_value' in validated_data and validated_data['ext_pos_cq_value'] is None:
+        #     validated_data['ext_pos_cq_value'] = 0
+        # if 'ext_pos_gc_reaction' in validated_data and validated_data['ext_pos_gc_reaction'] is None:
+        #     validated_data['ext_pos_gc_reaction'] = 0
 
         # update the Extraction Batch object
         instance.analysis_batch = validated_data.get('analysis_batch', instance.analysis_batch)
@@ -1045,11 +1048,14 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
         return ReverseTranscription.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
-        # if the positive control is included but null, set it to zero
-        if 'rt_pos_cq_value' in validated_data and validated_data['rt_pos_cq_value'] is None:
-            validated_data['rt_pos_cq_value'] = 0
-        if 'rt_pos_gc_reaction' in validated_data and validated_data['rt_pos_gc_reaction'] is None:
-            validated_data['rt_pos_gc_reaction'] = 0
+        # commenting out the below block of code because we want to prevent setting the values to zero if the user
+        # is simply editing other fields of the record (not cq_value or gc_reaction); instead we expect the user
+        # to always submit exactly the values they intend the fields to have
+        # # if the positive control is included but null, set it to zero
+        # if 'rt_pos_cq_value' in validated_data and validated_data['rt_pos_cq_value'] is None:
+        #     validated_data['rt_pos_cq_value'] = 0
+        # if 'rt_pos_gc_reaction' in validated_data and validated_data['rt_pos_gc_reaction'] is None:
+        #     validated_data['rt_pos_gc_reaction'] = 0
 
         # update the Reverse Transcription object
         instance.extraction_batch = validated_data.get('extraction_batch', instance.extraction_batch)
@@ -1284,24 +1290,36 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         updated_pcrreplicates = validated_data.get('updated_pcrreplicates', None)
         existing_reps = PCRReplicate.objects.filter(pcrreplicate_batch=instance.id)
         if len(existing_reps) == len(updated_pcrreplicates):
+            # commenting out the below block of code because we want to prevent setting the values to zero if the user
+            # is simply editing other fields of the record (not cq_value or gc_reaction); instead we expect the user
+            # to always submit exactly the values they intend the fields to have
             # if the cq and gc_reaction values are not present, set them to 0
-            extneg_cq = validated_data.get('ext_neg_cq_value', 0)
-            rtneg_cq = validated_data.get('rt_neg_cq_value', 0)
-            pcrneg_cq = validated_data.get('pcr_neg_cq_value', 0)
-            pcrpos_cq = validated_data.get('pcr_pos_cq_value', 0)
-            extneg_gcr = validated_data.get('ext_neg_gc_reaction', 0)
-            rtneg_gcr = validated_data.get('rt_neg_gc_reaction', 0)
-            pcrneg_gcr = validated_data.get('pcr_neg_gc_reaction', 0)
-            pcrpos_gcr = validated_data.get('pcr_pos_gc_reaction', 0)
-            # if the cq and gc_reaction values are null, set them to 0
-            instance.ext_neg_cq_value = 0 if extneg_cq is None else extneg_cq
-            instance.rt_neg_cq_value = 0 if rtneg_cq is None else rtneg_cq
-            instance.pcr_neg_cq_value = 0 if pcrneg_cq is None else pcrneg_cq
-            instance.pcr_pos_cq_value = 0 if pcrpos_cq is None else pcrpos_cq
-            instance.ext_neg_gc_reaction = 0 if extneg_gcr is None else extneg_gcr
-            instance.rt_neg_gc_reaction = 0 if rtneg_gcr is None else rtneg_gcr
-            instance.pcr_neg_gc_reaction = 0 if pcrneg_gcr is None else pcrneg_gcr
-            instance.pcr_pos_gc_reaction = 0 if pcrpos_gcr is None else pcrpos_gcr
+            # extneg_cq = validated_data.get('ext_neg_cq_value', 0)
+            # rtneg_cq = validated_data.get('rt_neg_cq_value', 0)
+            # pcrneg_cq = validated_data.get('pcr_neg_cq_value', 0)
+            # pcrpos_cq = validated_data.get('pcr_pos_cq_value', 0)
+            # extneg_gcr = validated_data.get('ext_neg_gc_reaction', 0)
+            # rtneg_gcr = validated_data.get('rt_neg_gc_reaction', 0)
+            # pcrneg_gcr = validated_data.get('pcr_neg_gc_reaction', 0)
+            # pcrpos_gcr = validated_data.get('pcr_pos_gc_reaction', 0)
+            # # if the cq and gc_reaction values are null, set them to 0
+            # instance.ext_neg_cq_value = 0 if extneg_cq is None else extneg_cq
+            # instance.rt_neg_cq_value = 0 if rtneg_cq is None else rtneg_cq
+            # instance.pcr_neg_cq_value = 0 if pcrneg_cq is None else pcrneg_cq
+            # instance.pcr_pos_cq_value = 0 if pcrpos_cq is None else pcrpos_cq
+            # instance.ext_neg_gc_reaction = 0 if extneg_gcr is None else extneg_gcr
+            # instance.rt_neg_gc_reaction = 0 if rtneg_gcr is None else rtneg_gcr
+            # instance.pcr_neg_gc_reaction = 0 if pcrneg_gcr is None else pcrneg_gcr
+            # instance.pcr_pos_gc_reaction = 0 if pcrpos_gcr is None else pcrpos_gcr
+
+            instance.ext_neg_cq_value = validated_data.get('ext_neg_cq_value', None)
+            instance.rt_neg_cq_value = validated_data.get('rt_neg_cq_value', None)
+            instance.pcr_neg_cq_value = validated_data.get('pcr_neg_cq_value', None)
+            instance.pcr_pos_cq_value = validated_data.get('pcr_pos_cq_value', None)
+            instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', None)
+            instance.rt_neg_gc_reaction = validated_data.get('rt_neg_gc_reaction', None)
+            instance.pcr_neg_gc_reaction = validated_data.get('pcr_neg_gc_reaction', None)
+            instance.pcr_pos_gc_reaction = validated_data.get('pcr_pos_gc_reaction', None)
 
             # then update the instance, but do not save until all child replicates are valid
             eb = validated_data.get('extraction_batch', instance.extraction_batch)
@@ -1321,11 +1339,14 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                         extraction_batch=eb.id, sample=sample.id).first()
                     if sample_extraction:
                         # finally validate the pcr reps and calculate their final replicate concentrations
-                        cq_value = pcrreplicate.get('cq_value', 0)
-                        gc_reaction = pcrreplicate.get('gc_reaction', 0)
-                        # if the cq and gc_reaction values are null, set them to 0
-                        cq_value = 0 if cq_value is None else cq_value
-                        gc_reaction = 0 if gc_reaction is None else gc_reaction
+                        cq_value = pcrreplicate.get('cq_value', None)
+                        gc_reaction = pcrreplicate.get('gc_reaction', None)
+                        # commenting out the below block of code because we want to prevent setting the values to zero
+                        # if the user is simply editing other fields of the record (not cq_value or gc_reaction);
+                        # instead we expect the user to always submit exactly the values they intend the fields to have
+                        # # if the cq and gc_reaction values are null, set them to 0
+                        # cq_value = 0 if cq_value is None else cq_value
+                        # gc_reaction = 0 if gc_reaction is None else gc_reaction
                         pcrrep = PCRReplicate.objects.filter(
                             sample_extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
                         if pcrrep:
