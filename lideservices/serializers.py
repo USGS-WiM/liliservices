@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+from queue import PriorityQueue
 from rest_framework import serializers
 from lideservices.models import *
 
@@ -1138,9 +1139,11 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
     def get_all_parent_controls_uploaded(self, obj):
         data = False
         pcrrep_batch = PCRReplicateBatch.objects.get(id=obj.pcrreplicate_batch_id)
-        if (pcrrep_batch.ext_neg_cq_value is not None and pcrrep_batch.rt_neg_cq_value is not None
-                and pcrrep_batch.pcr_neg_cq_value is not None):
-            data = True
+        if pcrrep_batch.ext_neg_cq_value is not None and pcrrep_batch.pcr_neg_cq_value is not None:
+            if pcrrep_batch.extraction_batch.reversetranscriptions.count() == 0:
+                data = True
+            elif pcrrep_batch.rt_neg_cq_value is not None:
+                data = True
         return data
 
     created_by = serializers.StringRelatedField()
@@ -1201,9 +1204,11 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     def get_all_parent_controls_uploaded(self, obj):
         data = False
         pcrrep_batch = PCRReplicateBatch.objects.get(id=obj.pcrreplicate_batch_id)
-        if (pcrrep_batch.ext_neg_cq_value is not None and pcrrep_batch.rt_neg_cq_value is not None
-                and pcrrep_batch.pcr_neg_cq_value is not None):
-            data = True
+        if pcrrep_batch.ext_neg_cq_value is not None and pcrrep_batch.pcr_neg_cq_value is not None:
+            if pcrrep_batch.extraction_batch.reversetranscriptions.count() == 0:
+                data = True
+            elif pcrrep_batch.rt_neg_cq_value is not None:
+                data = True
         return data
 
     created_by = serializers.StringRelatedField()
@@ -1265,6 +1270,12 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                     if 'sample' not in rep:
                         is_valid = False
                         details.append({"updated_pcrreplicates " + count: "sample is required"})
+                    else:
+                        sample_id = rep.get('sample', None)
+                        sample = Sample.objects.filter(id=sample_id).first()
+                        if not sample:
+                            is_valid = False
+                            details.append({"updated_pcrreplicates " + count: "no sample exists with ID: " + sample_id})
                     if 'cq_value' not in rep:
                         is_valid = False
                         details.append({"updated_pcrreplicates " + count: "cq_value is required"})
@@ -1288,8 +1299,9 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         response_errors = []
 
         updated_pcrreplicates = validated_data.get('updated_pcrreplicates', None)
+        updated_pcrreplicates_count = len(updated_pcrreplicates)
         existing_reps = PCRReplicate.objects.filter(pcrreplicate_batch=instance.id)
-        if len(existing_reps) == len(updated_pcrreplicates):
+        if len(existing_reps) == updated_pcrreplicates_count:
             # commenting out the below block of code because we want to prevent setting the values to zero if the user
             # is simply editing other fields of the record (not cq_value or gc_reaction); instead we expect the user
             # to always submit exactly the values they intend the fields to have
@@ -1328,80 +1340,90 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
             instance.modified_by = user
 
-            # next ensure the submitted pcr replicates exist in the DB
+            # next ensure that any submitted reps belonging to a pegneg sample are moved to the front of the queue
+            queued_updated_pcrreplicates = PriorityQueue()
+            queue_high_priority = 0
+            queue_low_priority = updated_pcrreplicates_count
             for pcrreplicate in updated_pcrreplicates:
                 sample_id = pcrreplicate.get('sample', None)
                 sample = Sample.objects.filter(id=sample_id).first()
-                if sample:
-                    if isinstance(eb, int):
-                        eb = ExtractionBatch.objects.filter(id=eb).first()
-                    sample_extraction = SampleExtraction.objects.filter(
-                        extraction_batch=eb.id, sample=sample.id).first()
-                    if sample_extraction:
-                        # finally validate the pcr reps and calculate their final replicate concentrations
-                        cq_value = pcrreplicate.get('cq_value', None)
-                        gc_reaction = pcrreplicate.get('gc_reaction', None)
-                        # commenting out the below block of code because we want to prevent setting the values to zero
-                        # if the user is simply editing other fields of the record (not cq_value or gc_reaction);
-                        # instead we expect the user to always submit exactly the values they intend the fields to have
-                        # # if the cq and gc_reaction values are null, set them to 0
-                        # cq_value = 0 if cq_value is None else cq_value
-                        # gc_reaction = 0 if gc_reaction is None else gc_reaction
-                        pcrrep = PCRReplicate.objects.filter(
-                            sample_extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
-                        if pcrrep:
-                            matrix = sample.matrix.code
-                            # if the sample is from a matrix that requires a final concentrated sample volume,
-                            # ensure that the FCSV value exists (note that zero evaluates to null in value checking)
-                            if matrix in ['F', 'W', 'WW']:
-                                fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
-                                if fcsv.final_concentrated_sample_volume is None:
-                                    is_valid = False
-                                    message = "No final concentrated sample volume exists"
-                                    message += " for Sample ID: " + sample
-                                    response_errors.append({"pcrreplicate": message})
-                                    # skip to the next item in the loop
-                                    continue
-                            # if the sample is from a matrix that requires a dissolution volume,
-                            # ensure that the dissolution volume exists for this sample
-                            elif matrix == 'A' and sample.dissolution_volume is None:
+                if sample.record_type == 2 and sample.peg_neg is None:
+                    queue_high_priority += 1
+                    queued_updated_pcrreplicates.put((queue_high_priority, pcrreplicate))
+                else:
+                    queued_updated_pcrreplicates.put((queue_low_priority, pcrreplicate))
+                    queue_low_priority -= 1
+
+            # next ensure the submitted pcr replicates exist in the DB
+            while queued_updated_pcrreplicates.queue:
+                pcrreplicate = queued_updated_pcrreplicates.get()[1]
+                sample_id = pcrreplicate.get('sample', None)
+                sample = Sample.objects.filter(id=sample_id).first()
+                # ensure is eb is an object not an ID
+                if isinstance(eb, int):
+                    eb = ExtractionBatch.objects.filter(id=eb).first()
+                sample_extraction = SampleExtraction.objects.filter(extraction_batch=eb.id, sample=sample.id).first()
+                if sample_extraction:
+                    # finally validate the pcr reps and calculate their final replicate concentrations
+                    cq_value = pcrreplicate.get('cq_value', None)
+                    gc_reaction = pcrreplicate.get('gc_reaction', None)
+                    # commenting out the below block of code because we want to prevent setting the values to zero
+                    # if the user is simply editing other fields of the record (not cq_value or gc_reaction);
+                    # instead we expect the user to always submit exactly the values they intend the fields to have
+                    # # if the cq and gc_reaction values are null, set them to 0
+                    # cq_value = 0 if cq_value is None else cq_value
+                    # gc_reaction = 0 if gc_reaction is None else gc_reaction
+                    pcrrep = PCRReplicate.objects.filter(
+                        sample_extraction=sample_extraction.id, pcrreplicate_batch=instance.id).first()
+                    if pcrrep:
+                        matrix = sample.matrix.code
+                        # if the sample is from a matrix that requires a final concentrated sample volume,
+                        # ensure that the FCSV value exists (note that zero evaluates to null in value checking)
+                        if matrix in ['F', 'W', 'WW']:
+                            fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
+                            if fcsv.final_concentrated_sample_volume is None:
                                 is_valid = False
-                                message = "No dissolution volume exists"
+                                message = "No final concentrated sample volume exists"
                                 message += " for Sample ID: " + sample
                                 response_errors.append({"pcrreplicate": message})
                                 # skip to the next item in the loop
                                 continue
-                            # if the sample is from a matrix that requires a post dilution volume,
-                            elif matrix == 'SM' and sample.post_dilution_volume is None:
-                                is_valid = False
-                                message = "No post dilution volume exists"
-                                message += " for Sample ID: " + sample
-                                response_errors.append({"pcrreplicate": message})
-                                # skip to the next item in the loop
-                                continue
-                            # that particular sample volume exists, so finish updating this rep
-                            new_data = {'pcrreplicate_batch': instance.id, 'cq_value': cq_value,
-                                        'gc_reaction': gc_reaction, 'modified_by': user}
-                            serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
-                            if serializer.is_valid():
-                                valid_data.append(serializer)
-                            else:
-                                is_valid = False
-                                response_errors.append(serializer.errors)
+                        # if the sample is from a matrix that requires a dissolution volume,
+                        # ensure that the dissolution volume exists for this sample
+                        elif matrix == 'A' and sample.dissolution_volume is None:
+                            is_valid = False
+                            message = "No dissolution volume exists"
+                            message += " for Sample ID: " + sample
+                            response_errors.append({"pcrreplicate": message})
+                            # skip to the next item in the loop
+                            continue
+                        # if the sample is from a matrix that requires a post dilution volume,
+                        elif matrix == 'SM' and sample.post_dilution_volume is None:
+                            is_valid = False
+                            message = "No post dilution volume exists"
+                            message += " for Sample ID: " + sample
+                            response_errors.append({"pcrreplicate": message})
+                            # skip to the next item in the loop
+                            continue
+                        # that particular sample volume exists, so finish updating this rep
+                        new_data = {'pcrreplicate_batch': instance.id, 'cq_value': cq_value,
+                                    'gc_reaction': gc_reaction, 'modified_by': user}
+                        serializer = PCRReplicateSerializer(pcrrep, data=new_data, partial=True)
+                        if serializer.is_valid():
+                            valid_data.append(serializer)
                         else:
                             is_valid = False
-                            message = "No PCRReplicate exists with PCRReplicate Batch ID: " + instance.id + ", "
-                            message += "SampleExtraction ID: " + sample_extraction.id
-                            response_errors.append({"pcrreplicate": message})
+                            response_errors.append(serializer.errors)
                     else:
                         is_valid = False
-                        message = "No SampleExtraction exists with Extraction Batch ID: " + eb.id + ", "
-                        message += "Sample ID: " + sample_id
-                        response_errors.append({"sampleextraction": message})
+                        message = "No PCRReplicate exists with PCRReplicate Batch ID: " + instance.id + ", "
+                        message += "SampleExtraction ID: " + sample_extraction.id
+                        response_errors.append({"pcrreplicate": message})
                 else:
                     is_valid = False
-                    message = "No Sample exists with Sample ID: " + sample_id
-                    response_errors.append({"sample": message})
+                    message = "No SampleExtraction exists with Extraction Batch ID: " + eb.id + ", "
+                    message += "Sample ID: " + sample_id
+                    response_errors.append({"sampleextraction": message})
         else:
             is_valid = False
             message = "The number of submitted PCR replicates (" + str(len(updated_pcrreplicates)) + ") does not match "

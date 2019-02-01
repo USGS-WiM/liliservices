@@ -849,8 +849,14 @@ class PCRReplicateBatch(HistoryModel):
         # invalid flags default to True (i.e., the rep is invalid)
         # and can only be set to False if the cq_values of this rep batch are equal to zero
         self.ext_neg_invalid = False if self.ext_neg_cq_value == 0 else True
-        self.rt_neg_invalid = False if self.rt_neg_cq_value == 0 else True
         self.pcr_neg_invalid = False if self.pcr_neg_cq_value == 0 else True
+        # reverse transcriptions are a special case... not every extraction batch will have a RT,
+        # so if there is no RT, set rt_neg_invalid to False regardless of the value of rt_neg_cq_value,
+        # but if there is a RT, apply the same logic as the other invalid flags
+        if self.extraction_batch.reversetranscriptions.count() == 0:
+            self.rt_neg_invalid = False
+        else:
+            self.rt_neg_invalid = False if self.rt_neg_cq_value == 0 else True
         # validating the pcr_pos will come in a later release of the software
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
@@ -906,6 +912,7 @@ class PCRReplicate(HistoryModel):
         #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
         if self.invalid_override is None:
             if self.cq_value is not None and self.gc_reaction is not None:
+                pcrreplicate_batch = PCRReplicateBatch.objects.filter(id=self.pcrreplicate_batch.id).first()
                 # first check related peg_neg validity
                 # assume no related peg_neg, in which case this control does not apply
                 # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
@@ -913,7 +920,7 @@ class PCRReplicate(HistoryModel):
                 peg_neg_id = self.sample_extraction.sample.peg_neg
                 if peg_neg_id is not None:
                     peg_neg_invalid_flags = []
-                    target_id = self.pcrreplicate_batch.target.id
+                    target_id = pcrreplicate_batch.target.id
                     # only check sample extractions with the same peg_neg_id as the sample of this data rep
                     ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
                     for ext_id in ext_ids:
@@ -927,9 +934,9 @@ class PCRReplicate(HistoryModel):
                 # then check all controls applicable to this rep
                 if (
                         not any_peg_neg_invalid and
-                        not self.pcrreplicate_batch.ext_neg_invalid and
-                        not self.pcrreplicate_batch.rt_neg_invalid and
-                        not self.pcrreplicate_batch.pcr_neg_invalid and
+                        not pcrreplicate_batch.ext_neg_invalid and
+                        not pcrreplicate_batch.rt_neg_invalid and
+                        not pcrreplicate_batch.pcr_neg_invalid and
                         self.cq_value >= Decimal('0') and
                         self.gc_reaction >= Decimal('0')
                 ):
