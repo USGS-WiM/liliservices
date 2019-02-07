@@ -26,10 +26,13 @@ def get_sci_val(decimal_val):
     :param decimal_val: the decimal value to be converted
     :return: the scientific notation of the decimal value
     """
-    sci_val = '0'
+    sci_val = ''
     if decimal_val:
-        sci_val = '{0: E}'.format(decimal_val)
-        sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+        if decimal_val == 0:
+            sci_val = '0'
+        else:
+            sci_val = '{0: E}'.format(decimal_val)
+            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
     return sci_val
 
 
@@ -507,6 +510,22 @@ class FinalSampleMeanConcentration(HistoryModel):
     def final_sample_mean_concentration_sci(self):
         return get_sci_val(self.final_sample_mean_concentration)
 
+    @property
+    def missing_replicates(self):
+        missing_replicates = []
+        # check whether all replicates have been uploaded
+        reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
+                                           pcrreplicate_batch__target__exact=self.target)
+        for rep in reps:
+            if ((rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None and rep.replicate_concentration is None)
+                    or (rep.invalid is True and rep.pcrreplicate_batch.re_pcr is None and rep.cq_value is None)):
+                missing_replicates.append({
+                    "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
+                    "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
+                    "replicate_number": rep.pcrreplicate_batch.replicate_number
+                })
+        return missing_replicates
+
     final_sample_mean_concentration = NullableNonnegativeDecimalField120100()
     sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
     target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
@@ -518,7 +537,8 @@ class FinalSampleMeanConcentration(HistoryModel):
         reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
                                            pcrreplicate_batch__target__exact=self.target)
         for rep in reps:
-            # ignore invalid reps and redos
+            # ignore invalid reps and 'redones' (batches that have been redone)
+            # in other words, only allow valid reps for batches that have not been redone
             if rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None:
                 if rep.replicate_concentration is None:
                     # this rep has no replicate_concentration
@@ -527,7 +547,7 @@ class FinalSampleMeanConcentration(HistoryModel):
                 if rep.replicate_concentration >= 0:
                     reps_count += 1
                     pos_replicate_concentrations.append(rep.replicate_concentration)
-        return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else None
+        return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else 0
 
     def __str__(self):
         return str(self.id)

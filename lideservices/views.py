@@ -912,75 +912,93 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             field_validations.append(updated_pcrreplicates_validation)
         else:
             # validate pcrreplicates
-            # TODO: refactor this code block to loop thru existing/expected sample reps instead of submitted data, then afterward indicate extraneous sample reps
-            pcr_replicate_batch_sample_ids = list(PCRReplicate.objects.filter(
-                pcr_replicate_batch=pcr_replicate_batch.id).values_list('id', flat=True))
+            existing_pcrreplicates = PCRReplicate.objects.filter(pcr_replicate_batch=pcr_replicate_batch.id)
             updated_pcrreplicates_sample_ids = []
-            updated_pcrreplicates_validations = []
+            all_pcrreplicates_validations = []
             updated_pcrreplicates = request.data.get('updated_pcrreplicates')
-            count = 1
-            for rep in updated_pcrreplicates:
+
+            for existing_rep in existing_pcrreplicates:
                 rep_validations = []
                 sample_validation = self.FieldValidation("sample")
-                cq_value_validation = self.FieldValidation("cq_value")
-                gc_reaction_validation = self.FieldValidation("gc_reaction")
 
-                # validate the sample (ensure an ID is present and that is belongs in this batch)
-                if 'sample' not in rep or rep['sample'] is None:
-                    invalid_reason = self.FieldValidation.InvalidReason("sample is a required field", 1)
-                    sample_validation.invalid_reasons.append(invalid_reason)
-                    rep_validations.append(sample_validation)
-                else:
-                    sample_id = rep.get('sample', None)
-                    if sample_id not in pcr_replicate_batch_sample_ids:
-                        message = "sample" + sample_id + " is not in this PCR replicate batch"
+                # attempt to find the matching updated rep
+                try:
+                    rep_index = updated_pcrreplicates_sample_ids.index(existing_rep.sample.id)
+                    # pop the matching updated rep from its list so that we eventually end up with an empty list,
+                    # or a list of extraneous reps
+                    updated_rep = updated_pcrreplicates.pop(rep_index)
+                    rep_validations = []
+                    cq_value_validation = self.FieldValidation("cq_value")
+                    gc_reaction_validation = self.FieldValidation("gc_reaction")
+
+                    # check if this rep has already been uploaded
+                    if existing_rep.cq_value is not None:
+                        sample_id = existing_rep.sample.id
+                        message = "sample" + str(sample_id) + " has already been uploaded for this PCR replicate batch"
                         invalid_reason = self.FieldValidation.InvalidReason(message, 1)
                         sample_validation.invalid_reasons.append(invalid_reason)
                         rep_validations.append(sample_validation)
-                    updated_pcrreplicates_sample_ids.append(sample_id)
 
-                # validate cq_value
-                if 'cq_value' not in rep:
-                    invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is missing", 2)
-                    cq_value_validation.invalid_reasons.append(invalid_reason)
-                    rep_validations.append(cq_value_validation)
-                elif rep['cq_value'] is not None:
-                    rep_cq_value = rep['cq_value']
-                    if not self.isnumber(rep_cq_value):
-                        invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is not a number", 1)
+                    # validate cq_value
+                    if 'cq_value' not in updated_rep:
+                        invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is missing", 2)
                         cq_value_validation.invalid_reasons.append(invalid_reason)
                         rep_validations.append(cq_value_validation)
-                    elif rep_cq_value < Decimal('0'):
-                        invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is less than zero", 2)
-                        cq_value_validation.invalid_reasons.append(invalid_reason)
-                        rep_validations.append(cq_value_validation)
+                    elif updated_rep['cq_value'] is not None:
+                        rep_cq_value = updated_rep['cq_value']
+                        if not self.isnumber(rep_cq_value):
+                            invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is not a number", 1)
+                            cq_value_validation.invalid_reasons.append(invalid_reason)
+                            rep_validations.append(cq_value_validation)
+                        elif rep_cq_value < Decimal('0'):
+                            invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is less than zero", 2)
+                            cq_value_validation.invalid_reasons.append(invalid_reason)
+                            rep_validations.append(cq_value_validation)
 
-                # validate gc_reaction
-                if 'gc_reaction' not in rep:
-                    invalid_reason = self.FieldValidation.InvalidReason("gc_reaction ('concentration') is missing", 2)
-                    gc_reaction_validation.invalid_reasons.append(invalid_reason)
-                    rep_validations.append(gc_reaction_validation)
-                elif rep['gc_reaction'] is not None:
-                    rep_gc_reaction = rep['gc_reaction']
-                    if not self.isnumber(rep_gc_reaction):
-                        message = "gc_reaction ('concentration') is not a number"
-                        invalid_reason = self.FieldValidation.InvalidReason(message, 1)
-                        cq_value_validation.invalid_reasons.append(invalid_reason)
-                        rep_validations.append(cq_value_validation)
-                    elif rep_gc_reaction < Decimal('0'):
-                        message = "gc_reaction ('concentration') is less than zero"
+                    # validate gc_reaction
+                    if 'gc_reaction' not in updated_rep:
+                        message = "gc_reaction ('concentration') is missing"
                         invalid_reason = self.FieldValidation.InvalidReason(message, 2)
-                        cq_value_validation.invalid_reasons.append(invalid_reason)
-                        rep_validations.append(cq_value_validation)
+                        gc_reaction_validation.invalid_reasons.append(invalid_reason)
+                        rep_validations.append(gc_reaction_validation)
+                    elif updated_rep['gc_reaction'] is not None:
+                        rep_gc_reaction = updated_rep['gc_reaction']
+                        if not self.isnumber(rep_gc_reaction):
+                            message = "gc_reaction ('concentration') is not a number"
+                            invalid_reason = self.FieldValidation.InvalidReason(message, 1)
+                            cq_value_validation.invalid_reasons.append(invalid_reason)
+                            rep_validations.append(cq_value_validation)
+                        elif rep_gc_reaction < Decimal('0'):
+                            message = "gc_reaction ('concentration') is less than zero"
+                            invalid_reason = self.FieldValidation.InvalidReason(message, 2)
+                            cq_value_validation.invalid_reasons.append(invalid_reason)
+                            rep_validations.append(cq_value_validation)
 
-                updated_pcrreplicates_validations.append({"updated_pcrreplicates_" + str(count): rep_validations})
-                count = count + 1
+                    all_pcrreplicates_validations.append({updated_rep['sample']: rep_validations})
 
-            missing_samples = list(set(pcr_replicate_batch_sample_ids) - set(updated_pcrreplicates_sample_ids))
-            if len(missing_samples) > 0:
-                updated_pcrreplicates_validations.append({"missing_sample_pcrreplicates": missing_samples})
-            updated_pcrreplicates_validation = {"updated_pcrreplicates": updated_pcrreplicates_validations}
-            field_validations.append(updated_pcrreplicates_validation)
+                except ValueError:
+                    message = "sample" + existing_rep.id + " was not found in this submission"
+                    invalid_reason = self.FieldValidation.InvalidReason(message, 2)
+                    sample_validation.invalid_reasons.append(invalid_reason)
+                    rep_validations.append(sample_validation)
+                    all_pcrreplicates_validations.append({existing_rep['sample']: rep_validations})
+
+            for extraneous_rep in updated_pcrreplicates:
+                rep_validations = []
+                sample_validation = self.FieldValidation("sample")
+                sample_id = "(No Sample ID)"
+                if 'sample' not in extraneous_rep or extraneous_rep['sample'] is None:
+                    invalid_reason = self.FieldValidation.InvalidReason("sample is a required field", 1)
+                else:
+                    sample_id = extraneous_rep.get('sample')
+                    message = "sample" + sample_id + " is not in this PCR replicate batch"
+                    invalid_reason = self.FieldValidation.InvalidReason(message, 1)
+                sample_validation.invalid_reasons.append(invalid_reason)
+                rep_validations.append(sample_validation)
+                all_pcrreplicates_validations.append({sample_id: rep_validations})
+
+            all_pcrreplicates_validation = {"updated_pcrreplicates": all_pcrreplicates_validations}
+            field_validations.append(all_pcrreplicates_validation)
 
         return Response(field_validations)
 
