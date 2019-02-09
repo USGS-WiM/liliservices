@@ -1,6 +1,4 @@
-import json
-from django.http import HttpResponse, JsonResponse
-from django.contrib.auth import authenticate, login, logout
+from django.http import JsonResponse
 from rest_framework import views, viewsets, generics, permissions, authentication, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -705,6 +703,7 @@ class PCRReplicateViewSet(HistoryViewSet):
                         new_invalid = item.get('invalid', None)
                         if new_invalid is not None and new_invalid != rep.invalid:
                             item['invalid_override'] = request.user.id
+                        rep.replicate_concentration = rep.calc_rep_conc()
                         serializer = self.serializer_class(rep, data=item, partial=True)
                         # if this item is valid, temporarily hold it until all items are proven valid, then save all
                         # if even one item is invalid, none will be saved, and the user will be returned the error(s)
@@ -745,27 +744,13 @@ class PCRReplicateViewSet(HistoryViewSet):
 class PCRReplicateBatchViewSet(HistoryViewSet):
     serializer_class = PCRReplicateBatchSerializer
 
-    class FieldValidation:
-        """ FieldValidation class represents the validity of each field of a PCRReplicateBatch object. """
-
-        class InvalidReason:
-            """ InvalidReason class represents the reason for the invalidity of a field as a message and a severity. """
-
-            def __init__(self, message="", severity=None):
-                self.message = message
-                self.severity = severity
-
-        def __init__(self, field_name="", invalid_reasons=[]):
-            self.field_name = field_name
-            self.invalid_reasons = invalid_reasons
-
     def isnumber(self, val):
         try:
-            return float(val)
+            return True if float(val) == 0 else float(val)
         except ValueError:
             return False
 
-    @action(detail=False)
+    @action(methods=['post'], detail=False)
     def validate(self, request):
         validation_errors = []
         if 'analysis_batch' not in request.data or request.data['analysis_batch'] is None:
@@ -786,7 +771,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
         pcr_replicate_batch = PCRReplicateBatch.objects.filter(
             extraction_batch=extraction_batch.id,
-            target=request.datarequest.data['target'],
+            target=request.data['target'],
             replicate_number=request.data['replicate_number']
         ).first()
 
@@ -794,107 +779,91 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         if extraction_batch.reversetranscriptions.count() > 0:
             rt_exists = True
 
-        field_validations = []
-
-        # create the empty control field validations to hold potential validation messages
-        ext_neg_cq_value_validation = self.FieldValidation("ext_neg_cq_value")
-        ext_neg_gc_reaction_validation = self.FieldValidation("ext_neg_gc_reaction")
-        rt_neg_cq_value_validation = self.FieldValidation("rt_neg_cq_value")
-        rt_neg_gc_reaction_validation = self.FieldValidation("rt_neg_gc_reaction")
-        pcr_neg_cq_value_validation = self.FieldValidation("pcr_neg_cq_value")
-        pcr_neg_gc_reaction_validation = self.FieldValidation("pcr_neg_gc_reaction")
-        pcr_pos_cq_value_validation = self.FieldValidation("pcr_pos_cq_value")
-        pcr_pos_gc_reaction_validation = self.FieldValidation("pcr_pos_gc_reaction")
-
         # validate the controls
+        field_validations = []
+        ext_neg_cq_value_invalid_reason = ()
+        ext_neg_gc_reaction_invalid_reason = ()
+        rt_neg_cq_value_invalid_reason = ()
+        rt_neg_gc_reaction_invalid_reason = ()
+        pcr_neg_cq_value_invalid_reason = ()
+        pcr_neg_gc_reaction_invalid_reason = ()
+        pcr_pos_cq_value_invalid_reason = ()
+        pcr_pos_gc_reaction_invalid_reason = ()
 
         # validate ext_neg_cq_value
         if 'ext_neg_cq_value' not in request.data or request.data['ext_neg_cq_value'] is None:
-            invalid_reason = self.FieldValidation.InvalidReason("ext_neg_cq_value ('cp') is missing", 2)
-            ext_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+            ext_neg_cq_value_invalid_reason = ("ext_neg_cq_value ('cp') is missing", 2)
         elif not self.isnumber(request.data['ext_neg_cq_value']):
-            invalid_reason = self.FieldValidation.InvalidReason("ext_neg_cq_value ('cp') is not a number", 1)
-            ext_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+            ext_neg_cq_value_invalid_reason = ("ext_neg_cq_value ('cp') is not a number", 1)
         elif request.data['ext_neg_cq_value'] > 0:
-            invalid_reason = self.FieldValidation.InvalidReason("ext_neg_cq_value ('cp') is positive", 1)
-            ext_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+            ext_neg_cq_value_invalid_reason = ("ext_neg_cq_value ('cp') is positive", 1)
 
         # validate ext_neg_gc_reaction
         if 'ext_neg_gc_reaction' not in request.data or request.data['ext_neg_gc_reaction'] is None:
-            invalid_reason = self.FieldValidation.InvalidReason("ext_neg_gc_reaction ('concentration') is missing", 2)
-            ext_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            ext_neg_gc_reaction_invalid_reason = ("ext_neg_gc_reaction ('concentration') is missing", 2)
         elif not self.isnumber(request.data['ext_neg_gc_reaction']):
-            invalid_reason = self.FieldValidation.InvalidReason("ext_neg_gc_reaction ('cp') is not a number", 1)
-            ext_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            ext_neg_gc_reaction_invalid_reason = ("ext_neg_gc_reaction ('cp') is not a number", 1)
         elif request.data['ext_neg_gc_reaction'] > 0:
-            invalid_reason = self.FieldValidation.InvalidReason("ext_neg_gc_reaction ('cp') is positive", 1)
-            ext_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            ext_neg_gc_reaction_invalid_reason = ("ext_neg_gc_reaction ('cp') is positive", 1)
 
         if rt_exists:
 
             # validate rt_neg_cq_value
             if 'rt_neg_cq_value' not in request.data or request.data['rt_neg_cq_value'] is None:
-                invalid_reason = self.FieldValidation.InvalidReason("rt_neg_cq_value ('cp') is missing", 2)
-                rt_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+                rt_neg_cq_value_invalid_reason = ("rt_neg_cq_value ('cp') is missing", 2)
             elif not self.isnumber(request.data['rt_neg_cq_value']):
-                invalid_reason = self.FieldValidation.InvalidReason("rt_neg_cq_value ('cp') is not a number", 1)
-                rt_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+                rt_neg_cq_value_invalid_reason = ("rt_neg_cq_value ('cp') is not a number", 1)
             elif request.data['rt_neg_cq_value'] > 0:
-                invalid_reason = self.FieldValidation.InvalidReason("rt_neg_cq_value ('cp') is positive", 1)
-                rt_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+                rt_neg_cq_value_invalid_reason = ("rt_neg_cq_value ('cp') is positive", 1)
 
             # validate rt_neg_gc_reaction
             if 'rt_neg_gc_reaction' not in request.data or request.data['rt_neg_gc_reaction'] is None:
                 message = "rt_neg_gc_reaction ('concentration') is missing"
-                invalid_reason = self.FieldValidation.InvalidReason(message, 2)
-                rt_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+                rt_neg_gc_reaction_invalid_reason = (message, 2)
             elif not self.isnumber(request.data['rt_neg_gc_reaction']):
-                invalid_reason = self.FieldValidation.InvalidReason("rt_neg_gc_reaction ('cp') is not a number", 1)
-                rt_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+                rt_neg_gc_reaction_invalid_reason = ("rt_neg_gc_reaction ('cp') is not a number", 1)
             elif request.data['rt_neg_gc_reaction'] > 0:
-                invalid_reason = self.FieldValidation.InvalidReason("rt_neg_gc_reaction ('cp') is positive", 1)
-                rt_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+                rt_neg_gc_reaction_invalid_reason = ("rt_neg_gc_reaction ('cp') is positive", 1)
 
         # validate pcr_neg_cq_value
         if 'pcr_neg_cq_value' not in request.data or request.data['pcr_neg_cq_value'] is None:
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_neg_cq_value ('cp') is missing", 2)
-            pcr_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+            pcr_neg_cq_value_invalid_reason = ("pcr_neg_cq_value ('cp') is missing", 2)
         elif not self.isnumber(request.data['pcr_neg_cq_value']):
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_neg_cq_value ('cp') is not a number", 1)
-            pcr_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+            pcr_neg_cq_value_invalid_reason = ("pcr_neg_cq_value ('cp') is not a number", 1)
         elif request.data['pcr_neg_cq_value'] > 0:
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_neg_cq_value ('cp') is positive", 1)
-            pcr_neg_cq_value_validation.invalid_reasons.append(invalid_reason)
+            pcr_neg_cq_value_invalid_reason = ("pcr_neg_cq_value ('cp') is positive", 1)
 
         # validate pcr_neg_gc_reaction
         if 'pcr_neg_gc_reaction' not in request.data or request.data['pcr_neg_gc_reaction'] is None:
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_neg_gc_reaction ('concentration') is missing", 2)
-            pcr_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            pcr_neg_gc_reaction_invalid_reason = ("pcr_neg_gc_reaction ('concentration') is missing", 2)
         elif not self.isnumber(request.data['pcr_neg_gc_reaction']):
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_neg_gc_reaction ('cp') is not a number", 1)
-            pcr_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            pcr_neg_gc_reaction_invalid_reason = ("pcr_neg_gc_reaction ('cp') is not a number", 1)
         elif request.data['pcr_neg_gc_reaction'] > 0:
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_neg_gc_reaction ('cp') is positive", 1)
-            pcr_neg_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            pcr_neg_gc_reaction_invalid_reason = ("pcr_neg_gc_reaction ('cp') is positive", 1)
 
         # validate pcr_pos_cq_value
         if 'pcr_pos_cq_value' not in request.data or request.data['pcr_pos_cq_value'] is None:
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_pos_cq_value ('cp') is missing", 2)
-            pcr_pos_cq_value_validation.invalid_reasons.append(invalid_reason)
+            pcr_pos_cq_value_invalid_reason = ("pcr_pos_cq_value ('cp') is missing", 2)
         elif not self.isnumber(request.data['pcr_pos_cq_value']):
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_pos_cq_value ('cp') is not a number", 1)
-            pcr_pos_cq_value_validation.invalid_reasons.append(invalid_reason)
+            pcr_pos_cq_value_invalid_reason = ("pcr_pos_cq_value ('cp') is not a number", 1)
         # TODO: eventually we will also validate the pcr_pos_cq_value by testing if it is >0.5 cylces from expected
 
         # validate pcr_pos_gc_reaction
         if 'pcr_pos_gc_reaction' not in request.data or request.data['pcr_pos_gc_reaction'] is None:
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_pos_gc_reaction ('concentration') is missing", 2)
-            pcr_pos_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            pcr_pos_gc_reaction_invalid_reason = ("pcr_pos_gc_reaction ('concentration') is missing", 2)
         elif not self.isnumber(request.data['pcr_pos_gc_reaction']):
-            invalid_reason = self.FieldValidation.InvalidReason("pcr_pos_gc_reaction ('cp') is not a number", 1)
-            pcr_pos_gc_reaction_validation.invalid_reasons.append(invalid_reason)
+            pcr_pos_gc_reaction_invalid_reason = ("pcr_pos_gc_reaction ('cp') is not a number", 1)
 
         # populate the response object with the current control field validations
+        ext_neg_cq_value_validation = {"ext_neg_cq_value": ext_neg_cq_value_invalid_reason}
+        ext_neg_gc_reaction_validation = {"ext_neg_gc_reaction": ext_neg_gc_reaction_invalid_reason}
+        rt_neg_cq_value_validation = {"rt_neg_cq_value": rt_neg_cq_value_invalid_reason}
+        rt_neg_gc_reaction_validation = {"rt_neg_gc_reaction": rt_neg_gc_reaction_invalid_reason}
+        pcr_neg_cq_value_validation = {"pcr_neg_cq_value": pcr_neg_cq_value_invalid_reason}
+        pcr_neg_gc_reaction_validation = {"pcr_neg_gc_reaction": pcr_neg_gc_reaction_invalid_reason}
+        pcr_pos_cq_value_validation = {"pcr_pos_cq_value": pcr_pos_cq_value_invalid_reason}
+        pcr_pos_gc_reaction_validation = {"pcr_pos_gc_reaction": pcr_pos_gc_reaction_invalid_reason}
+
         field_validations.append(ext_neg_cq_value_validation)
         field_validations.append(ext_neg_gc_reaction_validation)
         field_validations.append(rt_neg_cq_value_validation)
@@ -906,101 +875,99 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
         # check that pcrreplicates have been submitted
         if 'updated_pcrreplicates' not in request.data or not request.data['updated_pcrreplicates']:
-            updated_pcrreplicates_validation = self.FieldValidation("updated_pcrreplicates")
-            invalid_reason = self.FieldValidation.InvalidReason("updated_pcrreplicates is missing", 2)
-            updated_pcrreplicates_validation.invalid_reasons.append(invalid_reason)
-            field_validations.append(updated_pcrreplicates_validation)
+            field_validations.append({"updated_pcrreplicates": [("updated_pcrreplicates is missing", 2)]})
         else:
             # validate pcrreplicates
-            existing_pcrreplicates = PCRReplicate.objects.filter(pcr_replicate_batch=pcr_replicate_batch.id)
-            updated_pcrreplicates_sample_ids = []
+            existing_pcrreplicates = PCRReplicate.objects.filter(pcrreplicate_batch=pcr_replicate_batch.id)
             all_pcrreplicates_validations = []
             updated_pcrreplicates = request.data.get('updated_pcrreplicates')
+            updated_pcrreplicates_sample_ids = [rep['sample'] for rep in updated_pcrreplicates]
 
             for existing_rep in existing_pcrreplicates:
                 rep_validations = []
-                sample_validation = self.FieldValidation("sample")
 
                 # attempt to find the matching updated rep
                 try:
-                    rep_index = updated_pcrreplicates_sample_ids.index(existing_rep.sample.id)
+                    rep_index = updated_pcrreplicates_sample_ids.index(existing_rep.sample_extraction.sample.id)
                     # pop the matching updated rep from its list so that we eventually end up with an empty list,
                     # or a list of extraneous reps
                     updated_rep = updated_pcrreplicates.pop(rep_index)
+                    # also remove the parallel sample ID so that the two lists continue to have matching indexes
+                    del updated_pcrreplicates_sample_ids[rep_index]
                     rep_validations = []
-                    cq_value_validation = self.FieldValidation("cq_value")
-                    gc_reaction_validation = self.FieldValidation("gc_reaction")
 
                     # check if this rep has already been uploaded
                     if existing_rep.cq_value is not None:
-                        sample_id = existing_rep.sample.id
-                        message = "sample" + str(sample_id) + " has already been uploaded for this PCR replicate batch"
-                        invalid_reason = self.FieldValidation.InvalidReason(message, 1)
-                        sample_validation.invalid_reasons.append(invalid_reason)
+                        sample_id = existing_rep.sample_extraction.sample.id
+                        message = "sample " + str(sample_id) + " has already been uploaded for this PCR replicate batch"
+                        sample_invalid_reason = (message, 1)
+                        sample_validation = {"sample": sample_invalid_reason}
                         rep_validations.append(sample_validation)
+                    else:
+                        rep_validations.append({"sample": ()})
 
                     # validate cq_value
-                    if 'cq_value' not in updated_rep:
-                        invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is missing", 2)
-                        cq_value_validation.invalid_reasons.append(invalid_reason)
+                    if 'cq_value' not in updated_rep or updated_rep['cq_value'] is None:
+                        cq_value_invalid_reason = ("cq_value ('cp') is missing", 2)
+                        cq_value_validation = {"cq_value": cq_value_invalid_reason}
                         rep_validations.append(cq_value_validation)
-                    elif updated_rep['cq_value'] is not None:
+                    else:
                         rep_cq_value = updated_rep['cq_value']
                         if not self.isnumber(rep_cq_value):
-                            invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is not a number", 1)
-                            cq_value_validation.invalid_reasons.append(invalid_reason)
+                            cq_value_invalid_reason = ("cq_value ('cp') is not a number", 1)
+                            cq_value_validation = {"cq_value": cq_value_invalid_reason}
                             rep_validations.append(cq_value_validation)
                         elif rep_cq_value < Decimal('0'):
-                            invalid_reason = self.FieldValidation.InvalidReason("cq_value ('cp') is less than zero", 2)
-                            cq_value_validation.invalid_reasons.append(invalid_reason)
+                            cq_value_invalid_reason = ("cq_value ('cp') is less than zero", 2)
+                            cq_value_validation = {"cq_value": cq_value_invalid_reason}
                             rep_validations.append(cq_value_validation)
+                        else:
+                            rep_validations.append({"cq_value": ()})
 
                     # validate gc_reaction
-                    if 'gc_reaction' not in updated_rep:
+                    if 'gc_reaction' not in updated_rep or updated_rep['gc_reaction'] is None:
                         message = "gc_reaction ('concentration') is missing"
-                        invalid_reason = self.FieldValidation.InvalidReason(message, 2)
-                        gc_reaction_validation.invalid_reasons.append(invalid_reason)
+                        gc_reaction_invalid_reason = (message, 2)
+                        gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
                         rep_validations.append(gc_reaction_validation)
-                    elif updated_rep['gc_reaction'] is not None:
+                    else:
                         rep_gc_reaction = updated_rep['gc_reaction']
                         if not self.isnumber(rep_gc_reaction):
                             message = "gc_reaction ('concentration') is not a number"
-                            invalid_reason = self.FieldValidation.InvalidReason(message, 1)
-                            cq_value_validation.invalid_reasons.append(invalid_reason)
-                            rep_validations.append(cq_value_validation)
+                            gc_reaction_invalid_reason = (message, 1)
+                            gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
+                            rep_validations.append(gc_reaction_validation)
                         elif rep_gc_reaction < Decimal('0'):
                             message = "gc_reaction ('concentration') is less than zero"
-                            invalid_reason = self.FieldValidation.InvalidReason(message, 2)
-                            cq_value_validation.invalid_reasons.append(invalid_reason)
-                            rep_validations.append(cq_value_validation)
+                            gc_reaction_invalid_reason = (message, 2)
+                            gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
+                            rep_validations.append(gc_reaction_validation)
+                        else:
+                            rep_validations.append({"gc_reaction": ()})
 
                     all_pcrreplicates_validations.append({updated_rep['sample']: rep_validations})
 
                 except ValueError:
-                    message = "sample" + existing_rep.id + " was not found in this submission"
-                    invalid_reason = self.FieldValidation.InvalidReason(message, 2)
-                    sample_validation.invalid_reasons.append(invalid_reason)
+                    message = "(sample " + str(existing_rep.sample_extraction.sample.id) + ") not found in submission"
+                    sample_invalid_reason = (message, 2)
+                    sample_validation = {"sample": sample_invalid_reason}
                     rep_validations.append(sample_validation)
-                    all_pcrreplicates_validations.append({existing_rep['sample']: rep_validations})
+                    all_pcrreplicates_validations.append({existing_rep.sample_extraction.sample.id: rep_validations})
 
             for extraneous_rep in updated_pcrreplicates:
-                rep_validations = []
-                sample_validation = self.FieldValidation("sample")
                 sample_id = "(No Sample ID)"
                 if 'sample' not in extraneous_rep or extraneous_rep['sample'] is None:
-                    invalid_reason = self.FieldValidation.InvalidReason("sample is a required field", 1)
+                    sample_invalid_reason = ("sample is a required field", 1)
                 else:
-                    sample_id = extraneous_rep.get('sample')
-                    message = "sample" + sample_id + " is not in this PCR replicate batch"
-                    invalid_reason = self.FieldValidation.InvalidReason(message, 1)
-                sample_validation.invalid_reasons.append(invalid_reason)
-                rep_validations.append(sample_validation)
-                all_pcrreplicates_validations.append({sample_id: rep_validations})
+                    sample_id = str(extraneous_rep.get('sample'))
+                    message = "(sample_" + sample_id + ") is not in this PCR replicate batch"
+                    sample_invalid_reason = (message, 1)
+                all_pcrreplicates_validations.append({sample_id: {"sample": [sample_invalid_reason]}})
 
             all_pcrreplicates_validation = {"updated_pcrreplicates": all_pcrreplicates_validations}
             field_validations.append(all_pcrreplicates_validation)
 
-        return Response(field_validations)
+        return JsonResponse(field_validations, safe=False, status=200)
 
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):

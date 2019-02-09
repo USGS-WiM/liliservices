@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from datetime import date
 from django.db import models
@@ -27,7 +28,7 @@ def get_sci_val(decimal_val):
     :return: the scientific notation of the decimal value
     """
     sci_val = ''
-    if decimal_val:
+    if decimal_val is not None:
         if decimal_val == 0:
             sci_val = '0'
         else:
@@ -905,6 +906,67 @@ class PCRReplicate(HistoryModel):
     def replicate_concentration_sci(self):
         return get_sci_val(self.replicate_concentration)
 
+    @property
+    def invalid_reasons(self):
+        reasons = []
+        if self.invalid:
+            pcrreplicate_batch = PCRReplicateBatch.objects.filter(id=self.pcrreplicate_batch.id).first()
+            # first check related peg_neg validity
+            # assume no related peg_neg, in which case this control does not apply
+            # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
+            peg_neg_cq_values_missing = []
+            any_peg_neg_invalid = False
+            peg_neg_id = self.sample_extraction.sample.peg_neg
+            if peg_neg_id is not None:
+                peg_neg_invalid_flags = []
+                target_id = pcrreplicate_batch.target.id
+                # only check sample extractions with the same peg_neg_id as the sample of this data rep
+                ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
+                for ext_id in ext_ids:
+                    # only check reps with the same target as this data rep
+                    reps = PCRReplicate.objects.filter(sample_extraction=ext_id,
+                                                       pcrreplicate_batch__target__exact=target_id)
+                    # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
+                    for rep in reps:
+                        peg_neg_invalid_flags.append(rep.invalid)
+                        if not rep.gc_reaction:
+                            peg_neg_cq_values_missing.append({str(rep.id): {
+                                "sample": rep.sample_extraction.sample.id,
+                                "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
+                                "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
+                                "replicate_number": rep.pcrreplicate_batch.replicate_number,
+                                "target": rep.pcrreplicate_batch.target.id
+                            }})
+                any_peg_neg_invalid = any(peg_neg_invalid_flags)
+
+            # then check all controls applicable to this rep
+            if any_peg_neg_invalid:
+                reasons.append("peg_neg invalid")
+            if len(peg_neg_cq_values_missing) > 0:
+                reasons.append("peg_neg missing replicates: " + json.dumps(peg_neg_cq_values_missing))
+            if pcrreplicate_batch.ext_neg_cq_value is None:
+                reasons.append("ext_neg missing")
+            elif pcrreplicate_batch.ext_neg_cq_value > 0:
+                reasons.append("ext_neg positive")
+            # reverse transcriptions are a special case... not every extraction batch will have a RT,
+            # so if there is no RT, rt_neg_invalid is False regardless of the value of rt_neg_cq_value,
+            # but if there is a RT, apply the same logic as the other invalid flags
+            if pcrreplicate_batch.rt_neg_invalid:
+                if pcrreplicate_batch.rt_neg_cq_value is None:
+                    reasons.append("rt_neg missing")
+                elif pcrreplicate_batch.rt_neg_cq_value > 0:
+                    reasons.append("rt_neg positive")
+            if pcrreplicate_batch.pcr_neg_cq_value is None:
+                reasons.append("pcr_neg missing")
+            elif pcrreplicate_batch.pcr_neg_cq_value > 0:
+                reasons.append("pcr_neg positive")
+            if self.cq_value is None:
+                reasons.append("cq_value ('cp') missing")
+            if self.gc_reaction is None:
+                reasons.append("gc_reaction ('concentration') missing")
+
+        return reasons
+
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
     cq_value = NullableNonnegativeDecimalField2010()
@@ -918,53 +980,8 @@ class PCRReplicate(HistoryModel):
     # override the save method to assign or calculate concentration_unit, replicate_concentration, and invalid flag
     def save(self, *args, **kwargs):
         # assign the correct (and required) concentration unit value
-        self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
-
-        # if there is a gc_reaction value, calculate the replicate_concentration and set the concentration_unit
-        if self.gc_reaction is not None and self.gc_reaction > Decimal('0'):
-            # calculate their replicate_concentration
-            self.replicate_concentration = self.calc_rep_conc()
-
-        # assess the invalid flags
-        # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
-        #     1. all parent controls exist
-        #     2. all parent control flags are False (i.e., the controls are valid)
-        #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
-        if self.invalid_override is None:
-            if self.cq_value is not None and self.gc_reaction is not None:
-                pcrreplicate_batch = PCRReplicateBatch.objects.filter(id=self.pcrreplicate_batch.id).first()
-                # first check related peg_neg validity
-                # assume no related peg_neg, in which case this control does not apply
-                # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
-                any_peg_neg_invalid = False
-                peg_neg_id = self.sample_extraction.sample.peg_neg
-                if peg_neg_id is not None:
-                    peg_neg_invalid_flags = []
-                    target_id = pcrreplicate_batch.target.id
-                    # only check sample extractions with the same peg_neg_id as the sample of this data rep
-                    ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
-                    for ext_id in ext_ids:
-                        # only check reps with the same target as this data rep
-                        reps = PCRReplicate.objects.filter(sample_extraction=ext_id,
-                                                           pcrreplicate_batch__target__exact=target_id)
-                        # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                        for rep in reps:
-                            peg_neg_invalid_flags.append(rep.invalid)
-                    any_peg_neg_invalid = any(peg_neg_invalid_flags)
-                # then check all controls applicable to this rep
-                if (
-                        not any_peg_neg_invalid and
-                        not pcrreplicate_batch.ext_neg_invalid and
-                        not pcrreplicate_batch.rt_neg_invalid and
-                        not pcrreplicate_batch.pcr_neg_invalid and
-                        self.cq_value >= Decimal('0') and
-                        self.gc_reaction >= Decimal('0')
-                ):
-                    self.invalid = False
-                else:
-                    self.invalid = True
-            else:
-                self.invalid = True
+        if self.concentration_unit is None:
+            self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
 
         super(PCRReplicate, self).save(*args, **kwargs)
 
@@ -1044,6 +1061,49 @@ class PCRReplicate(HistoryModel):
             return final_value
         else:
             return None
+
+    def calc_invalid(self):
+        # assess the invalid flags
+        # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
+        #     1. all parent controls exist
+        #     2. all parent control flags are False (i.e., the controls are valid)
+        #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
+        if self.invalid_override is None:
+            if self.cq_value is not None and self.gc_reaction is not None:
+                pcrreplicate_batch = PCRReplicateBatch.objects.filter(id=self.pcrreplicate_batch.id).first()
+                # first check related peg_neg validity
+                # assume no related peg_neg, in which case this control does not apply
+                # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
+                any_peg_neg_invalid = False
+                peg_neg_id = self.sample_extraction.sample.peg_neg
+                if peg_neg_id is not None:
+                    peg_neg_invalid_flags = []
+                    target_id = pcrreplicate_batch.target.id
+                    # only check sample extractions with the same peg_neg_id as the sample of this data rep
+                    ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
+                    for ext_id in ext_ids:
+                        # only check reps with the same target as this data rep
+                        reps = PCRReplicate.objects.filter(sample_extraction=ext_id,
+                                                           pcrreplicate_batch__target__exact=target_id)
+                        # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
+                        for rep in reps:
+                            peg_neg_invalid_flags.append(rep.invalid)
+                    any_peg_neg_invalid = any(peg_neg_invalid_flags)
+                # then check all controls applicable to this rep
+                if (
+                        not any_peg_neg_invalid and
+                        not pcrreplicate_batch.ext_neg_invalid and
+                        not pcrreplicate_batch.rt_neg_invalid and
+                        not pcrreplicate_batch.pcr_neg_invalid and
+                        self.cq_value is not None and
+                        self.gc_reaction is not None
+                ):
+                    zero = Decimal('0')
+                    return False if self.cq_value >= zero and self.gc_reaction >= zero else False
+                else:
+                    return True
+            else:
+                return True
 
     def __str__(self):
         return str(self.id)
