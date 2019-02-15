@@ -634,6 +634,7 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
             new_samples = []
 
         # update the Analysis Batch object
+        instance.name = validated_data.get('name', instance.name)
         instance.analysis_batch_description = validated_data.get('analysis_batch_description',
                                                                  instance.analysis_batch_description)
         instance.analysis_batch_notes = validated_data.get('analysis_batch_notes', instance.analysis_batch_notes)
