@@ -979,8 +979,8 @@ class PCRReplicate(HistoryModel):
 
     # override the save method to assign or calculate concentration_unit, replicate_concentration, and invalid flag
     def save(self, *args, **kwargs):
-        # assign the correct (and required) concentration unit value
-        if self.concentration_unit is None:
+        # assign the correct (and required) concentration unit value on new records
+        if self.pk is None:
             self.concentration_unit = self.get_conc_unit(self.sample_extraction.sample.id)
 
         super(PCRReplicate, self).save(*args, **kwargs)
