@@ -894,21 +894,25 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             updated_pcrreplicates_sample_ids = [rep['sample'] for rep in updated_pcrreplicates]
 
             for existing_rep in existing_pcrreplicates:
+                sample_id = existing_rep.sample_extraction.sample.id
                 rep_validations = []
 
                 # attempt to find the matching updated rep
                 try:
-                    rep_index = updated_pcrreplicates_sample_ids.index(existing_rep.sample_extraction.sample.id)
+                    rep_index = updated_pcrreplicates_sample_ids.index(sample_id)
                     # pop the matching updated rep from its list so that we eventually end up with an empty list,
                     # or a list of extraneous reps
                     updated_rep = updated_pcrreplicates.pop(rep_index)
                     # also remove the parallel sample ID so that the two lists continue to have matching indexes
                     del updated_pcrreplicates_sample_ids[rep_index]
+
+                    # start building up the response object
+                    response_rep = {"sample": sample_id}
+
                     rep_validations = []
 
                     # check if this rep has already been uploaded
                     if existing_rep.cq_value is not None:
-                        sample_id = existing_rep.sample_extraction.sample.id
                         message = "sample " + str(sample_id) + " has already been uploaded for this PCR replicate batch"
                         sample_invalid_reason = {"message": message, "severity": 1}
                         sample_validation = {"sample": sample_invalid_reason}
@@ -921,8 +925,10 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                         cq_value_invalid_reason = {"message": "cq_value ('cp') is missing", "severity": 2}
                         cq_value_validation = {"cq_value": cq_value_invalid_reason}
                         rep_validations.append(cq_value_validation)
+                        response_rep['cq_value'] = ''
                     else:
                         rep_cq_value = updated_rep['cq_value']
+                        response_rep['cq_value'] = rep_cq_value
                         if not self.isnumber(rep_cq_value):
                             cq_value_invalid_reason = {"message": "cq_value ('cp') is not a number", "severity": 1}
                             cq_value_validation = {"cq_value": cq_value_invalid_reason}
@@ -940,31 +946,52 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                         gc_reaction_invalid_reason = {"message": message, "severity": 2}
                         gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
                         rep_validations.append(gc_reaction_validation)
+                        response_rep['gc_reaction'] = ''
+                        response_rep['gc_reaction_sci'] = ''
                     else:
                         rep_gc_reaction = updated_rep['gc_reaction']
+                        response_rep['gc_reaction'] = rep_gc_reaction
                         if not self.isnumber(rep_gc_reaction):
                             message = "gc_reaction ('concentration') is not a number"
                             gc_reaction_invalid_reason = {"message": message, "severity": 1}
                             gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
                             rep_validations.append(gc_reaction_validation)
+                            response_rep['gc_reaction_sci'] = ''
                         elif rep_gc_reaction < Decimal('0'):
                             message = "gc_reaction ('concentration') is less than zero"
                             gc_reaction_invalid_reason = {"message": message, "severity": 2}
                             gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
                             rep_validations.append(gc_reaction_validation)
+                            response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
                         else:
                             rep_validations.append({"gc_reaction": {}})
+                            response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
 
-                    all_pcrreplicates_validations.append({updated_rep['sample']: rep_validations})
+                    response_rep['replicate_concentration_sci'] = ''
+                    response_rep['validation_errors'] = rep_validations
+                    all_pcrreplicates_validations.append(response_rep)
 
+                # no matching updated_rep was found
                 except ValueError:
-                    message = "(sample " + str(existing_rep.sample_extraction.sample.id) + ") not found in submission"
-                    sample_invalid_reason = {"message": message, "severity": 2}
-                    sample_validation = {"sample": sample_invalid_reason}
-                    rep_validations.append(sample_validation)
-                    all_pcrreplicates_validations.append({existing_rep.sample_extraction.sample.id: rep_validations})
+                    # start building up the response object
+                    response_rep = {"sample": sample_id}
+                    response_rep['cq_value'] = ''
+                    response_rep['gc_reaction'] = ''
+                    response_rep['gc_reaction_sci'] = ''
+                    response_rep['replicate_concentration_sci'] = ''
 
+                    message = "(sample " + str(sample_id) + ") not found in submission"
+                    sample_invalid_reason = {"message": message, "severity": 2}
+                    rep_validations.append({"sample": sample_invalid_reason})
+                    rep_validations.append({"cq_value": {}})
+                    rep_validations.append({"gc_reaction": {}})
+
+                    response_rep['validation_errors'] = rep_validations
+                    all_pcrreplicates_validations.append(response_rep)
+
+            # now list out the other updated reps that were submitted but do not belong to this batch
             for extraneous_rep in updated_pcrreplicates:
+                rep_validations = []
                 sample_id = "(No Sample ID)"
                 if 'sample' not in extraneous_rep or extraneous_rep['sample'] is None:
                     sample_invalid_reason = {"message": "sample is a required field", "severity": 1}
@@ -972,7 +999,31 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                     sample_id = str(extraneous_rep.get('sample'))
                     message = "(sample_" + sample_id + ") is not in this PCR replicate batch"
                     sample_invalid_reason = {"message": message, "severity": 1}
-                all_pcrreplicates_validations.append({sample_id: {"sample": [sample_invalid_reason]}})
+
+                # start building up the response object
+                response_rep = {"sample": sample_id}
+                if 'cq_value' not in extraneous_rep or extraneous_rep['cq_value'] is None:
+                    response_rep['cq_value'] = ''
+                else:
+                    rep_cq_value = extraneous_rep['cq_value']
+                    response_rep['cq_value'] = rep_cq_value
+                if 'gc_reaction' not in extraneous_rep or extraneous_rep['gc_reaction'] is None:
+                    response_rep['gc_reaction'] = ''
+                    response_rep['gc_reaction_sci'] = ''
+                else:
+                    rep_gc_reaction = extraneous_rep['gc_reaction']
+                    response_rep['gc_reaction'] = rep_gc_reaction
+                    if not self.isnumber(rep_gc_reaction):
+                        response_rep['gc_reaction_sci'] = ''
+                    else:
+                        response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
+                response_rep['replicate_concentration_sci'] = ''
+
+                rep_validations.append({"sample": sample_invalid_reason})
+                rep_validations.append({"cq_value": {}})
+                rep_validations.append({"gc_reaction": {}})
+                response_rep['validation_errors'] = rep_validations
+                all_pcrreplicates_validations.append(response_rep)
 
             field_validations["updated_pcrreplicates"] = all_pcrreplicates_validations
 

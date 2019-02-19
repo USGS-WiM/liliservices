@@ -33,7 +33,7 @@ def get_sci_val(decimal_val):
             sci_val = '0'
         else:
             sci_val = '{0: E}'.format(decimal_val)
-            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.') + 'E' + sci_val.split('E')[1]
+            sci_val = sci_val.split('E')[0].rstrip('0').rstrip('.').lstrip() + 'E' + sci_val.split('E')[1]
     return sci_val
 
 
