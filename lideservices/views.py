@@ -525,7 +525,7 @@ class ExtractionMethodViewSet(HistoryViewSet):
 
 class ExtractionBatchViewSet(HistoryViewSet):
     queryset = ExtractionBatch.objects.all()
-    serializer_class = ExtractionBatchSerializer
+    # serializer_class = ExtractionBatchSerializer
 
     # override the default serializer_class if summary fields are requested
     def get_serializer_class(self):
@@ -562,8 +562,9 @@ class ExtractionBatchViewSet(HistoryViewSet):
                 else:
                     eb_id = item.pop('id')
                     eb = ExtractionBatch.objects.filter(id=eb_id).first()
+                    item['modified_by'] = request.user
                     if eb:
-                        serializer = self.serializer_class(eb, data=item, partial=True)
+                        serializer = self.get_serializer(eb, data=item, partial=True)
                         # if this item is valid, temporarily hold it until all items are proven valid, then save all
                         # if even one item is invalid, none will be saved, and the user will be returned the error(s)
                         if serializer.is_valid():

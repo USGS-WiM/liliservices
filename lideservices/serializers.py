@@ -715,8 +715,9 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
                 # if rt_pos_cq_value is included, update the related RT record
                 if 'rt_pos_cq_value' in validated_data:
                     rt = ReverseTranscription.objects.filter(extraction_batch=eb_id, re_rt=None)
-                    rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
-                    rt.save()
+                    if rt is not None:
+                        rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
+                        rt.save()
                 if 'request' in self.context and hasattr(self.context['request'], 'user'):
                     user = self.context['request'].user
                 else:
@@ -971,8 +972,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         # if rt_pos_cq_value is included, update the related RT record
         if 'rt_pos_cq_value' in validated_data:
             rt = ReverseTranscription.objects.filter(extraction_batch=instance.id, re_rt=None).first()
-            rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
-            rt.save()
+            if rt is not None:
+                rt.rt_pos_cq_value = validated_data['rt_pos_cq_value']
+                rt.save()
 
         return instance
 
@@ -1730,8 +1732,8 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'sampleextractions', 'reverse_transcriptions', 'targets',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'ext_pos_cq_value', 'ext_pos_gc_reaction', 'ext_pos_invalid', 'sampleextractions',
+                  'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
