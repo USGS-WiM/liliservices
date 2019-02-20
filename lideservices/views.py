@@ -751,6 +751,22 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         except ValueError:
             return False
 
+    def err_obj(self, field, message, severity):
+        return {"field": field, "message": message, "severity": severity}
+
+    def validate_controls(self, field):
+        synonym = " ('cp')" if 'cq_value' in field else " ('concentration')" if 'gc_reaction' in field else ''
+        invalid_reason = None
+        if field not in self.request.data or self.request.data[field] is None:
+            invalid_reason = self.err_obj(field, field + synonym + " is missing", 2)
+        elif not self.isnumber(self.request.data[field]):
+            invalid_reason = self.err_obj(field, field + synonym + " is not a number", 1)
+        elif self.request.data[field] > 0 and field not in ['pcr_pos_cq_value', 'pcr_pos_gc_reaction']:
+            # TODO: eventually we will also validate the pcr_pos_cq_value by testing if it is >0.5 cylces from expected
+            invalid_reason = self.err_obj(field, field + synonym + " is positive", 1)
+
+        return invalid_reason
+
     @action(methods=['post'], detail=False)
     def validate(self, request):
         validation_errors = []
@@ -787,101 +803,23 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             message += " and replicate number of " + str(request.data['replicate_number'])
             return Response({"pcrreplicate_batch": message}, status=400)
 
-        rt_exists = False
-        if extraction_batch.reversetranscriptions.count() > 0:
-            rt_exists = True
+        rt_exists = True if extraction_batch.reversetranscriptions.count() > 0 else False
 
-        # validate the controls
+        # start building up the response object
         field_validations = {"id": pcrreplicate_batch.id}
-        ext_neg_cq_value_invalid_reason = {}
-        ext_neg_gc_reaction_invalid_reason = {}
-        rt_neg_cq_value_invalid_reason = {}
-        rt_neg_gc_reaction_invalid_reason = {}
-        pcr_neg_cq_value_invalid_reason = {}
-        pcr_neg_gc_reaction_invalid_reason = {}
-        pcr_pos_cq_value_invalid_reason = {}
-        pcr_pos_gc_reaction_invalid_reason = {}
 
-        # validate ext_neg_cq_value
-        if 'ext_neg_cq_value' not in request.data or request.data['ext_neg_cq_value'] is None:
-            ext_neg_cq_value_invalid_reason = {"message": "ext_neg_cq_value ('cp') is missing", "severity": 2}
-        elif not self.isnumber(request.data['ext_neg_cq_value']):
-            ext_neg_cq_value_invalid_reason = {"message": "ext_neg_cq_value ('cp') is not a number", "severity": 1}
-        elif request.data['ext_neg_cq_value'] > 0:
-            ext_neg_cq_value_invalid_reason = {"message": "ext_neg_cq_value ('cp') is positive", "severity": 1}
-
-        # validate ext_neg_gc_reaction
-        if 'ext_neg_gc_reaction' not in request.data or request.data['ext_neg_gc_reaction'] is None:
-            message = "ext_neg_gc_reaction ('concentration') is missing"
-            ext_neg_gc_reaction_invalid_reason = {"message": message, "severity": 2}
-        elif not self.isnumber(request.data['ext_neg_gc_reaction']):
-            message = "ext_neg_gc_reaction ('cp') is not a number"
-            ext_neg_gc_reaction_invalid_reason = {"message": message, "severity": 1}
-        elif request.data['ext_neg_gc_reaction'] > 0:
-            ext_neg_gc_reaction_invalid_reason = {"message": "ext_neg_gc_reaction ('cp') is positive", "severity": 1}
-
-        if rt_exists:
-
-            # validate rt_neg_cq_value
-            if 'rt_neg_cq_value' not in request.data or request.data['rt_neg_cq_value'] is None:
-                rt_neg_cq_value_invalid_reason = {"message": "rt_neg_cq_value ('cp') is missing", "severity": 2}
-            elif not self.isnumber(request.data['rt_neg_cq_value']):
-                rt_neg_cq_value_invalid_reason = {"message": "rt_neg_cq_value ('cp') is not a number", "severity": 1}
-            elif request.data['rt_neg_cq_value'] > 0:
-                rt_neg_cq_value_invalid_reason = {"message": "rt_neg_cq_value ('cp') is positive", "severity": 1}
-
-            # validate rt_neg_gc_reaction
-            if 'rt_neg_gc_reaction' not in request.data or request.data['rt_neg_gc_reaction'] is None:
-                message = "rt_neg_gc_reaction ('concentration') is missing"
-                rt_neg_gc_reaction_invalid_reason = {"message": message, "severity": 2}
-            elif not self.isnumber(request.data['rt_neg_gc_reaction']):
-                message = "rt_neg_gc_reaction ('cp') is not a number"
-                rt_neg_gc_reaction_invalid_reason = {"message": message, "severity": 1}
-            elif request.data['rt_neg_gc_reaction'] > 0:
-                rt_neg_gc_reaction_invalid_reason = {"message": "rt_neg_gc_reaction ('cp') is positive", "severity": 1}
-
-        # validate pcr_neg_cq_value
-        if 'pcr_neg_cq_value' not in request.data or request.data['pcr_neg_cq_value'] is None:
-            pcr_neg_cq_value_invalid_reason = {"message": "pcr_neg_cq_value ('cp') is missing", "severity": 2}
-        elif not self.isnumber(request.data['pcr_neg_cq_value']):
-            pcr_neg_cq_value_invalid_reason = {"message": "pcr_neg_cq_value ('cp') is not a number", "severity": 1}
-        elif request.data['pcr_neg_cq_value'] > 0:
-            pcr_neg_cq_value_invalid_reason = {"message": "pcr_neg_cq_value ('cp') is positive", "severity": 1}
-
-        # validate pcr_neg_gc_reaction
-        if 'pcr_neg_gc_reaction' not in request.data or request.data['pcr_neg_gc_reaction'] is None:
-            message = "pcr_neg_gc_reaction ('concentration') is missing"
-            pcr_neg_gc_reaction_invalid_reason = {"message": message, "severity": 2}
-        elif not self.isnumber(request.data['pcr_neg_gc_reaction']):
-            message = "pcr_neg_gc_reaction ('cp') is not a number"
-            pcr_neg_gc_reaction_invalid_reason = {"message": message, "severity": 1}
-        elif request.data['pcr_neg_gc_reaction'] > 0:
-            pcr_neg_gc_reaction_invalid_reason = {"message": "pcr_neg_gc_reaction ('cp') is positive", "severity": 1}
-
-        # validate pcr_pos_cq_value
-        if 'pcr_pos_cq_value' not in request.data or request.data['pcr_pos_cq_value'] is None:
-            pcr_pos_cq_value_invalid_reason = {"message": "pcr_pos_cq_value ('cp') is missing", "severity": 2}
-        elif not self.isnumber(request.data['pcr_pos_cq_value']):
-            pcr_pos_cq_value_invalid_reason = {"message": "pcr_pos_cq_value ('cp') is not a number", "severity": 1}
-        # TODO: eventually we will also validate the pcr_pos_cq_value by testing if it is >0.5 cylces from expected
-
-        # validate pcr_pos_gc_reaction
-        if 'pcr_pos_gc_reaction' not in request.data or request.data['pcr_pos_gc_reaction'] is None:
-            message = "pcr_pos_gc_reaction ('concentration') is missing"
-            pcr_pos_gc_reaction_invalid_reason = {"message": message, "severity": 2}
-        elif not self.isnumber(request.data['pcr_pos_gc_reaction']):
-            message = "pcr_pos_gc_reaction ('cp') is not a number"
-            pcr_pos_gc_reaction_invalid_reason = {"message": message, "severity": 1}
-
-        # populate the response object with the current control field validations
-        field_validations["ext_neg_cq_value"] = ext_neg_cq_value_invalid_reason
-        field_validations["ext_neg_gc_reaction"] = ext_neg_gc_reaction_invalid_reason
-        field_validations["rt_neg_cq_value"] = rt_neg_cq_value_invalid_reason
-        field_validations["rt_neg_gc_reaction"] = rt_neg_gc_reaction_invalid_reason
-        field_validations["pcr_neg_cq_value"] = pcr_neg_cq_value_invalid_reason
-        field_validations["pcr_neg_gc_reaction"] = pcr_neg_gc_reaction_invalid_reason
-        field_validations["pcr_pos_cq_value"] = pcr_pos_cq_value_invalid_reason
-        field_validations["pcr_pos_gc_reaction"] = pcr_pos_gc_reaction_invalid_reason
+        # populate the response object with the submitted control values and the control validations
+        control_fields = ['ext_neg_cq_value', 'ext_neg_gc_reaction', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
+                          'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_pos_cq_value', 'pcr_pos_gc_reaction']
+        control_validations = []
+        for field in control_fields:
+                field_validations[field] = request.data[field] if field in request.data else None
+                # exclude RT fields if there are no RTs related to this extraction batch
+                if rt_exists:
+                    validation_error = self.validate_controls(field)
+                    if validation_error:
+                        control_validations.append(validation_error)
+        field_validations["validation_errors"] = control_validations
 
         # check that pcrreplicates have been submitted
         if 'updated_pcrreplicates' not in request.data or not request.data['updated_pcrreplicates']:
@@ -914,57 +852,38 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                     # check if this rep has already been uploaded
                     if existing_rep.cq_value is not None:
                         message = "sample " + str(sample_id) + " has already been uploaded for this PCR replicate batch"
-                        sample_invalid_reason = {"message": message, "severity": 1}
-                        sample_validation = {"sample": sample_invalid_reason}
-                        rep_validations.append(sample_validation)
-                    else:
-                        rep_validations.append({"sample": {}})
+                        rep_validations.append(self.err_obj("cq_value", message, 1))
 
                     # validate cq_value
                     if 'cq_value' not in updated_rep or updated_rep['cq_value'] is None:
-                        cq_value_invalid_reason = {"message": "cq_value ('cp') is missing", "severity": 2}
-                        cq_value_validation = {"cq_value": cq_value_invalid_reason}
-                        rep_validations.append(cq_value_validation)
-                        response_rep['cq_value'] = ''
+                        rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is missing", 2))
+                        response_rep['cq_value'] = None
                     else:
                         rep_cq_value = updated_rep['cq_value']
                         response_rep['cq_value'] = rep_cq_value
                         if not self.isnumber(rep_cq_value):
-                            cq_value_invalid_reason = {"message": "cq_value ('cp') is not a number", "severity": 1}
-                            cq_value_validation = {"cq_value": cq_value_invalid_reason}
-                            rep_validations.append(cq_value_validation)
+                            rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is not a number", 1))
                         elif rep_cq_value < Decimal('0'):
-                            cq_value_invalid_reason = {"message": "cq_value ('cp') is less than zero", "severity":  2}
-                            cq_value_validation = {"cq_value": cq_value_invalid_reason}
-                            rep_validations.append(cq_value_validation)
-                        else:
-                            rep_validations.append({"cq_value": {}})
+                            rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is less than zero", 2))
 
                     # validate gc_reaction
                     if 'gc_reaction' not in updated_rep or updated_rep['gc_reaction'] is None:
                         message = "gc_reaction ('concentration') is missing"
-                        gc_reaction_invalid_reason = {"message": message, "severity": 2}
-                        gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
-                        rep_validations.append(gc_reaction_validation)
-                        response_rep['gc_reaction'] = ''
+                        rep_validations.append(self.err_obj("gc_reaction", message, 2))
+                        response_rep['gc_reaction'] = None
                         response_rep['gc_reaction_sci'] = ''
                     else:
                         rep_gc_reaction = updated_rep['gc_reaction']
                         response_rep['gc_reaction'] = rep_gc_reaction
                         if not self.isnumber(rep_gc_reaction):
                             message = "gc_reaction ('concentration') is not a number"
-                            gc_reaction_invalid_reason = {"message": message, "severity": 1}
-                            gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
-                            rep_validations.append(gc_reaction_validation)
+                            rep_validations.append(self.err_obj("gc_reaction", message, 1))
                             response_rep['gc_reaction_sci'] = ''
                         elif rep_gc_reaction < Decimal('0'):
                             message = "gc_reaction ('concentration') is less than zero"
-                            gc_reaction_invalid_reason = {"message": message, "severity": 2}
-                            gc_reaction_validation = {"gc_reaction": gc_reaction_invalid_reason}
-                            rep_validations.append(gc_reaction_validation)
+                            rep_validations.append(self.err_obj("gc_reaction", message, 2))
                             response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
                         else:
-                            rep_validations.append({"gc_reaction": {}})
                             response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
 
                     response_rep['replicate_concentration_sci'] = ''
@@ -975,16 +894,13 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 except ValueError:
                     # start building up the response object
                     response_rep = {"sample": sample_id}
-                    response_rep['cq_value'] = ''
-                    response_rep['gc_reaction'] = ''
+                    response_rep['cq_value'] = None
+                    response_rep['gc_reaction'] = None
                     response_rep['gc_reaction_sci'] = ''
                     response_rep['replicate_concentration_sci'] = ''
 
-                    message = "(sample " + str(sample_id) + ") not found in submission"
-                    sample_invalid_reason = {"message": message, "severity": 2}
-                    rep_validations.append({"sample": sample_invalid_reason})
-                    rep_validations.append({"cq_value": {}})
-                    rep_validations.append({"gc_reaction": {}})
+                    message = "sample " + str(sample_id) + " not found in submission"
+                    rep_validations.append(self.err_obj("sample", message, 2))
 
                     response_rep['validation_errors'] = rep_validations
                     all_pcrreplicates_validations.append(response_rep)
@@ -994,11 +910,11 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 rep_validations = []
                 sample_id = "(No Sample ID)"
                 if 'sample' not in extraneous_rep or extraneous_rep['sample'] is None:
-                    sample_invalid_reason = {"message": "sample is a required field", "severity": 1}
+                    validation_error = self.err_obj("sample", "sample is a required field", 1)
                 else:
                     sample_id = str(extraneous_rep.get('sample'))
-                    message = "(sample_" + sample_id + ") is not in this PCR replicate batch"
-                    sample_invalid_reason = {"message": message, "severity": 1}
+                    message = "sample " + sample_id + " is not in this PCR replicate batch"
+                    validation_error = self.err_obj("sample", message, 1)
 
                 # start building up the response object
                 response_rep = {"sample": sample_id}
@@ -1019,9 +935,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                         response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
                 response_rep['replicate_concentration_sci'] = ''
 
-                rep_validations.append({"sample": sample_invalid_reason})
-                rep_validations.append({"cq_value": {}})
-                rep_validations.append({"gc_reaction": {}})
+                rep_validations.append(validation_error)
                 response_rep['validation_errors'] = rep_validations
                 all_pcrreplicates_validations.append(response_rep)
 
@@ -1168,13 +1082,13 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                         suggested_dilution_factor = None
                         diff = pos - cq
                         # If INH CONT Cq minus Sample Cq<2 cycles, then dilution factor = 1 (no dilution)
-                        # If INH CONT Cq minus Sample Cq>=2 cycles AND Sample Cq>36, then dilution factor = 5
-                        # If INH CONT Cq minus Sample Cq>2 cycles AND Sample Cq<36 or no Cq, then dilution factor = 10
+                        # If INH CONT Cq minus Sample Cq>=2 cycles AND Sample Cq<36, then dilution factor = 5
+                        # If INH CONT Cq minus Sample Cq>2 cycles AND Sample Cq>36 or no Cq, then dilution factor = 10
                         if 0.0 <= diff < 2.0:
                             suggested_dilution_factor = 1
-                        elif diff >= 2.0 and cq > 36.0:
+                        elif diff >= 2.0 and cq < 36.0:
                             suggested_dilution_factor = 5
-                        elif diff > 2.0 and cq < 36.0:
+                        elif diff > 2.0 and cq > 36.0:
                             suggested_dilution_factor = 10
                         # if 0.0 <= diff <= 1.0:
                         #     suggested_dilution_factor = 1
