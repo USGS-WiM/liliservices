@@ -1095,11 +1095,10 @@ class PCRReplicate(HistoryModel):
                         not pcrreplicate_batch.ext_neg_invalid and
                         not pcrreplicate_batch.rt_neg_invalid and
                         not pcrreplicate_batch.pcr_neg_invalid and
-                        self.cq_value is not None and
-                        self.gc_reaction is not None
+                        self.cq_value is not None and self.cq_value >= Decimal('0') and
+                        self.gc_reaction is not None and self.gc_reaction >= Decimal('0')
                 ):
-                    zero = Decimal('0')
-                    return False if self.cq_value >= zero and self.gc_reaction >= zero else False
+                    return False
                 else:
                     return True
             else:
