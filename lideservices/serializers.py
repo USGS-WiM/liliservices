@@ -1182,6 +1182,8 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         instance.replicate_concentration = instance.calc_rep_conc()
         if not instance.invalid_override:
             instance.invalid = instance.calc_invalid()
+        else:
+            instance.invalid = validated_data.get('invalid', instance.invalid)
 
         instance.save()
 
