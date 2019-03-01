@@ -1103,6 +1103,8 @@ class PCRReplicate(HistoryModel):
                     return True
             else:
                 return True
+        else:
+            return self.invalid if self.invalid else True
 
     def __str__(self):
         return str(self.id)
