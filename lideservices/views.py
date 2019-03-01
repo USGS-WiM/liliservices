@@ -886,7 +886,6 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                         else:
                             response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
 
-                    response_rep['replicate_concentration_sci'] = ''
                     response_rep['validation_errors'] = rep_validations
                     all_pcrreplicates_validations.append(response_rep)
 
@@ -897,7 +896,6 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                     response_rep['cq_value'] = None
                     response_rep['gc_reaction'] = None
                     response_rep['gc_reaction_sci'] = ''
-                    response_rep['replicate_concentration_sci'] = ''
 
                     message = "sample " + str(sample_id) + " not found in submission"
                     rep_validations.append(self.err_obj("sample", message, 2))
@@ -933,7 +931,6 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                         response_rep['gc_reaction_sci'] = ''
                     else:
                         response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
-                response_rep['replicate_concentration_sci'] = ''
 
                 rep_validations.append(validation_error)
                 response_rep['validation_errors'] = rep_validations
