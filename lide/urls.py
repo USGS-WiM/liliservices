@@ -17,6 +17,9 @@ from django.conf.urls import url, include
 from django.conf import settings
 from django.contrib import admin
 
+handler500 = 'rest_framework.exceptions.server_error'
+handler400 = 'rest_framework.exceptions.bad_request'
+
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     #url(r'^media/(?P<path>.*)$', 'django.views.static.serve', {'document_root': settings.MEDIA_ROOT, }),

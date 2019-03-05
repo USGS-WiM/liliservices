@@ -177,6 +177,7 @@ class Sample(HistoryModel):
 
     class Meta:
         db_table = "lide_sample"
+        ordering = ['id']
 
 
 class Aliquot(HistoryModel):
