@@ -549,7 +549,7 @@ class FinalSampleMeanConcentration(HistoryModel):
                 if rep.replicate_concentration >= 0:
                     reps_count += 1
                     pos_replicate_concentrations.append(rep.replicate_concentration)
-        return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else 0
+        return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else None
 
     def __str__(self):
         return str(self.id)
