@@ -126,7 +126,7 @@ class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinalSampleMeanConcentration
         fields = ('id', 'final_sample_mean_concentration', 'final_sample_mean_concentration_sci', 'sample', 'target',
-                  'target_string', 'collaborator_sample_id', 'collection_start_date', 'missing_replicates',
+                  'target_string', 'collaborator_sample_id', 'collection_start_date', 'no_value_reasons',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -1189,20 +1189,6 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
         return instance
 
-    def get_inhibition_dilution_factor(self, obj):
-        sample_extraction_id = obj.sample_extraction_id
-        sample_extraction = SampleExtraction.objects.get(id=sample_extraction_id)
-        pcrreplicate_batch_id = obj.pcrreplicate_batch_id
-        pcrreplicate_batch = PCRReplicateBatch.objects.get(id=pcrreplicate_batch_id)
-        nucleic_acid_type = pcrreplicate_batch.target.nucleic_acid_type
-        if nucleic_acid_type == 'DNA':
-            data = sample_extraction.inhibition_dna.dilution_factor
-        elif nucleic_acid_type == 'RNA':
-            data = sample_extraction.inhibition_rna.dilution_factor
-        else:
-            data = None
-        return data
-
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     cq_value = NullableRStrip10DecimalField()
@@ -1210,7 +1196,6 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
     replicate_concentration = RStrip100DecimalField()
     sample = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample', read_only=True)
     peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
-    inhibition_dilution_factor = serializers.SerializerMethodField()
     invalid_override_string = serializers.StringRelatedField(source='invalid_override')
 
     class Meta:

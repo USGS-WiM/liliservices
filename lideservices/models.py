@@ -513,20 +513,42 @@ class FinalSampleMeanConcentration(HistoryModel):
         return get_sci_val(self.final_sample_mean_concentration)
 
     @property
-    def missing_replicates(self):
+    def no_value_reasons(self):
         missing_replicates = []
-        # check whether all replicates have been uploaded
-        reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
-                                           pcrreplicate_batch__target__exact=self.target)
-        for rep in reps:
-            if ((rep.invalid is False and rep.pcrreplicate_batch.re_pcr is None and rep.replicate_concentration is None)
-                    or (rep.invalid is True and rep.pcrreplicate_batch.re_pcr is None and rep.cq_value is None)):
-                missing_replicates.append({
-                    "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
-                    "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
-                    "replicate_number": rep.pcrreplicate_batch.replicate_number
-                })
-        return missing_replicates
+        missing_inhibitions = []
+        if self.final_sample_mean_concentration is None:
+            # check whether all replicates have been uploaded
+            reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
+                                               pcrreplicate_batch__target__exact=self.target)
+            for rep in reps:
+                if ((rep.invalid is False
+                     and rep.pcrreplicate_batch.re_pcr is None
+                     and rep.replicate_concentration is None)
+                        or (rep.invalid is True
+                            and rep.pcrreplicate_batch.re_pcr is None
+                            and rep.cq_value is None)):
+                    missing_replicates.append({
+                        "id": rep.id,
+                        "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
+                        "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
+                        "replicate_number": rep.pcrreplicate_batch.replicate_number
+                    })
+                if rep.inhibition_dilution_factor is None:
+                    nucleic_acid_type = rep.pcrreplicate_batch.target.nucleic_acid_type
+                    if nucleic_acid_type == 'RNA':
+                        inhibition_id = rep.sample_extraction.inhibition_rna.id
+                    else:
+                        inhibition_id = rep.sample_extraction.inhibition_dna.id
+                    missing_inhibitions.append({
+                        "id": inhibition_id,
+                        "sample": rep.sample_extraction.sample.id,
+                        "extraction_batch": rep.pcrreplicate_batch.extraction_batch.id,
+                        "nucleic_acid_type": nucleic_acid_type.name
+                    })
+        if missing_replicates or missing_inhibitions:
+            return {"missing_replicates": missing_replicates, "missing_inhibitions": missing_inhibitions}
+        else:
+            return None
 
     final_sample_mean_concentration = NullableNonnegativeDecimalField120100()
     sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
@@ -967,6 +989,17 @@ class PCRReplicate(HistoryModel):
                 reasons.append("gc_reaction ('concentration') missing")
 
         return reasons
+
+    def inhibition_dilution_factor(self):
+        sample_extraction = self.sample_extraction
+        nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
+        if nucleic_acid_type == 'DNA':
+            data = sample_extraction.inhibition_dna.dilution_factor
+        elif nucleic_acid_type == 'RNA':
+            data = sample_extraction.inhibition_rna.dilution_factor
+        else:
+            data = None
+        return data
 
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
