@@ -513,7 +513,7 @@ class FinalSampleMeanConcentration(HistoryModel):
         return get_sci_val(self.final_sample_mean_concentration)
 
     @property
-    def no_value_reasons(self):
+    def no_concentration_reasons(self):
         missing_replicates = []
         missing_inhibitions = []
         if self.final_sample_mean_concentration is None:
@@ -521,12 +521,9 @@ class FinalSampleMeanConcentration(HistoryModel):
             reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
                                                pcrreplicate_batch__target__exact=self.target)
             for rep in reps:
-                if ((rep.invalid is False
-                     and rep.pcrreplicate_batch.re_pcr is None
-                     and rep.replicate_concentration is None)
-                        or (rep.invalid is True
-                            and rep.pcrreplicate_batch.re_pcr is None
-                            and rep.cq_value is None)):
+                if (rep.pcrreplicate_batch.re_pcr is None and
+                    ((rep.invalid is False and rep.replicate_concentration is None)
+                        or (rep.invalid is True and rep.cq_value is None))):
                     missing_replicates.append({
                         "id": rep.id,
                         "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
@@ -534,16 +531,17 @@ class FinalSampleMeanConcentration(HistoryModel):
                         "replicate_number": rep.pcrreplicate_batch.replicate_number
                     })
                 if rep.inhibition_dilution_factor is None:
-                    nucleic_acid_type = rep.pcrreplicate_batch.target.nucleic_acid_type
-                    if nucleic_acid_type == 'RNA':
+                    nucleic_acid_type_name = rep.pcrreplicate_batch.target.nucleic_acid_type.name
+                    if nucleic_acid_type_name == 'RNA':
                         inhibition_id = rep.sample_extraction.inhibition_rna.id
                     else:
                         inhibition_id = rep.sample_extraction.inhibition_dna.id
+                    # print(rep.id, inhibition_id)
                     missing_inhibitions.append({
                         "id": inhibition_id,
                         "sample": rep.sample_extraction.sample.id,
                         "extraction_batch": rep.pcrreplicate_batch.extraction_batch.id,
-                        "nucleic_acid_type": nucleic_acid_type.name
+                        "nucleic_acid_type": nucleic_acid_type_name
                     })
         if missing_replicates or missing_inhibitions:
             return {"missing_replicates": missing_replicates, "missing_inhibitions": missing_inhibitions}
@@ -990,6 +988,7 @@ class PCRReplicate(HistoryModel):
 
         return reasons
 
+    @property
     def inhibition_dilution_factor(self):
         sample_extraction = self.sample_extraction
         nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type

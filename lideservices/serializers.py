@@ -126,7 +126,7 @@ class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinalSampleMeanConcentration
         fields = ('id', 'final_sample_mean_concentration', 'final_sample_mean_concentration_sci', 'sample', 'target',
-                  'target_string', 'collaborator_sample_id', 'collection_start_date', 'no_value_reasons',
+                  'target_string', 'collaborator_sample_id', 'collection_start_date', 'no_concentration_reasons',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
