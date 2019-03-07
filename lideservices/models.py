@@ -553,8 +553,11 @@ class FinalSampleMeanConcentration(HistoryModel):
     target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
 
     # Calculate sample mean concentration for all samples whose target replicates are now in the database
+    # Concentrations from replicates are used to determine the Mean Sample Concentration
+    # by taking the average of positive replicates (negative replicates (value of "0") are ignored).
+    # If all replicates are negative ("0"), then the Mean Sample Concentration is "0".
     def calc_sample_mean_conc(self):
-        reps_count = 0
+        pos_reps_count = 0
         pos_replicate_concentrations = []
         reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
                                            pcrreplicate_batch__target__exact=self.target)
@@ -566,10 +569,12 @@ class FinalSampleMeanConcentration(HistoryModel):
                     # this rep has no replicate_concentration
                     # therefore not all sample-target combos are in the DB, so set this FSMC to null
                     return None
-                if rep.replicate_concentration >= 0:
-                    reps_count += 1
+                if rep.replicate_concentration > 0:
+                    pos_reps_count += 1
                     pos_replicate_concentrations.append(rep.replicate_concentration)
-        return sum(pos_replicate_concentrations) / reps_count if reps_count > 0 else None
+        # all all sample-target combos are in the DB, so calculate the mean,
+        # unless there are no positive replicates, in which case just return zero
+        return sum(pos_replicate_concentrations) / pos_reps_count if pos_reps_count > 0 else 0
 
     def __str__(self):
         return str(self.id)
@@ -989,6 +994,22 @@ class PCRReplicate(HistoryModel):
         return reasons
 
     @property
+    def no_concentration_reasons(self):
+        reasons = []
+        if self.replicate_concentration is None:
+            sample = self.sample_extraction.sample
+            if self.inhibition_dilution_factor is None:
+                reasons.append("inhibition dilution_factor missing")
+            if (sample.matrix.code in ['F', 'W', 'WW']
+                    and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
+                reasons.append("final_concentrated_sample_volume missing")
+            if sample.matrix.code == 'A' and sample.dissolution_volume is None:
+                reasons.append("sample dissolution_volume missing")
+            if sample.matrix.code == 'SM' and sample.post_dilution_volume is None:
+                reasons.append("sample post_dilution_volume missing")
+        return reasons
+
+    @property
     def inhibition_dilution_factor(self):
         sample_extraction = self.sample_extraction
         nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
@@ -999,6 +1020,28 @@ class PCRReplicate(HistoryModel):
         else:
             data = None
         return data
+
+    @property
+    def calculation_values(self):
+        eb = self.sample_extraction.extraction_batch
+        sample = self.sample_extraction.sample
+        calc_vals = {
+            "nucleic_acid_type_name": self.pcrreplicate_batch.target.nucleic_acid_type.name,
+            "matrix_code": sample.matrix.code,
+            "qpcr_reaction_volume": eb.qpcr_reaction_volume,
+            "qpcr_template_volume": eb.qpcr_template_volume,
+            "elution_volume": eb.elution_volume,
+            "extraction_volume": eb.extraction_volume,
+            "sample_dilution_factor": eb.sample_dilution_factor,
+            "inhibition_dilution_factor": self.inhibition_dilution_factor,
+            "total_volume_or_mass_sampled": sample.total_volume_or_mass_sampled,
+            "final_concentrated_sample_volume": sample.final_concentrated_sample_volume.final_concentrated_sample_volume,
+            "dissolution_volume": sample.dissolution_volume,
+            "post_dilution_volume": sample.post_dilution_volume
+        }
+        # final_concentrated_sample_volume = FinalConcentratedSampleVolume.objects.values_list(
+        #     'final_concentrated_sample_volume', flat=True).get(sample=self.sample_extraction.sample.id)
+        return calc_vals
 
     sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
     pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
@@ -1042,29 +1085,44 @@ class PCRReplicate(HistoryModel):
             conc_unit = Unit.objects.get(name='Liter')
         return conc_unit
 
-    # TODO: ask what to do about zeros
     # Calculate replicate_concentration, but only if gc_reaction is a positive number
+    # Equations are for determining the final concentration for a replicate.
+    # Concentrations from replicates are used to determine the Mean Sample Concentration
+    # by taking the average of positive replicates (negative replicates (value of "0") are ignored).
+    # If all replicates are negative ("0"), then the Mean Sample Concentration is "0".
     def calc_rep_conc(self):
-        if self.gc_reaction is not None and self.gc_reaction > Decimal('0'):
-            nucleic_acid_type = self.pcrreplicate_batch.target.nucleic_acid_type
-            extr = self.sample_extraction
-            eb = self.sample_extraction.extraction_batch
+        # ensure that all necessary values are not null, otherwise return null
+        # aside from the following, all other necessary fields are required (not nullable) at time of creation
+        # all reps must have gc_reaction and inhibition_dilution_factor
+        # reps with matrix F, W, or WW must have final_concentrated_sample_volume
+        # reps with matrix A must have dissolution_volume
+        # reps with matrix SM must have post_dilution_volume
+        if (self.gc_reaction is not None and self.gc_reaction > Decimal('0')
+                and self.inhibition_dilution_factor is not None):
             sample = self.sample_extraction.sample
             matrix = sample.matrix.code
-            # TODO: ensure that all necessary values are not null (more than just the following line)
-            if None in (eb.qpcr_reaction_volume, eb.qpcr_template_volume, eb.elution_volume, eb.extraction_volume,
-                        eb.sample_dilution_factor):
-                # escape the whole process and notify user of missing data that is required
-                pass
+
+            if (matrix in ['F', 'W', 'WW']
+                    and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
+                return None
+            elif matrix == 'A' and sample.dissolution_volume is None:
+                return None
+            elif matrix == 'SM' and sample.post_dilution_volume is None:
+                return None
+
+            nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
+            extr = self.sample_extraction
+            eb = self.sample_extraction.extraction_batch
+
             # first apply the universal expressions
             prelim_value = (self.gc_reaction / eb.qpcr_reaction_volume) * (
                     eb.qpcr_reaction_volume / eb.qpcr_template_volume) * (
                                    eb.elution_volume / eb.extraction_volume) * (
                                eb.sample_dilution_factor)
-            if nucleic_acid_type == 'DNA':
+            if nucleic_acid_type_name == 'DNA':
                 prelim_value = prelim_value * extr.inhibition_dna.dilution_factor
             # apply the RT the expression if applicable
-            elif nucleic_acid_type == 'RNA':
+            elif nucleic_acid_type_name == 'RNA':
                 # assume that there can be only one RT per EB, except when there is a re_rt,
                 # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
                 # that references the only valid RT;

@@ -454,7 +454,7 @@ class AnalysisBatchDetailViewSet(HistoryViewSet):
                 queryset = queryset.filter(id__in=batch_list)
             else:
                 queryset = queryset.filter(id__exact=batch)
-        return queryset	
+        return queryset
 
 
 class AnalysisBatchSummaryViewSet(HistoryViewSet):
@@ -670,7 +670,6 @@ class SampleExtractionViewSet(HistoryViewSet):
 
 
 class PCRReplicateViewSet(HistoryViewSet):
-    queryset = PCRReplicate.objects.all()
     serializer_class = PCRReplicateSerializer
 
     def get_serializer(self, *args, **kwargs):
@@ -683,7 +682,18 @@ class PCRReplicateViewSet(HistoryViewSet):
 
         return super(PCRReplicateViewSet, self).get_serializer(*args, **kwargs)
 
-    # override the default PATCH method to allow bulk processing
+    def get_queryset(self):
+        queryset = PCRReplicate.objects.all()
+        id = self.request.query_params.get('id', None)
+        if id is not None:
+            if LIST_DELIMETER in id:
+                id_list = id.split(',')
+                queryset = queryset.filter(id__in=id_list)
+            else:
+                queryset = queryset.filter(id__exact=id)
+        return queryset
+
+# override the default PATCH method to allow bulk processing
     def patch(self, request, pk=None):
         request_data = JSONParser().parse(request)
         # if there is no pk, assume this is a bulk request

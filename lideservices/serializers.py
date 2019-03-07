@@ -1128,32 +1128,18 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
 
         return ret
 
-    def get_inhibition_dilution_factor(self, obj):
-        sample_extraction_id = obj.sample_extraction_id
-        sample_extraction = SampleExtraction.objects.get(id=sample_extraction_id)
-        pcrreplicate_batch_id = obj.pcrreplicate_batch_id
-        pcrreplicate_batch = PCRReplicateBatch.objects.get(id=pcrreplicate_batch_id)
-        nucleic_acid_type = pcrreplicate_batch.target.nucleic_acid_type
-        if nucleic_acid_type == 'DNA':
-            data = sample_extraction.inhibition_dna.dilution_factor
-        elif nucleic_acid_type == 'RNA':
-            data = sample_extraction.inhibition_rna.dilution_factor
-        else:
-            data = None
-        return data
-
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
     sample = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample', read_only=True)
     peg_neg = serializers.PrimaryKeyRelatedField(source='sample_extraction.sample.peg_neg', read_only=True)
-    inhibition_dilution_factor = serializers.SerializerMethodField()
     invalid_override_string = serializers.StringRelatedField(source='invalid_override')
 
     class Meta:
         model = PCRReplicate
         fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
-                  'invalid', 'invalid_override', 'invalid_override_string', 'invalid_reasons',
+                  'no_concentration_reasons', 'invalid', 'invalid_override', 'invalid_override_string',
+                  'invalid_reasons', 'calculation_values',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         extra_kwargs = {
             'concentration_unit': {'required': False}
@@ -1202,8 +1188,8 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         model = PCRReplicate
         fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
                   'cq_value', 'gc_reaction', 'gc_reaction_sci', 'replicate_concentration',
-                  'replicate_concentration_sci', 'concentration_unit', 'invalid', 'invalid_override',
-                  'invalid_override_string', 'invalid_reasons',
+                  'replicate_concentration_sci', 'concentration_unit', 'no_concentration_reasons', 'invalid',
+                  'invalid_override', 'invalid_override_string', 'invalid_reasons', 'calculation_values',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = PCRReplicateListSerializer
         extra_kwargs = {
