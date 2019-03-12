@@ -525,14 +525,14 @@ class FinalSampleMeanConcentration(HistoryModel):
             return identifier_obj
 
         total_count = 0
-        qpcr_results_missing = []
-        concentration_calc_values_missing = []
+        qpcr_results_null = []
+        concentration_calc_values_null = []
         positive_concentrations = []
         negative_concentrations = []
         invalids = []
         redones = []
-        qpcr_results_missing_count = 0
-        concentration_calc_values_missing_count = 0
+        qpcr_results_null_count = 0
+        concentration_calc_values_null_count = 0
         positive_concentration_count = 0
         negative_concentration_count = 0
         invalid_count = 0
@@ -547,8 +547,8 @@ class FinalSampleMeanConcentration(HistoryModel):
             if rep.pcrreplicate_batch.re_pcr is None:
                 if rep.invalid is False:
                     if rep.replicate_concentration is None:
-                        concentration_calc_values_missing_count += 1
-                        concentration_calc_values_missing.append(make_rep_identifier_object(rep))
+                        concentration_calc_values_null_count += 1
+                        concentration_calc_values_null.append(make_rep_identifier_object(rep))
                     elif rep.replicate_concentration > 0:
                         positive_concentration_count += 1
                         positive_concentrations.append(make_rep_identifier_object(rep))
@@ -558,8 +558,8 @@ class FinalSampleMeanConcentration(HistoryModel):
                         negative_concentrations.append(make_rep_identifier_object(rep))
                 else:
                     if rep.cq_value is None:
-                        qpcr_results_missing_count += 1
-                        qpcr_results_missing.append(make_rep_identifier_object(rep))
+                        qpcr_results_null_count += 1
+                        qpcr_results_null.append(make_rep_identifier_object(rep))
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
                         invalid_count += 1
@@ -569,10 +569,10 @@ class FinalSampleMeanConcentration(HistoryModel):
                 redones.append(make_rep_identifier_object(rep))
 
         data = {
-            "qpcr_results_missing_count": qpcr_results_missing_count,
-            "qpcr_results_missing": qpcr_results_missing,
-            "concentration_calc_values_missing_count": concentration_calc_values_missing_count,
-            "concentration_calc_values_missing": concentration_calc_values_missing,
+            "qpcr_results_null_count": qpcr_results_null_count,
+            "qpcr_results_null": qpcr_results_null,
+            "concentration_calc_values_null_count": concentration_calc_values_null_count,
+            "concentration_calc_values_null": concentration_calc_values_null,
             "positive_concentration_count": positive_concentration_count,
             "positive_concentrations": positive_concentrations,
             "negative_concentration_count": negative_concentration_count,
@@ -595,17 +595,17 @@ class FinalSampleMeanConcentration(HistoryModel):
     def calc_sample_mean_conc(self):
         sample_target_replicates = self.sample_target_replicates
 
-        if (sample_target_replicates['missing_replicate_count'] == 0
-                and sample_target_replicates['missing_inhibition_count'] == 0):
+        if (sample_target_replicates['qpcr_results_null_count'] == 0
+                and sample_target_replicates['concentration_calc_values_null_count'] == 0):
 
-            pos_reps_count = sample_target_replicates['positive_replicate_count']
+            pos_reps_count = sample_target_replicates['positive_concentration_count']
             if pos_reps_count > 0:
                 pos_replicate_concentrations = list(PCRReplicate.objects.filter(
-                    id__in=sample_target_replicates['positive_replicates']).values_list(
+                    id__in=sample_target_replicates['positive_concentrations']).values_list(
                     'replicate_concentration', flat=True))
                 return sum(pos_replicate_concentrations) / pos_reps_count
             else:
-                if sample_target_replicates['negative_replicate_count'] > 0:
+                if sample_target_replicates['negative_concentration_count'] > 0:
                     return 0
                 else:
                     return None
@@ -970,13 +970,13 @@ class PCRReplicate(HistoryModel):
 
     @property
     def invalid_reasons(self):
-        reasons = []
+        reasons = {}
         if self.invalid:
             pcrreplicate_batch = PCRReplicateBatch.objects.filter(id=self.pcrreplicate_batch.id).first()
             # first check related peg_neg validity
             # assume no related peg_neg, in which case this control does not apply
             # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
-            peg_neg_cq_values_missing = []
+            peg_neg_cq_values_null = []
             any_peg_neg_invalid = False
             peg_neg_id = self.sample_extraction.sample.peg_neg
             if peg_neg_id is not None:
@@ -992,7 +992,7 @@ class PCRReplicate(HistoryModel):
                     for rep in reps:
                         peg_neg_invalid_flags.append(rep.invalid)
                         if not rep.gc_reaction:
-                            peg_neg_cq_values_missing.append({str(rep.id): {
+                            peg_neg_cq_values_null.append({str(rep.id): {
                                 "sample": rep.sample_extraction.sample.id,
                                 "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
                                 "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
@@ -1003,54 +1003,85 @@ class PCRReplicate(HistoryModel):
 
             # then check all controls applicable to this rep
             if any_peg_neg_invalid:
-                reasons.append("peg_neg invalid")
-            if len(peg_neg_cq_values_missing) > 0:
-                reasons.append("peg_neg missing replicates: " + json.dumps(peg_neg_cq_values_missing))
+                reasons["peg_neg_invalid"] = True
+            else:
+                reasons["peg_neg_invalid"] = False
+            if len(peg_neg_cq_values_null) > 0:
+                reasons["peg_neg_null_replicates"] = json.dumps(peg_neg_cq_values_null)
+            else:
+                reasons["peg_neg_null_replicates"] = ""
             if pcrreplicate_batch.ext_neg_cq_value is None:
-                reasons.append("ext_neg missing")
-            elif pcrreplicate_batch.ext_neg_cq_value > 0:
-                reasons.append("ext_neg positive")
+                reasons["ext_neg_null"] = True
+            else:
+                reasons["ext_neg_null"] = False
+            if pcrreplicate_batch.ext_neg_cq_value > 0:
+                reasons["ext_neg_positive"] = True
+            else:
+                reasons["ext_neg_positive"] = False
             # reverse transcriptions are a special case... not every extraction batch will have a RT,
             # so if there is no RT, rt_neg_invalid is False regardless of the value of rt_neg_cq_value,
             # but if there is a RT, apply the same logic as the other invalid flags
             if pcrreplicate_batch.rt_neg_invalid:
                 if pcrreplicate_batch.rt_neg_cq_value is None:
-                    reasons.append("rt_neg missing")
-                elif pcrreplicate_batch.rt_neg_cq_value > 0:
-                    reasons.append("rt_neg positive")
+                    reasons["rt_neg_null"] = True
+                else:
+                    reasons["rt_neg_null"] = False
+                if pcrreplicate_batch.rt_neg_cq_value > 0:
+                    reasons["rt_neg_positive"] = True
+                else:
+                    reasons["rt_neg_positive"] = False
+            else:
+                reasons["rt_neg_null"] = False
+                reasons["rt_neg_positive"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is None:
-                reasons.append("pcr_neg missing")
-            elif pcrreplicate_batch.pcr_neg_cq_value > 0:
-                reasons.append("pcr_neg positive")
+                reasons["pcr_neg_null"] = True
+            else:
+                reasons["pcr_neg_null"] = False
+            if pcrreplicate_batch.pcr_neg_cq_value > 0:
+                reasons["pcr_neg_positive"] = True
+            else:
+                reasons["pcr_neg_positive"] = False
             if self.cq_value is None:
-                reasons.append("cq_value ('cp') missing")
+                reasons["cq_value_null"] = True
+            else:
+                reasons["cq_value_null"] = False
             if self.gc_reaction is None:
-                reasons.append("gc_reaction ('concentration') missing")
+                reasons["gc_reaction_null"] = True
+            else:
+                reasons["gc_reaction_null"] = False
+        else:
+            reasons = {
+                "peg_neg_invalid": False, "peg_neg_null_replicates": False,
+                "ext_neg_null": False, "ext_neg_positive": False,
+                "rt_neg_null": False, "rt_neg_positive": False,
+                "pcr_neg_null": False, "pcr_neg_positive": False,
+                "cq_value_null": False, "gc_reaction_null": False
+            }
 
         return reasons
 
     @property
-    def no_concentration_reasons(self):
-        reasons = {}
+    def missing_calculation_values(self):
+        values = {}
         sample = self.sample_extraction.sample
         if self.inhibition_dilution_factor is None:
-            reasons["inhibition dilution_factor missing"] = True
+            values["inhibition_dilution_factor"] = True
         else:
-            reasons["inhibition dilution_factor missing"] = False
+            values["inhibition_dilution_factor"] = False
         if (sample.matrix.code in ['F', 'W', 'WW']
                 and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
-            reasons["final_concentrated_sample_volume missing"] = True
+            values["final_concentrated_sample_volume"] = True
         else:
-            reasons["final_concentrated_sample_volume missing"] = False
+            values["final_concentrated_sample_volume"] = False
         if sample.matrix.code == 'A' and sample.dissolution_volume is None:
-            reasons["sample dissolution_volume missing"] = True
+            values["sample dissolution_volume"] = True
         else:
-            reasons["sample dissolution_volume missing"] = False
+            values["sample dissolution_volume"] = False
         if sample.matrix.code == 'SM' and sample.post_dilution_volume is None:
-            reasons["sample post_dilution_volume missing"] = True
+            values["sample post_dilution_volume"] = True
         else:
-            reasons["sample post_dilution_volume missing"] = False
-        return reasons
+            values["sample post_dilution_volume"] = False
+        return values
 
     @property
     def inhibition(self):
