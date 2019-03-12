@@ -512,42 +512,6 @@ class FinalSampleMeanConcentration(HistoryModel):
     def final_sample_mean_concentration_sci(self):
         return get_sci_val(self.final_sample_mean_concentration)
 
-    # @property
-    # def no_concentration_reasons(self):
-    #     missing_replicates = []
-    #     missing_inhibitions = []
-    #     if self.final_sample_mean_concentration is None:
-    #         # check whether all replicates have been uploaded
-    #         reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
-    #                                            pcrreplicate_batch__target__exact=self.target)
-    #         for rep in reps:
-    #             if (rep.pcrreplicate_batch.re_pcr is None and
-    #                 ((rep.invalid is False and rep.replicate_concentration is None)
-    #                     or (rep.invalid is True and rep.cq_value is None))):
-    #                 missing_replicates.append({
-    #                     "id": rep.id,
-    #                     "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
-    #                     "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
-    #                     "replicate_number": rep.pcrreplicate_batch.replicate_number
-    #                 })
-    #             if rep.inhibition_dilution_factor is None:
-    #                 nucleic_acid_type_name = rep.pcrreplicate_batch.target.nucleic_acid_type.name
-    #                 if nucleic_acid_type_name == 'RNA':
-    #                     inhibition_id = rep.sample_extraction.inhibition_rna.id
-    #                 else:
-    #                     inhibition_id = rep.sample_extraction.inhibition_dna.id
-    #                 # print(rep.id, inhibition_id)
-    #                 missing_inhibitions.append({
-    #                     "id": inhibition_id,
-    #                     "sample": rep.sample_extraction.sample.id,
-    #                     "extraction_batch": rep.pcrreplicate_batch.extraction_batch.id,
-    #                     "nucleic_acid_type": nucleic_acid_type_name
-    #                 })
-    #     if missing_replicates or missing_inhibitions:
-    #         return {"missing_replicates": missing_replicates, "missing_inhibitions": missing_inhibitions}
-    #     else:
-    #         return None
-
     @property
     def sample_target_replicates(self):
 
@@ -560,78 +524,63 @@ class FinalSampleMeanConcentration(HistoryModel):
             }
             return identifier_obj
 
-        missing_replicates = []
-        missing_inhibitions = []
-        missing_inhibition_ids = []
-        positive_replicates = []
-        negative_replicates = []
-        invalid_replicates = []
-        redone_replicates = []
-        missing_replicate_count = 0
-        missing_inhibition_count = 0
-        positive_replicate_count = 0
-        negative_replicate_count = 0
-        invalid_replicate_count = 0
-        redone_replicate_count = 0
+        total_count = 0
+        qpcr_results_missing = []
+        concentration_calc_values_missing = []
+        positive_concentrations = []
+        negative_concentrations = []
+        invalids = []
+        redones = []
+        qpcr_results_missing_count = 0
+        concentration_calc_values_missing_count = 0
+        positive_concentration_count = 0
+        negative_concentration_count = 0
+        invalid_count = 0
+        redone_count = 0
 
         reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
                                            pcrreplicate_batch__target__exact=self.target)
         for rep in reps:
+            total_count += 1
             # ignore invalid reps and 'redones' (batches that have been redone)
             # in other words, only allow valid reps for batches that have not been redone
             if rep.pcrreplicate_batch.re_pcr is None:
                 if rep.invalid is False:
                     if rep.replicate_concentration is None:
-                        missing_replicate_count += 1
-                        missing_replicates.append(make_rep_identifier_object(rep))
+                        concentration_calc_values_missing_count += 1
+                        concentration_calc_values_missing.append(make_rep_identifier_object(rep))
                     elif rep.replicate_concentration > 0:
-                        positive_replicate_count += 1
-                        positive_replicates.append(make_rep_identifier_object(rep))
+                        positive_concentration_count += 1
+                        positive_concentrations.append(make_rep_identifier_object(rep))
                     else:
-                        # a negative replicate_concentration is impossible due to the model field definition
-                        negative_replicate_count += 1
-                        negative_replicates.append(make_rep_identifier_object(rep))
+                        # a replicate_concentration less than zero is impossible due to the model field definition
+                        negative_concentration_count += 1
+                        negative_concentrations.append(make_rep_identifier_object(rep))
                 else:
                     if rep.cq_value is None:
-                        missing_replicate_count += 1
-                        missing_replicates.append(make_rep_identifier_object(rep))
+                        qpcr_results_missing_count += 1
+                        qpcr_results_missing.append(make_rep_identifier_object(rep))
                     else:
-                        # a negative cq_value is impossible due to the model field definition
-                        invalid_replicate_count += 1
-                        invalid_replicates.append(make_rep_identifier_object(rep))
-                if rep.inhibition_dilution_factor is None:
-                    nucleic_acid_type_name = rep.pcrreplicate_batch.target.nucleic_acid_type.name
-                    if nucleic_acid_type_name == 'RNA':
-                        inhibition_id = rep.sample_extraction.inhibition_rna.id
-                    else:
-                        inhibition_id = rep.sample_extraction.inhibition_dna.id
-                    if inhibition_id not in missing_inhibition_ids:
-                        missing_inhibition_ids.append(inhibition_id)
-                        missing_inhibition_count += 1
-                        missing_inhibitions.append({
-                            "id": inhibition_id,
-                            "sample": rep.sample_extraction.sample.id,
-                            "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
-                            "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
-                            "nucleic_acid_type": nucleic_acid_type_name
-                        })
+                        # a cq_value less than zero is impossible due to the model field definition
+                        invalid_count += 1
+                        invalids.append(make_rep_identifier_object(rep))
             else:
-                redone_replicate_count += 1
-                redone_replicates.append(make_rep_identifier_object(rep))
+                redone_count += 1
+                redones.append(make_rep_identifier_object(rep))
 
         data = {
-            "missing_replicate_count": missing_replicate_count,
-            "missing_replicates": missing_replicates,
-            "missing_inhibition_count": missing_inhibition_count,
-            "missing_inhibitions": missing_inhibitions,
-            "positive_replicate_count": positive_replicate_count,
-            "positive_replicates": positive_replicates,
-            "negative_replicate_count": negative_replicate_count,
-            "negative_replicates": negative_replicates,
-            "invalid_replicate_count": invalid_replicate_count,
-            "invalid_replicates": invalid_replicates,
-            "redone_replicate_count": redone_replicate_count,
-            "redone_replicates": redone_replicates
+            "qpcr_results_missing_count": qpcr_results_missing_count,
+            "qpcr_results_missing": qpcr_results_missing,
+            "concentration_calc_values_missing_count": concentration_calc_values_missing_count,
+            "concentration_calc_values_missing": concentration_calc_values_missing,
+            "positive_concentration_count": positive_concentration_count,
+            "positive_concentrations": positive_concentrations,
+            "negative_concentration_count": negative_concentration_count,
+            "negative_concentrations": negative_concentrations,
+            "invalid_count": invalid_count,
+            "invalids": invalids,
+            "redone_count": redone_count,
+            "redones": redones
         }
         return data
 
@@ -1082,19 +1031,45 @@ class PCRReplicate(HistoryModel):
 
     @property
     def no_concentration_reasons(self):
-        reasons = []
-        if self.replicate_concentration is None:
-            sample = self.sample_extraction.sample
-            if self.inhibition_dilution_factor is None:
-                reasons.append("inhibition dilution_factor missing")
-            if (sample.matrix.code in ['F', 'W', 'WW']
-                    and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
-                reasons.append("final_concentrated_sample_volume missing")
-            if sample.matrix.code == 'A' and sample.dissolution_volume is None:
-                reasons.append("sample dissolution_volume missing")
-            if sample.matrix.code == 'SM' and sample.post_dilution_volume is None:
-                reasons.append("sample post_dilution_volume missing")
+        reasons = {}
+        sample = self.sample_extraction.sample
+        if self.inhibition_dilution_factor is None:
+            reasons["inhibition dilution_factor missing"] = True
+        else:
+            reasons["inhibition dilution_factor missing"] = False
+        if (sample.matrix.code in ['F', 'W', 'WW']
+                and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
+            reasons["final_concentrated_sample_volume missing"] = True
+        else:
+            reasons["final_concentrated_sample_volume missing"] = False
+        if sample.matrix.code == 'A' and sample.dissolution_volume is None:
+            reasons["sample dissolution_volume missing"] = True
+        else:
+            reasons["sample dissolution_volume missing"] = False
+        if sample.matrix.code == 'SM' and sample.post_dilution_volume is None:
+            reasons["sample post_dilution_volume missing"] = True
+        else:
+            reasons["sample post_dilution_volume missing"] = False
         return reasons
+
+    @property
+    def inhibition(self):
+        sample_extraction = self.sample_extraction
+        nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
+        if nucleic_acid_type_name == 'DNA':
+            inhibition_id = sample_extraction.inhibition_dna.id
+        elif nucleic_acid_type_name == 'RNA':
+            inhibition_id = sample_extraction.inhibition_rna.id
+        else:
+            inhibition_id = None
+        data = {
+            "id": inhibition_id,
+            "sample": self.sample_extraction.sample.id,
+            "analysis_batch": self.pcrreplicate_batch.extraction_batch.analysis_batch.id,
+            "extraction_number": self.pcrreplicate_batch.extraction_batch.extraction_number,
+            "nucleic_acid_type": nucleic_acid_type_name
+        }
+        return data
 
     @property
     def inhibition_dilution_factor(self):
@@ -1240,6 +1215,8 @@ class PCRReplicate(HistoryModel):
         else:
             return None
 
+    # TODO: if the rep itself comes from a pegneg sample, and it is invalid,
+    #  also invalidate all related reps with the same target from samples using that pegneg
     def calc_invalid(self):
         # assess the invalid flags
         # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:

@@ -1136,10 +1136,10 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
-                  'cq_value', 'gc_reaction', 'replicate_concentration', 'concentration_unit',
-                  'no_concentration_reasons', 'invalid', 'invalid_override', 'invalid_override_string',
-                  'invalid_reasons', 'calculation_values',
+        fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition', 'inhibition_dilution_factor',
+                  'pcrreplicate_batch', 'cq_value', 'gc_reaction', 'gc_reaction_sci', 'replicate_concentration',
+                  'replicate_concentration_sci', 'concentration_unit', 'no_concentration_reasons', 'calculation_values',
+                  'invalid', 'invalid_override', 'invalid_override_string', 'invalid_reasons',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         extra_kwargs = {
             'concentration_unit': {'required': False}
@@ -1186,10 +1186,10 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PCRReplicate
-        fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition_dilution_factor', 'pcrreplicate_batch',
-                  'cq_value', 'gc_reaction', 'gc_reaction_sci', 'replicate_concentration',
-                  'replicate_concentration_sci', 'concentration_unit', 'no_concentration_reasons', 'invalid',
-                  'invalid_override', 'invalid_override_string', 'invalid_reasons', 'calculation_values',
+        fields = ('id', 'sample_extraction', 'sample', 'peg_neg', 'inhibition', 'inhibition_dilution_factor',
+                  'pcrreplicate_batch', 'cq_value', 'gc_reaction', 'gc_reaction_sci', 'replicate_concentration',
+                  'replicate_concentration_sci', 'concentration_unit', 'no_concentration_reasons', 'calculation_values',
+                  'invalid', 'invalid_override', 'invalid_override_string', 'invalid_reasons',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = PCRReplicateListSerializer
         extra_kwargs = {
