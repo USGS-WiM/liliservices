@@ -67,7 +67,7 @@ class SampleViewSet(HistoryViewSet):
 
     @action(detail=False)
     def get_sampler_names(self, request):
-        sampler_names = Sample.objects.values_list('sampler_name', flat=True).distinct()
+        sampler_names = set(list(Sample.objects.values_list('sampler_name', flat=True)))
         return Response({"sampler_names": sampler_names})
 
     @action(detail=False)

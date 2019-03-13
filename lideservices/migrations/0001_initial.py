@@ -213,7 +213,7 @@ class Migration(migrations.Migration):
                 ('modified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='freezerlocation_modifier', to=settings.AUTH_USER_MODEL)),
             ],
             options={
-                'db_table': 'lide_freezer_location',
+                'db_table': 'lide_freezerlocation',
             },
         ),
         migrations.CreateModel(
@@ -391,6 +391,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'lide_sample',
+                'ordering': ['id'],
             },
         ),
         migrations.CreateModel(
@@ -424,6 +425,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'lide_sampleextraction',
+                'ordering': ['sample', 'id'],
             },
         ),
         migrations.CreateModel(

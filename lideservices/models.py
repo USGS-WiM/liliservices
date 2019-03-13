@@ -441,7 +441,7 @@ class FreezerLocation(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_freezer_location"
+        db_table = "lide_freezerlocation"
         unique_together = ("freezer", "rack", "box", "row", "spot")
 
 
@@ -1014,7 +1014,7 @@ class PCRReplicate(HistoryModel):
                 reasons["ext_neg_null"] = True
             else:
                 reasons["ext_neg_null"] = False
-            if pcrreplicate_batch.ext_neg_cq_value > 0:
+            if pcrreplicate_batch.ext_neg_cq_value is not None and pcrreplicate_batch.ext_neg_cq_value > 0:
                 reasons["ext_neg_positive"] = True
             else:
                 reasons["ext_neg_positive"] = False
@@ -1026,7 +1026,7 @@ class PCRReplicate(HistoryModel):
                     reasons["rt_neg_null"] = True
                 else:
                     reasons["rt_neg_null"] = False
-                if pcrreplicate_batch.rt_neg_cq_value > 0:
+                if pcrreplicate_batch.rt_neg_cq_value is not None and pcrreplicate_batch.rt_neg_cq_value > 0:
                     reasons["rt_neg_positive"] = True
                 else:
                     reasons["rt_neg_positive"] = False
@@ -1037,7 +1037,7 @@ class PCRReplicate(HistoryModel):
                 reasons["pcr_neg_null"] = True
             else:
                 reasons["pcr_neg_null"] = False
-            if pcrreplicate_batch.pcr_neg_cq_value > 0:
+            if pcrreplicate_batch.pcr_neg_cq_value is not None and pcrreplicate_batch.pcr_neg_cq_value > 0:
                 reasons["pcr_neg_positive"] = True
             else:
                 reasons["pcr_neg_positive"] = False
