@@ -1124,7 +1124,21 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
                 # calculate the replicate_concentration and invalidity
                 data['replicate_concentration'] = self.child.calc_rep_conc()
                 data['invalid'] = self.child.calc_invalid()
-                ret.append(self.child.update(pcrrep, data))
+                self.child.update(pcrrep, data)
+                ret.append(self.child)
+
+                # if the rep is a pegneg, find all data reps related to that pegneg and recalc their invalid flags
+                sample = self.child.sample_extraction.sample
+                if sample.record_type.id == 2 and sample.peg_neg is None:
+                    related_sample_ids = list(Sample.objects.filter(peg_neg=sample.id).values_list('id', flat=True))
+                    related_ext_ids = SampleExtraction.objects.filter(sample__in=related_sample_ids)
+                    reps = PCRReplicate.objects.filter(sample_extraction__in=related_ext_ids,
+                                                       pcrreplicate_batch__target__exact=
+                                                       self.child.pcrreplicate_batch.target.id)
+                    # calculate the invalidity
+                    for rep in reps:
+                        rep.invalid = rep.calc_invalid()
+                        rep.save()
 
         return ret
 
@@ -1170,6 +1184,18 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
             instance.invalid = instance.calc_invalid()
         else:
             instance.invalid = validated_data.get('invalid', instance.invalid)
+
+        # if the rep is a pegneg, find all data reps related to that pegneg and recalc their invalid flags
+        sample = instance.sample_extraction.sample
+        if sample.record_type.id == 2 and sample.peg_neg is None:
+            related_sample_ids = list(Sample.objects.filter(peg_neg=sample.id).values_list('id', flat=True))
+            related_ext_ids = SampleExtraction.objects.filter(sample__in=related_sample_ids)
+            reps = PCRReplicate.objects.filter(sample_extraction__in=related_ext_ids,
+                                               pcrreplicate_batch__target__exact=instance.pcrreplicate_batch.target.id)
+            # calculate the invalidity
+            for rep in reps:
+                rep.invalid = rep.calc_invalid()
+                rep.save()
 
         instance.save()
 

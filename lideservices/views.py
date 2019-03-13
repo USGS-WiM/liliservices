@@ -865,36 +865,40 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                         rep_validations.append(self.err_obj("cq_value", message, 1))
 
                     # validate cq_value
-                    if 'cq_value' not in updated_rep or updated_rep['cq_value'] is None:
+                    # remember that null is an acceptable value
+                    if 'cq_value' not in updated_rep:  # or updated_rep['cq_value'] is None:
                         rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is missing", 2))
-                        response_rep['cq_value'] = None
                     else:
                         rep_cq_value = updated_rep['cq_value']
                         response_rep['cq_value'] = rep_cq_value
-                        if not self.isnumber(rep_cq_value):
-                            rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is not a number", 1))
-                        elif rep_cq_value < Decimal('0'):
-                            rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is less than zero", 2))
+                        if rep_cq_value is not None:
+                            if not self.isnumber(rep_cq_value):
+                                rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is not a number", 1))
+                            elif rep_cq_value < Decimal('0'):
+                                rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is less than zero", 2))
 
                     # validate gc_reaction
-                    if 'gc_reaction' not in updated_rep or updated_rep['gc_reaction'] is None:
+                    # remember that null is an acceptable value
+                    if 'gc_reaction' not in updated_rep:  # or updated_rep['gc_reaction'] is None:
                         message = "gc_reaction ('concentration') is missing"
                         rep_validations.append(self.err_obj("gc_reaction", message, 2))
-                        response_rep['gc_reaction'] = None
-                        response_rep['gc_reaction_sci'] = ''
                     else:
                         rep_gc_reaction = updated_rep['gc_reaction']
                         response_rep['gc_reaction'] = rep_gc_reaction
-                        if not self.isnumber(rep_gc_reaction):
-                            message = "gc_reaction ('concentration') is not a number"
-                            rep_validations.append(self.err_obj("gc_reaction", message, 1))
-                            response_rep['gc_reaction_sci'] = ''
-                        elif rep_gc_reaction < Decimal('0'):
-                            message = "gc_reaction ('concentration') is less than zero"
-                            rep_validations.append(self.err_obj("gc_reaction", message, 2))
-                            response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
+                        if rep_gc_reaction is not None:
+                            if not self.isnumber(rep_gc_reaction):
+                                message = "gc_reaction ('concentration') is not a number"
+                                rep_validations.append(self.err_obj("gc_reaction", message, 1))
+                                response_rep['gc_reaction_sci'] = ''
+                            elif rep_gc_reaction < Decimal('0'):
+                                message = "gc_reaction ('concentration') is less than zero"
+                                rep_validations.append(self.err_obj("gc_reaction", message, 2))
+                                response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
+                            else:
+                                response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
                         else:
-                            response_rep['gc_reaction_sci'] = get_sci_val(rep_gc_reaction)
+                            response_rep['gc_reaction'] = None
+                            response_rep['gc_reaction_sci'] = ''
 
                     response_rep['validation_errors'] = rep_validations
                     all_pcrreplicates_validations.append(response_rep)
@@ -903,11 +907,8 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 except ValueError:
                     # start building up the response object
                     response_rep = {"sample": sample_id}
-                    response_rep['cq_value'] = None
-                    response_rep['gc_reaction'] = None
-                    response_rep['gc_reaction_sci'] = ''
 
-                    message = "sample " + str(sample_id) + " not found in submission"
+                    message = "sample " + str(sample_id) + " expected by not found in submission"
                     rep_validations.append(self.err_obj("sample", message, 2))
 
                     response_rep['validation_errors'] = rep_validations
@@ -926,14 +927,13 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
                 # start building up the response object
                 response_rep = {"sample": sample_id}
-                if 'cq_value' not in extraneous_rep or extraneous_rep['cq_value'] is None:
-                    response_rep['cq_value'] = ''
+                if 'cq_value' not in extraneous_rep:
+                    continue
                 else:
                     rep_cq_value = extraneous_rep['cq_value']
                     response_rep['cq_value'] = rep_cq_value
-                if 'gc_reaction' not in extraneous_rep or extraneous_rep['gc_reaction'] is None:
-                    response_rep['gc_reaction'] = ''
-                    response_rep['gc_reaction_sci'] = ''
+                if 'gc_reaction' not in extraneous_rep:
+                    continue
                 else:
                     rep_gc_reaction = extraneous_rep['gc_reaction']
                     response_rep['gc_reaction'] = rep_gc_reaction
