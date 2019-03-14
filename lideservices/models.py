@@ -525,14 +525,14 @@ class FinalSampleMeanConcentration(HistoryModel):
             return identifier_obj
 
         total_count = 0
-        qpcr_results_null = []
-        concentration_calc_values_null = []
+        qpcr_results_missing = []
+        concentration_calc_values_missing = []
         positive_concentrations = []
         negative_concentrations = []
         invalids = []
         redones = []
-        qpcr_results_null_count = 0
-        concentration_calc_values_null_count = 0
+        qpcr_results_missing_count = 0
+        concentration_calc_values_missing_count = 0
         positive_concentration_count = 0
         negative_concentration_count = 0
         invalid_count = 0
@@ -547,8 +547,8 @@ class FinalSampleMeanConcentration(HistoryModel):
             if rep.pcrreplicate_batch.re_pcr is None:
                 if rep.invalid is False:
                     if rep.replicate_concentration is None:
-                        concentration_calc_values_null_count += 1
-                        concentration_calc_values_null.append(make_rep_identifier_object(rep))
+                        concentration_calc_values_missing_count += 1
+                        concentration_calc_values_missing.append(make_rep_identifier_object(rep))
                     elif rep.replicate_concentration > 0:
                         positive_concentration_count += 1
                         positive_concentrations.append(make_rep_identifier_object(rep))
@@ -558,8 +558,8 @@ class FinalSampleMeanConcentration(HistoryModel):
                         negative_concentrations.append(make_rep_identifier_object(rep))
                 else:
                     if rep.cq_value is None:
-                        qpcr_results_null_count += 1
-                        qpcr_results_null.append(make_rep_identifier_object(rep))
+                        qpcr_results_missing_count += 1
+                        qpcr_results_missing.append(make_rep_identifier_object(rep))
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
                         invalid_count += 1
@@ -569,10 +569,10 @@ class FinalSampleMeanConcentration(HistoryModel):
                 redones.append(make_rep_identifier_object(rep))
 
         data = {
-            "qpcr_results_null_count": qpcr_results_null_count,
-            "qpcr_results_null": qpcr_results_null,
-            "concentration_calc_values_null_count": concentration_calc_values_null_count,
-            "concentration_calc_values_null": concentration_calc_values_null,
+            "qpcr_results_missing_count": qpcr_results_missing_count,
+            "qpcr_results_missing": qpcr_results_missing,
+            "concentration_calc_values_missing_count": concentration_calc_values_missing_count,
+            "concentration_calc_values_missing": concentration_calc_values_missing,
             "positive_concentration_count": positive_concentration_count,
             "positive_concentrations": positive_concentrations,
             "negative_concentration_count": negative_concentration_count,
@@ -595,13 +595,14 @@ class FinalSampleMeanConcentration(HistoryModel):
     def calc_sample_mean_conc(self):
         sample_target_replicates = self.sample_target_replicates
 
-        if (sample_target_replicates['qpcr_results_null_count'] == 0
-                and sample_target_replicates['concentration_calc_values_null_count'] == 0):
+        if (sample_target_replicates['qpcr_results_missing_count'] == 0
+                and sample_target_replicates['concentration_calc_values_missing_count'] == 0):
 
             pos_reps_count = sample_target_replicates['positive_concentration_count']
             if pos_reps_count > 0:
+                rep_ids = [rep['id'] for rep in sample_target_replicates['positive_concentrations']]
                 pos_replicate_concentrations = list(PCRReplicate.objects.filter(
-                    id__in=sample_target_replicates['positive_concentrations']).values_list(
+                    id__in=rep_ids).values_list(
                     'replicate_concentration', flat=True))
                 return sum(pos_replicate_concentrations) / pos_reps_count
             else:
@@ -976,7 +977,7 @@ class PCRReplicate(HistoryModel):
             # first check related peg_neg validity
             # assume no related peg_neg, in which case this control does not apply
             # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
-            peg_neg_cq_values_null = []
+            peg_neg_cq_values_missing = []
             any_peg_neg_invalid = False
             peg_neg_id = self.sample_extraction.sample.peg_neg
             if peg_neg_id is not None:
@@ -992,7 +993,7 @@ class PCRReplicate(HistoryModel):
                     for rep in reps:
                         peg_neg_invalid_flags.append(rep.invalid)
                         if not rep.gc_reaction:
-                            peg_neg_cq_values_null.append({str(rep.id): {
+                            peg_neg_cq_values_missing.append({str(rep.id): {
                                 "sample": rep.sample_extraction.sample.id,
                                 "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
                                 "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
@@ -1006,14 +1007,14 @@ class PCRReplicate(HistoryModel):
                 reasons["peg_neg_invalid"] = True
             else:
                 reasons["peg_neg_invalid"] = False
-            if len(peg_neg_cq_values_null) > 0:
-                reasons["peg_neg_null_replicates"] = json.dumps(peg_neg_cq_values_null)
+            if len(peg_neg_cq_values_missing) > 0:
+                reasons["peg_neg_missing_replicates"] = json.dumps(peg_neg_cq_values_missing)
             else:
-                reasons["peg_neg_null_replicates"] = ""
+                reasons["peg_neg_missing_replicates"] = ""
             if pcrreplicate_batch.ext_neg_cq_value is None:
-                reasons["ext_neg_null"] = True
+                reasons["ext_neg_missing"] = True
             else:
-                reasons["ext_neg_null"] = False
+                reasons["ext_neg_missing"] = False
             if pcrreplicate_batch.ext_neg_cq_value is not None and pcrreplicate_batch.ext_neg_cq_value > 0:
                 reasons["ext_neg_positive"] = True
             else:
@@ -1023,39 +1024,39 @@ class PCRReplicate(HistoryModel):
             # but if there is a RT, apply the same logic as the other invalid flags
             if pcrreplicate_batch.rt_neg_invalid:
                 if pcrreplicate_batch.rt_neg_cq_value is None:
-                    reasons["rt_neg_null"] = True
+                    reasons["rt_neg_missing"] = True
                 else:
-                    reasons["rt_neg_null"] = False
+                    reasons["rt_neg_missing"] = False
                 if pcrreplicate_batch.rt_neg_cq_value is not None and pcrreplicate_batch.rt_neg_cq_value > 0:
                     reasons["rt_neg_positive"] = True
                 else:
                     reasons["rt_neg_positive"] = False
             else:
-                reasons["rt_neg_null"] = False
+                reasons["rt_neg_missing"] = False
                 reasons["rt_neg_positive"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is None:
-                reasons["pcr_neg_null"] = True
+                reasons["pcr_neg_missing"] = True
             else:
-                reasons["pcr_neg_null"] = False
+                reasons["pcr_neg_missing"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is not None and pcrreplicate_batch.pcr_neg_cq_value > 0:
                 reasons["pcr_neg_positive"] = True
             else:
                 reasons["pcr_neg_positive"] = False
             if self.cq_value is None:
-                reasons["cq_value_null"] = True
+                reasons["cq_value_missing"] = True
             else:
-                reasons["cq_value_null"] = False
+                reasons["cq_value_missing"] = False
             if self.gc_reaction is None:
-                reasons["gc_reaction_null"] = True
+                reasons["gc_reaction_missing"] = True
             else:
-                reasons["gc_reaction_null"] = False
+                reasons["gc_reaction_missing"] = False
         else:
             reasons = {
-                "peg_neg_invalid": False, "peg_neg_null_replicates": False,
-                "ext_neg_null": False, "ext_neg_positive": False,
-                "rt_neg_null": False, "rt_neg_positive": False,
-                "pcr_neg_null": False, "pcr_neg_positive": False,
-                "cq_value_null": False, "gc_reaction_null": False
+                "peg_neg_invalid": False, "peg_neg_missing_replicates": False,
+                "ext_neg_missing": False, "ext_neg_positive": False,
+                "rt_neg_missing": False, "rt_neg_positive": False,
+                "pcr_neg_missing": False, "pcr_neg_positive": False,
+                "cq_value_missing": False, "gc_reaction_missing": False
             }
 
         return reasons
@@ -1190,59 +1191,62 @@ class PCRReplicate(HistoryModel):
         # reps with matrix F, W, or WW must have final_concentrated_sample_volume
         # reps with matrix A must have dissolution_volume
         # reps with matrix SM must have post_dilution_volume
-        if (self.gc_reaction is not None and self.gc_reaction > Decimal('0')
-                and self.inhibition_dilution_factor is not None):
-            sample = self.sample_extraction.sample
-            matrix = sample.matrix.code
+        if self.gc_reaction is not None and self.inhibition_dilution_factor is not None:
+            if self.gc_reaction > Decimal('0'):
+                sample = self.sample_extraction.sample
+                matrix = sample.matrix.code
 
-            if (matrix in ['F', 'W', 'WW']
-                    and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
-                return None
-            elif matrix == 'A' and sample.dissolution_volume is None:
-                return None
-            elif matrix == 'SM' and sample.post_dilution_volume is None:
-                return None
+                if (matrix in ['F', 'W', 'WW']
+                        and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
+                    return None
+                elif matrix == 'A' and sample.dissolution_volume is None:
+                    return None
+                elif matrix == 'SM' and sample.post_dilution_volume is None:
+                    return None
 
-            nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
-            extr = self.sample_extraction
-            eb = self.sample_extraction.extraction_batch
+                nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
+                extr = self.sample_extraction
+                eb = self.sample_extraction.extraction_batch
 
-            # first apply the universal expressions
-            prelim_value = (self.gc_reaction / eb.qpcr_reaction_volume) * (
-                    eb.qpcr_reaction_volume / eb.qpcr_template_volume) * (
-                                   eb.elution_volume / eb.extraction_volume) * (
-                               eb.sample_dilution_factor)
-            if nucleic_acid_type_name == 'DNA':
-                prelim_value = prelim_value * extr.inhibition_dna.dilution_factor
-            # apply the RT the expression if applicable
-            elif nucleic_acid_type_name == 'RNA':
-                # assume that there can be only one RT per EB, except when there is a re_rt,
-                # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
-                # that references the only valid RT;
-                # in other words, the re_rt value must be null for the record to be valid
-                rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
-                dl = extr.inhibition_rna.dilution_factor
-                prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
-            # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
-            if matrix in ['F', 'W', 'WW']:
-                fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
-                prelim_value = prelim_value * (
-                        fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
-            elif matrix == 'A':
-                prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
-            elif matrix == 'SM':
-                prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
-            # finally, apply the unit-cancelling expression
-            if matrix in ['A', 'F', 'W', 'WW']:
-                # 1,000 microliters per 1 milliliter
-                final_value = prelim_value * 1000
-            elif matrix == 'LM':
-                # 1,000,000 microliters per 1 liter
-                final_value = prelim_value * 1000000
+                # first apply the universal expressions
+                prelim_value = (self.gc_reaction / eb.qpcr_reaction_volume) * (
+                        eb.qpcr_reaction_volume / eb.qpcr_template_volume) * (
+                                       eb.elution_volume / eb.extraction_volume) * (
+                                   eb.sample_dilution_factor)
+                if nucleic_acid_type_name == 'DNA':
+                    prelim_value = prelim_value * extr.inhibition_dna.dilution_factor
+                # apply the RT the expression if applicable
+                elif nucleic_acid_type_name == 'RNA':
+                    # assume that there can be only one RT per EB, except when there is a re_rt,
+                    # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
+                    # that references the only valid RT;
+                    # in other words, the re_rt value must be null for the record to be valid
+                    rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
+                    dl = extr.inhibition_rna.dilution_factor
+                    prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
+                # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
+                if matrix in ['F', 'W', 'WW']:
+                    fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
+                    prelim_value = prelim_value * (
+                            fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
+                elif matrix == 'A':
+                    prelim_value = prelim_value * (sample.dissolution_volume / sample.total_volume_or_mass_sampled)
+                elif matrix == 'SM':
+                    prelim_value = prelim_value * (sample.post_dilution_volume / sample.total_volume_or_mass_sampled)
+                # finally, apply the unit-cancelling expression
+                if matrix in ['A', 'F', 'W', 'WW']:
+                    # 1,000 microliters per 1 milliliter
+                    final_value = prelim_value * 1000
+                elif matrix == 'LM':
+                    # 1,000,000 microliters per 1 liter
+                    final_value = prelim_value * 1000000
+                else:
+                    # solid manure
+                    final_value = prelim_value
+                return final_value
             else:
-                # solid manure
-                final_value = prelim_value
-            return final_value
+                # a gc_reaction less than zero is impossible due to the model field definition
+                return 0
         else:
             return None
 

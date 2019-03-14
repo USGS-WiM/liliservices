@@ -1221,6 +1221,7 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'concentration_unit': {'required': False}
         }
+        validators = []
 
 
 class PCRReplicateBatchSerializer(serializers.ModelSerializer):
@@ -1234,14 +1235,14 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         valid_data = []
         response_errors = []
 
-        instance.ext_neg_cq_value = validated_data.get('ext_neg_cq_value', None)
-        instance.rt_neg_cq_value = validated_data.get('rt_neg_cq_value', None)
-        instance.pcr_neg_cq_value = validated_data.get('pcr_neg_cq_value', None)
-        instance.pcr_pos_cq_value = validated_data.get('pcr_pos_cq_value', None)
-        instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', None)
-        instance.rt_neg_gc_reaction = validated_data.get('rt_neg_gc_reaction', None)
-        instance.pcr_neg_gc_reaction = validated_data.get('pcr_neg_gc_reaction', None)
-        instance.pcr_pos_gc_reaction = validated_data.get('pcr_pos_gc_reaction', None)
+        instance.ext_neg_cq_value = validated_data.get('ext_neg_cq_value', 0)
+        instance.rt_neg_cq_value = validated_data.get('rt_neg_cq_value', 0)
+        instance.pcr_neg_cq_value = validated_data.get('pcr_neg_cq_value', 0)
+        instance.pcr_pos_cq_value = validated_data.get('pcr_pos_cq_value', 0)
+        instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', 0)
+        instance.rt_neg_gc_reaction = validated_data.get('rt_neg_gc_reaction', 0)
+        instance.pcr_neg_gc_reaction = validated_data.get('pcr_neg_gc_reaction', 0)
+        instance.pcr_pos_gc_reaction = validated_data.get('pcr_pos_gc_reaction', 0)
 
         # begin updating the instance, but do not save until all child replicates are valid
         instance.notes = validated_data.get('notes', instance.notes)
@@ -1285,8 +1286,8 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             sample_id = pcrreplicate.get('sample', None)
             sample = Sample.objects.filter(id=sample_id).first()
             # finally validate the pcr reps and calculate their final replicate concentrations
-            cq_value = pcrreplicate.get('cq_value', None)
-            gc_reaction = pcrreplicate.get('gc_reaction', None)
+            cq_value = pcrreplicate.get('cq_value', 0)
+            gc_reaction = pcrreplicate.get('gc_reaction', 0)
             matrix = sample.matrix.code
             # if the sample is from a matrix that requires a final concentrated sample volume,
             # ensure that the FCSV value exists (note that zero evaluates to null in value checking)

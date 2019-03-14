@@ -780,13 +780,13 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
     @action(methods=['post'], detail=False)
     def validate(self, request):
         validation_errors = []
-        if 'analysis_batch' not in request.data or request.data['analysis_batch'] is None:
+        if 'analysis_batch' not in request.data:
             validation_errors.append("analysis_batch is required")
-        if 'extraction_number' not in request.data or request.data['extraction_number'] is None:
+        if 'extraction_number' not in request.data:
             validation_errors.append("extraction_number is required")
-        if 'target' not in request.data or request.data['target'] is None:
+        if 'target' not in request.data:
             validation_errors.append("target is required")
-        if 'replicate_number' not in request.data or request.data['replicate_number'] is None:
+        if 'replicate_number' not in request.data:
             validation_errors.append("replicate_number is required")
         if len(validation_errors) > 0:
             return Response(validation_errors)
@@ -866,7 +866,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
                     # validate cq_value
                     # remember that null is an acceptable value
-                    if 'cq_value' not in updated_rep:  # or updated_rep['cq_value'] is None:
+                    if 'cq_value' not in updated_rep:
                         rep_validations.append(self.err_obj("cq_value", "cq_value ('cp') is missing", 2))
                     else:
                         rep_cq_value = updated_rep['cq_value']
@@ -879,7 +879,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
                     # validate gc_reaction
                     # remember that null is an acceptable value
-                    if 'gc_reaction' not in updated_rep:  # or updated_rep['gc_reaction'] is None:
+                    if 'gc_reaction' not in updated_rep:
                         message = "gc_reaction ('concentration') is missing"
                         rep_validations.append(self.err_obj("gc_reaction", message, 2))
                     else:
