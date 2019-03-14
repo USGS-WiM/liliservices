@@ -1235,14 +1235,24 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         valid_data = []
         response_errors = []
 
-        instance.ext_neg_cq_value = validated_data.get('ext_neg_cq_value', 0)
-        instance.rt_neg_cq_value = validated_data.get('rt_neg_cq_value', 0)
-        instance.pcr_neg_cq_value = validated_data.get('pcr_neg_cq_value', 0)
-        instance.pcr_pos_cq_value = validated_data.get('pcr_pos_cq_value', 0)
-        instance.ext_neg_gc_reaction = validated_data.get('ext_neg_gc_reaction', 0)
-        instance.rt_neg_gc_reaction = validated_data.get('rt_neg_gc_reaction', 0)
-        instance.pcr_neg_gc_reaction = validated_data.get('pcr_neg_gc_reaction', 0)
-        instance.pcr_pos_gc_reaction = validated_data.get('pcr_pos_gc_reaction', 0)
+        # if the cq and gc_reaction values are not present, set them to 0
+        extneg_cq = validated_data.get('ext_neg_cq_value', 0)
+        rtneg_cq = validated_data.get('rt_neg_cq_value', 0)
+        pcrneg_cq = validated_data.get('pcr_neg_cq_value', 0)
+        pcrpos_cq = validated_data.get('pcr_pos_cq_value', 0)
+        extneg_gcr = validated_data.get('ext_neg_gc_reaction', 0)
+        rtneg_gcr = validated_data.get('rt_neg_gc_reaction', 0)
+        pcrneg_gcr = validated_data.get('pcr_neg_gc_reaction', 0)
+        pcrpos_gcr = validated_data.get('pcr_pos_gc_reaction', 0)
+        # if the cq and gc_reaction values are null, set them to 0
+        instance.ext_neg_cq_value = 0 if extneg_cq is None else extneg_cq
+        instance.rt_neg_cq_value = 0 if rtneg_cq is None else rtneg_cq
+        instance.pcr_neg_cq_value = 0 if pcrneg_cq is None else pcrneg_cq
+        instance.pcr_pos_cq_value = 0 if pcrpos_cq is None else pcrpos_cq
+        instance.ext_neg_gc_reaction = 0 if extneg_gcr is None else extneg_gcr
+        instance.rt_neg_gc_reaction = 0 if rtneg_gcr is None else rtneg_gcr
+        instance.pcr_neg_gc_reaction = 0 if pcrneg_gcr is None else pcrneg_gcr
+        instance.pcr_pos_gc_reaction = 0 if pcrpos_gcr is None else pcrpos_gcr
 
         # begin updating the instance, but do not save until all child replicates are valid
         instance.notes = validated_data.get('notes', instance.notes)
@@ -1286,8 +1296,10 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             sample_id = pcrreplicate.get('sample', None)
             sample = Sample.objects.filter(id=sample_id).first()
             # finally validate the pcr reps and calculate their final replicate concentrations
-            cq_value = pcrreplicate.get('cq_value', 0)
-            gc_reaction = pcrreplicate.get('gc_reaction', 0)
+            cq = pcrreplicate.get('cq_value', 0)
+            cq_value = 0 if cq is None else cq
+            gcr = pcrreplicate.get('gc_reaction', 0)
+            gc_reaction = 0 if gcr is None else gcr
             matrix = sample.matrix.code
             # if the sample is from a matrix that requires a final concentrated sample volume,
             # ensure that the FCSV value exists (note that zero evaluates to null in value checking)
