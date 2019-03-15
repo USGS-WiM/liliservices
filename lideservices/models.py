@@ -1071,9 +1071,12 @@ class PCRReplicate(HistoryModel):
             values["inhibition_dilution_factor"] = True
         else:
             values["inhibition_dilution_factor"] = False
-        if (sample.matrix.code in ['F', 'W', 'WW']
-                and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
-            values["final_concentrated_sample_volume"] = True
+        if sample.matrix.code in ['F', 'W', 'WW']:
+            fcsv = FinalConcentratedSampleVolume.objects.filter(sample=sample.id).first()
+            if not fcsv or fcsv.final_concentrated_sample_volume is None:
+                values["final_concentrated_sample_volume"] = True
+            else:
+                values["final_concentrated_sample_volume"] = False
         else:
             values["final_concentrated_sample_volume"] = False
         if sample.matrix.code == 'A' and sample.dissolution_volume is None:
@@ -1198,10 +1201,12 @@ class PCRReplicate(HistoryModel):
             if self.gc_reaction > Decimal('0'):
                 sample = self.sample_extraction.sample
                 matrix = sample.matrix.code
+                fcsv = None
 
-                if (matrix in ['F', 'W', 'WW']
-                        and sample.final_concentrated_sample_volume.final_concentrated_sample_volume is None):
-                    return None
+                if matrix in ['F', 'W', 'WW']:
+                    fcsv = FinalConcentratedSampleVolume.objects.filter(sample=sample.id).first()
+                    if not fcsv or fcsv.final_concentrated_sample_volume is None:
+                        return None
                 elif matrix == 'A' and sample.dissolution_volume is None:
                     return None
                 elif matrix == 'SM' and sample.post_dilution_volume is None:
@@ -1229,7 +1234,6 @@ class PCRReplicate(HistoryModel):
                     prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
                 # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
                 if matrix in ['F', 'W', 'WW']:
-                    fcsv = FinalConcentratedSampleVolume.objects.get(sample=sample.id)
                     prelim_value = prelim_value * (
                             fcsv.final_concentrated_sample_volume / sample.total_volume_or_mass_sampled)
                 elif matrix == 'A':
