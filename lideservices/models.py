@@ -1009,7 +1009,7 @@ class PCRReplicate(HistoryModel):
                 reasons["peg_neg_invalid"] = False
             if len(peg_neg_cq_values_missing) > 0:
                 reasons["peg_neg_missing"] = True
-                reasons["peg_neg_missing_replicates"] = json.dumps(peg_neg_cq_values_missing)
+                reasons["peg_neg_missing_replicates"] = peg_neg_cq_values_missing
             else:
                 reasons["peg_neg_missing"] = False
                 reasons["peg_neg_missing_replicates"] = ""
