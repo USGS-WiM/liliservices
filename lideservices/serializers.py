@@ -195,7 +195,7 @@ class AliquotListSerializer(serializers.ListSerializer):
                             message += str(freezer_object.spots) + ")."
                             details.append(message)
                     else:
-                        details.append("The submitted freezer (" + item['freezer'] + ") does not exist!")
+                        details.append("The submitted freezer (" + str(item['freezer']) + ") does not exist!")
             if not is_valid:
                 raise serializers.ValidationError(details)
         elif self.context['request'].method == 'PUT':
@@ -772,7 +772,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         is_valid = False
                         message = ""
                         if 'sample' in item:
-                            message += "new sample_extraction with sample_id " + item['sample']
+                            message += "new sample_extraction with sample_id " + str(item['sample'])
                             message += " is missing an inhibition; "
                         message += "Either inhibition_dna or inhibition_rna is required within new_sample_extractions"
                         message += " (these two fields cannot both be null) "
@@ -1308,7 +1308,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                 if fcsv.final_concentrated_sample_volume is None:
                     is_valid = False
                     message = "No final concentrated sample volume exists"
-                    message += " for Sample ID: " + sample.id
+                    message += " for Sample ID: " + str(sample.id)
                     response_errors.append({"pcrreplicate": message})
                     # skip to the next item in the loop
                     continue
@@ -1317,15 +1317,16 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             elif matrix == 'A' and sample.dissolution_volume is None:
                 is_valid = False
                 message = "No dissolution volume exists"
-                message += " for Sample ID: " + sample.id
+                message += " for Sample ID: " + str(sample.id)
                 response_errors.append({"pcrreplicate": message})
                 # skip to the next item in the loop
                 continue
             # if the sample is from a matrix that requires a post dilution volume,
+            # ensure that the post dilution volume value exists (note that zero evaluates to null in value checking)
             elif matrix == 'SM' and sample.post_dilution_volume is None:
                 is_valid = False
                 message = "No post dilution volume exists"
-                message += " for Sample ID: " + sample.id
+                message += " for Sample ID: " + str(sample.id)
                 response_errors.append({"pcrreplicate": message})
                 # skip to the next item in the loop
                 continue

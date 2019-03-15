@@ -574,7 +574,8 @@ class ExtractionBatchViewSet(HistoryViewSet):
                             response_errors.append(serializer.errors)
                     else:
                         is_valid = False
-                        response_errors.append({"extractionbatch": "No ExtractionBatch exists with this ID: " + eb_id})
+                        message = "No ExtractionBatch exists with this ID: " + str(eb_id)
+                        response_errors.append({"extractionbatch": message})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
@@ -594,7 +595,8 @@ class ExtractionBatchViewSet(HistoryViewSet):
                 else:
                     return Response(serializer.errors, status=400)
             else:
-                return JsonResponse({"extractionbatch": "No ExtractionBatch exists with this ID: " + pk}, status=400)
+                message = "No ExtractionBatch exists with this ID: " + str(pk)
+                return JsonResponse({"extractionbatch": message}, status=400)
 
 
 class ReverseTranscriptionViewSet(HistoryViewSet):
@@ -640,7 +642,7 @@ class ReverseTranscriptionViewSet(HistoryViewSet):
                     else:
                         is_valid = False
                         response_errors.append(
-                            {"reversetranscription": "No ReverseTranscription exists with this ID: " + rt_id})
+                            {"reversetranscription": "No ReverseTranscription exists with this ID: " + str(rt_id)})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
@@ -661,7 +663,7 @@ class ReverseTranscriptionViewSet(HistoryViewSet):
                     return Response(serializer.errors, status=400)
             else:
                 return JsonResponse(
-                    {"reversetranscription": "No ReverseTranscription exists with this ID: " + pk}, status=400)
+                    {"reversetranscription": "No ReverseTranscription exists with this ID: " + str(pk)}, status=400)
 
 
 class SampleExtractionViewSet(HistoryViewSet):
@@ -725,7 +727,7 @@ class PCRReplicateViewSet(HistoryViewSet):
                             response_errors.append(serializer.errors)
                     else:
                         is_valid = False
-                        response_errors.append({"pcrreplicate": "No PCRReplicate exists with this ID: " + rep_id})
+                        response_errors.append({"pcrreplicate": "No PCRReplicate exists with this ID: " + str(rep_id)})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
@@ -749,7 +751,7 @@ class PCRReplicateViewSet(HistoryViewSet):
                 else:
                     return Response(serializer.errors, status=400)
             else:
-                return JsonResponse({"pcrreplicate": "No PCRReplicate exists with this ID: " + pk}, status=400)
+                return JsonResponse({"pcrreplicate": "No PCRReplicate exists with this ID: " + str(pk)}, status=400)
 
 
 class PCRReplicateBatchViewSet(HistoryViewSet):
@@ -1020,7 +1022,7 @@ class InhibitionViewSet(HistoryViewSet):
                             response_errors.append(serializer.errors)
                     else:
                         is_valid = False
-                        response_errors.append({"inhibition": "No Inhibition exists with this ID: " + inhib})
+                        response_errors.append({"inhibition": "No Inhibition exists with this ID: " + str(inhib)})
             if is_valid:
                 # now that all items are proven valid, save and return them to the user
                 for item in valid_data:
@@ -1040,7 +1042,7 @@ class InhibitionViewSet(HistoryViewSet):
                 else:
                     return Response(serializer.errors, status=400)
             else:
-                return JsonResponse({"inhibition": "No Inhibition exists with this ID: " + pk}, status=400)
+                return JsonResponse({"inhibition": "No Inhibition exists with this ID: " + str(pk)}, status=400)
 
 
 class SampleInhibitionViewSet(HistoryViewSet):
@@ -1110,8 +1112,8 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                         response_data.append(new_data)
                     else:
                         is_valid = False
-                        message = "No Inhibition exists with Sample ID: " + sample
-                        message += ", Extraction Batch ID: " + eb + ", Nucleic Acid Type ID: " + na
+                        message = "No Inhibition exists with Sample ID: " + str(sample)
+                        message += ", Extraction Batch ID: " + str(eb) + ", Nucleic Acid Type ID: " + str(na)
                         response_errors.append({"inhibition": message})
                 if is_valid:
                     return JsonResponse(response_data, safe=False, status=200)
@@ -1119,7 +1121,8 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                     return JsonResponse(response_errors, safe=False, status=400)
             return Response(serializer.errors, status=400)
         else:
-            message = "No Extraction Batch exists with Analysis Batch ID: " + ab + " and Extraction Number: " + en
+            message = "No Extraction Batch exists with Analysis Batch ID: " + str(ab)
+            message += " and Extraction Number: " + str(en)
             return JsonResponse({"extraction_batch": message}, status=400)
 
 
