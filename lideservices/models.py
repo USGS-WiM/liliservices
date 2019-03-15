@@ -1121,6 +1121,7 @@ class PCRReplicate(HistoryModel):
     def calculation_values(self):
         eb = self.sample_extraction.extraction_batch
         samp = self.sample_extraction.sample
+        fcsv = FinalConcentratedSampleVolume.objects.filter(sample=samp.id).first()
         calc_vals = {
             "nucleic_acid_type_name": self.pcrreplicate_batch.target.nucleic_acid_type.name,
             "matrix_code": samp.matrix.code,
@@ -1131,7 +1132,7 @@ class PCRReplicate(HistoryModel):
             "sample_dilution_factor": eb.sample_dilution_factor,
             "inhibition_dilution_factor": self.inhibition_dilution_factor,
             "total_volume_or_mass_sampled": samp.total_volume_or_mass_sampled,
-            "final_concentrated_sample_volume": samp.final_concentrated_sample_volume.final_concentrated_sample_volume,
+            "final_concentrated_sample_volume": fcsv.final_concentrated_sample_volume if fcsv else None,
             "dissolution_volume": samp.dissolution_volume,
             "post_dilution_volume": samp.post_dilution_volume
         }
