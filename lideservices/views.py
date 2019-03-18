@@ -769,14 +769,14 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
     def validate_controls(self, field):
         synonym = " ('cp')" if 'cq_value' in field else " ('concentration')" if 'gc_reaction' in field else ''
         invalid_reason = None
-        if field not in self.request.data or self.request.data[field] is None:
+        if field not in self.request.data:
             invalid_reason = self.err_obj(field, field + synonym + " is missing", 2)
-        elif not self.isnumber(self.request.data[field]):
-            invalid_reason = self.err_obj(field, field + synonym + " is not a number", 1)
-        elif self.request.data[field] > 0 and field not in ['pcr_pos_cq_value', 'pcr_pos_gc_reaction']:
-            # TODO: eventually we will also validate the pcr_pos_cq_value by testing if it is >0.5 cylces from expected
-            invalid_reason = self.err_obj(field, field + synonym + " is positive", 1)
-
+        elif self.request.data[field] is not None:
+            if not self.isnumber(self.request.data[field]):
+                invalid_reason = self.err_obj(field, field + synonym + " is not a number", 1)
+            elif self.request.data[field] > 0 and field not in ['pcr_pos_cq_value', 'pcr_pos_gc_reaction']:
+                # TODO: eventually we will also validate pcr_pos_cq_value by testing if it is >0.5 cylces from expected
+                invalid_reason = self.err_obj(field, field + synonym + " is positive", 1)
         return invalid_reason
 
     @action(methods=['post'], detail=False)
@@ -827,7 +827,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         for field in control_fields:
                 field_validations[field] = request.data[field] if field in request.data else None
                 # exclude RT fields if there are no RTs related to this extraction batch
-                if rt_exists:
+                if 'rt' not in field or rt_exists:
                     validation_error = self.validate_controls(field)
                     if validation_error:
                         control_validations.append(validation_error)
@@ -910,7 +910,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                     # start building up the response object
                     response_rep = {"sample": sample_id}
 
-                    message = "sample " + str(sample_id) + " expected by not found in submission"
+                    message = "sample " + str(sample_id) + " expected but not found in submission"
                     rep_validations.append(self.err_obj("sample", message, 2))
 
                     response_rep['validation_errors'] = rep_validations
@@ -1089,7 +1089,7 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                     inhib = Inhibition.objects.filter(sample=sample, extraction_batch=eb, nucleic_acid_type=na).first()
                     if inhib:
                         suggested_dilution_factor = None
-                        diff = pos - cq
+                        diff = abs(pos - cq)
                         # If INH CONT Cq minus Sample Cq<2 cycles, then dilution factor = 1 (no dilution)
                         # If INH CONT Cq minus Sample Cq>=2 cycles AND Sample Cq<36, then dilution factor = 5
                         # If INH CONT Cq minus Sample Cq>2 cycles AND Sample Cq>36 or no Cq, then dilution factor = 10

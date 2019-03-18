@@ -172,23 +172,23 @@ class Sample(HistoryModel):
     peg_neg = models.ForeignKey('self', null=True, related_name='samples')
     record_type = models.ForeignKey('RecordType', default=1)
 
-    # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
-    def save(self, *args, **kwargs):
-
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_sample = Sample.objects.get(id=self.pk)
-            if self.matrix.id != old_sample.matrix.id:
-                # TODO: consider possible implications of a change to the matrix
-                #recalc!!
-            if self.total_volume_or_mass_sampled != old_sample.total_volume_or_mass_sampled:
-                #recalc!!
-            if self.matrix.code == 'A' and self.dissolution_volume != old_sample.dissolution_volume:
-                # recalc!!
-            elif self.matrix.code == 'SM' and self.post_dilution_volume != old_sample.post_dilution_volume:
-                # recalc!!
-
-        super(Sample, self).save(*args, **kwargs)
+    # # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
+    # def save(self, *args, **kwargs):
+    #
+    #     # a value can only be changed if the instance already exists
+    #     if self.pk:
+    #         old_sample = Sample.objects.get(id=self.pk)
+    #         if self.matrix.id != old_sample.matrix.id:
+    #             # TODO: consider possible implications of a change to the matrix
+    #             #recalc!!
+    #         if self.total_volume_or_mass_sampled != old_sample.total_volume_or_mass_sampled:
+    #             #recalc!!
+    #         if self.matrix.code == 'A' and self.dissolution_volume != old_sample.dissolution_volume:
+    #             # recalc!!
+    #         elif self.matrix.code == 'SM' and self.post_dilution_volume != old_sample.post_dilution_volume:
+    #             # recalc!!
+    #
+    #     super(Sample, self).save(*args, **kwargs)
 
     def __str__(self):
         return str(self.id)
@@ -502,16 +502,16 @@ class FinalConcentratedSampleVolume(HistoryModel):
         max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
     notes = models.TextField(blank=True)
 
-    # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
-    def save(self, *args, **kwargs):
-
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_fcsv = FinalConcentratedSampleVolume.objects.get(id=self.pk)
-            if self.final_concentrated_sample_volume != old_fcsv.final_concentrated_sample_volume:
-                # recalc!!
-
-        super(FinalConcentratedSampleVolume, self).save(*args, **kwargs)
+    # # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
+    # def save(self, *args, **kwargs):
+    #
+    #     # a value can only be changed if the instance already exists
+    #     if self.pk:
+    #         old_fcsv = FinalConcentratedSampleVolume.objects.get(id=self.pk)
+    #         if self.final_concentrated_sample_volume != old_fcsv.final_concentrated_sample_volume:
+    #             # recalc!!
+    #
+    #     super(FinalConcentratedSampleVolume, self).save(*args, **kwargs)
 
     def __str__(self):
         return str(self.id)
@@ -795,50 +795,53 @@ class ExtractionBatch(HistoryModel):
     # override the save method to calculate invalid flag
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
-        # assess the invalid flag
-        # invalid flag defaults to True (i.e., the extraction batch is invalid)
-        # and can only be set to False if the cq_value of this extraction batch is equal to zero
-        self.ext_pos_invalid = False if self.ext_pos_cq_value == 0 else True
+        # validating the rt_pos will come in a later release of the software
+        # # assess the invalid flag
+        # # invalid flag defaults to True (i.e., the extraction batch is invalid)
+        # # and can only be set to False if the cq_value of this extraction batch is equal to zero
+        # self.ext_pos_invalid = False if self.ext_pos_cq_value == 0 else True
+        self.ext_pos_invalid = False
 
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_extraction_batch = ExtractionBatch.objects.get(id=self.pk)
-            if self.qpcr_reaction_volume != old_extraction_batch.qpcr_reaction_volume:
-                # recalc!!
-            if self.qpcr_template_volume != old_extraction_batch.qpcr_template_volume:
-                # recalc!!
-            if self.elution_volume != old_extraction_batch.elution_volume:
-                # recalc!!
-            if self.extraction_volume != old_extraction_batch.extraction_volume:
-                # recalc!!
-            if self.sample_dilution_factor != old_extraction_batch.sample_dilution_factor:
-                # recalc!!
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_extraction_batch = ExtractionBatch.objects.get(id=self.pk)
+        #     if self.qpcr_reaction_volume != old_extraction_batch.qpcr_reaction_volume:
+        #         # recalc!!
+        #     if self.qpcr_template_volume != old_extraction_batch.qpcr_template_volume:
+        #         # recalc!!
+        #     if self.elution_volume != old_extraction_batch.elution_volume:
+        #         # recalc!!
+        #     if self.extraction_volume != old_extraction_batch.extraction_volume:
+        #         # recalc!!
+        #     if self.sample_dilution_factor != old_extraction_batch.sample_dilution_factor:
+        #         # recalc!!
 
         super(ExtractionBatch, self).save(*args, **kwargs)
 
-        if self.ext_pos_invalid:
-            sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.id)
-            for sampleextraction in sampleextractions:
-                pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
-                for pcrreplicate in pcrreplicates:
-                    pcrreplicate.invalid = True
-                    pcrreplicate.save()
-
-                    # determine if all replicates for a given sample-target combo are now in the database or not
-                    # and calculate sample mean concentration if yes or set to null if no
-                    pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
-                    fsmc = FinalSampleMeanConcentration.objects.filter(
-                        sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
-                    # if the sample-target combo (fsmc) does not exist, create it
-                    if not fsmc:
-                        fsmc = FinalSampleMeanConcentration.objects.create(
-                            sample=sampleextraction.sample, target=pcrrepbatch.target,
-                            created_by=self.created_by, modified_by=self.modified_by)
-                    # update final sample mean concentration
-                    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-                    # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
-                    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-                    fsmc.save()
+        # commenting out the below block of code until we are ready to incorporate positive control validation
+        # if self.ext_pos_invalid:
+        #     sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.id)
+        #     for sampleextraction in sampleextractions:
+        #         pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
+        #         for pcrreplicate in pcrreplicates:
+        #             pcrreplicate.invalid = True
+        #             pcrreplicate.save()
+        #
+        #             # determine if all replicates for a given sample-target combo are now in the database or not
+        #             # and calculate sample mean concentration if yes or set to null if no
+        #             pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
+        #             fsmc = FinalSampleMeanConcentration.objects.filter(
+        #                 sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
+        #             # if the sample-target combo (fsmc) does not exist, create it
+        #             if not fsmc:
+        #                 fsmc = FinalSampleMeanConcentration.objects.create(
+        #                     sample=sampleextraction.sample, target=pcrrepbatch.target,
+        #                     created_by=self.created_by, modified_by=self.modified_by)
+        #             # update final sample mean concentration
+        #             # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+        #             # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
+        #             fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+        #             fsmc.save()
 
     def __str__(self):
         return self.extraction_string
@@ -873,37 +876,40 @@ class ReverseTranscription(HistoryModel):
 
     # override the save method to calculate invalid flag
     def save(self, *args, **kwargs):
-        # assess the invalid flag
-        # invalid flag defaults to True (i.e., the RT is invalid)
-        # and can only be set to False if the cq_value of this RT is equal to zero
-        self.rt_pos_invalid = False if self.rt_pos_cq_value == 0 else True
+        # validating the rt_pos will come in a later release of the software
+        # # assess the invalid flag
+        # # invalid flag defaults to True (i.e., the RT is invalid)
+        # # and can only be set to False if the cq_value of this RT is equal to zero
+        # self.rt_pos_invalid = False if self.rt_pos_cq_value == 0 else True
+        self.rt_pos_invalid = False
 
         super(ReverseTranscription, self).save(*args, **kwargs)
 
-        if self.rt_pos_invalid:
-            sampleextractions = SampleExtraction.objects.filter(
-                extraction_batch=self.extraction_batch)
-            for sampleextraction in sampleextractions:
-                pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
-                for pcrreplicate in pcrreplicates:
-                    pcrreplicate.invalid = True
-                    pcrreplicate.save()
-
-                    # determine if all replicates for a given sample-target combo are now in the database or not
-                    # and calculate sample mean concentration if yes or set to null if no
-                    pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
-                    fsmc = FinalSampleMeanConcentration.objects.filter(
-                        sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
-                    # if the sample-target combo (fsmc) does not exist, create it
-                    if not fsmc:
-                        fsmc = FinalSampleMeanConcentration.objects.create(
-                            sample=sampleextraction.sample, target=pcrrepbatch.target,
-                            created_by=self.created_by, modified_by=self.modified_by)
-                    # update final sample mean concentration
-                    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-                    # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
-                    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-                    fsmc.save()
+        # commenting out the below block of code until we are ready to incorporate positive control validation
+        # if self.rt_pos_invalid:
+        #     sampleextractions = SampleExtraction.objects.filter(
+        #         extraction_batch=self.extraction_batch)
+        #     for sampleextraction in sampleextractions:
+        #         pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
+        #         for pcrreplicate in pcrreplicates:
+        #             pcrreplicate.invalid = True
+        #             pcrreplicate.save()
+        #
+        #             # determine if all replicates for a given sample-target combo are now in the database or not
+        #             # and calculate sample mean concentration if yes or set to null if no
+        #             pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
+        #             fsmc = FinalSampleMeanConcentration.objects.filter(
+        #                 sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
+        #             # if the sample-target combo (fsmc) does not exist, create it
+        #             if not fsmc:
+        #                 fsmc = FinalSampleMeanConcentration.objects.create(
+        #                     sample=sampleextraction.sample, target=pcrrepbatch.target,
+        #                     created_by=self.created_by, modified_by=self.modified_by)
+        #             # update final sample mean concentration
+        #             # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+        #             # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
+        #             fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+        #             fsmc.save()
 
     def __str__(self):
         return str(self.id)
@@ -990,12 +996,12 @@ class PCRReplicateBatch(HistoryModel):
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
 
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_pcrreplicate_batch = PCRReplicateBatch.objects.get(id=self.pk)
-            if self.target.id != old_pcrreplicate_batch.target.id:
-                # TODO: consider possible implications of a change to the target
-                # recalc!!
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_pcrreplicate_batch = PCRReplicateBatch.objects.get(id=self.pk)
+        #     if self.target.id != old_pcrreplicate_batch.target.id:
+        #         # TODO: consider possible implications of a change to the target
+        #         # recalc!!
 
         super(PCRReplicateBatch, self).save(*args, **kwargs)
 
@@ -1397,11 +1403,11 @@ class Inhibition(HistoryModel):
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
 
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_inhibition = Inhibition.objects.get(id=self.pk)
-            if self.dilution_factor != old_inhibition.dilution_factor:
-                # recalc!!
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_inhibition = Inhibition.objects.get(id=self.pk)
+        #     if self.dilution_factor != old_inhibition.dilution_factor:
+        #         # recalc!!
 
         super(Inhibition, self).save(*args, **kwargs)
 
