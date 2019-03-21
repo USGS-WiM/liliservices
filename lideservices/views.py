@@ -815,7 +815,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             message += " and replicate number of " + str(request.data['replicate_number'])
             return Response({"pcrreplicate_batch": message}, status=400)
 
-        rt_exists = True if extraction_batch.reversetranscriptions.count() > 0 else False
+        rt = ReverseTranscription.objects.filter(extraction_batch=extraction_batch.id, re_rt=None).first()
 
         # start building up the response object
         field_validations = {"id": pcrreplicate_batch.id}
@@ -827,7 +827,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         for field in control_fields:
                 field_validations[field] = request.data[field] if field in request.data else None
                 # exclude RT fields if there are no RTs related to this extraction batch
-                if 'rt' not in field or rt_exists:
+                if 'rt' not in field or rt:
                     validation_error = self.validate_controls(field)
                     if validation_error:
                         control_validations.append(validation_error)

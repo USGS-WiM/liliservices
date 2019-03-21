@@ -502,7 +502,8 @@ class FinalConcentratedSampleVolume(HistoryModel):
         max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
     notes = models.TextField(blank=True)
 
-    # # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
+    # # override the save method to check if a rep calc value changed,
+    # # and if so, recalc rep conc and rep invalid and FSMC
     # def save(self, *args, **kwargs):
     #
     #     # a value can only be changed if the instance already exists
@@ -788,19 +789,16 @@ class ExtractionBatch(HistoryModel):
     sample_dilution_factor = NonnegativeIntegerField()
     qpcr_reaction_volume = models.DecimalField(
         max_digits=20, decimal_places=10, default=20, validators=[MINVAL_DECIMAL_10])
-    ext_pos_cq_value = NullableNonnegativeDecimalField2010()
-    ext_pos_gc_reaction = NullableNonnegativeDecimalField120100()
-    ext_pos_invalid = models.BooleanField(default=True)
+    ext_pos_dna_cq_value = NullableNonnegativeDecimalField2010()
+    ext_pos_dna_invalid = models.BooleanField(default=True)
 
     # override the save method to calculate invalid flag
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
-        # validating the rt_pos will come in a later release of the software
-        # # assess the invalid flag
-        # # invalid flag defaults to True (i.e., the extraction batch is invalid)
-        # # and can only be set to False if the cq_value of this extraction batch is equal to zero
-        # self.ext_pos_invalid = False if self.ext_pos_cq_value == 0 else True
-        self.ext_pos_invalid = False
+        # assess the invalid flag
+        # invalid flag defaults to True (i.e., the extraction batch is invalid)
+        # and can only be set to False if the cq_value of this extraction batch is not null
+        self.ext_pos_dna_invalid = False if self.ext_pos_dna_cq_value is not None else True
 
         # # a value can only be changed if the instance already exists
         # if self.pk:
@@ -818,30 +816,31 @@ class ExtractionBatch(HistoryModel):
 
         super(ExtractionBatch, self).save(*args, **kwargs)
 
-        # commenting out the below block of code until we are ready to incorporate positive control validation
-        # if self.ext_pos_invalid:
-        #     sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.id)
-        #     for sampleextraction in sampleextractions:
-        #         pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
-        #         for pcrreplicate in pcrreplicates:
-        #             pcrreplicate.invalid = True
-        #             pcrreplicate.save()
-        #
-        #             # determine if all replicates for a given sample-target combo are now in the database or not
-        #             # and calculate sample mean concentration if yes or set to null if no
-        #             pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
-        #             fsmc = FinalSampleMeanConcentration.objects.filter(
-        #                 sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
-        #             # if the sample-target combo (fsmc) does not exist, create it
-        #             if not fsmc:
-        #                 fsmc = FinalSampleMeanConcentration.objects.create(
-        #                     sample=sampleextraction.sample, target=pcrrepbatch.target,
-        #                     created_by=self.created_by, modified_by=self.modified_by)
-        #             # update final sample mean concentration
-        #             # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-        #             # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
-        #             fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-        #             fsmc.save()
+        # Invalidate all child PCR Replicates if this (their parent Extraction Batch) is invalid
+        if self.ext_pos_dna_invalid:
+            PCRReplicate.objects.filter(sample_extraction__extraction_batch=self.id).update(invalid=True)
+
+            pcrrepbatches = PCRReplicateBatch.objects.get(extraction_batch=self.id)
+            sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.id)
+            for sampleextraction in sampleextractions:
+                for pcrrepbatch in pcrrepbatches:
+
+                    # determine if all replicates for a given sample-target combo are now in the database or not
+                    # and calculate sample mean concentration if yes or set to null if no
+
+                    # first find a matching sample-target combo (fsmc)
+                    fsmc = FinalSampleMeanConcentration.objects.filter(
+                        sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
+                    # if the sample-target combo (fsmc) does not exist, create it
+                    if not fsmc:
+                        fsmc = FinalSampleMeanConcentration.objects.create(
+                            sample=sampleextraction.sample, target=pcrrepbatch.target,
+                            created_by=self.created_by, modified_by=self.modified_by)
+                    # then update final sample mean concentration
+                    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+                    # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
+                    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+                    fsmc.save()
 
     def __str__(self):
         return self.extraction_string
@@ -850,17 +849,12 @@ class ExtractionBatch(HistoryModel):
         db_table = "lide_extractionbatch"
         unique_together = ("analysis_batch", "extraction_number", "re_extraction")
         verbose_name_plural = "extractionbatches"
-        #  TODO: reassess extraction_number assignment logic for cases of re_extraction and re-use of extraction_number
 
 
 class ReverseTranscription(HistoryModel):
     """
     Reverse Transcription
     """
-
-    @property
-    def rt_pos_gc_reaction_sci(self):
-        return get_sci_val(self.rt_pos_gc_reaction)
 
     extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
     template_volume = models.DecimalField(
@@ -870,46 +864,44 @@ class ReverseTranscription(HistoryModel):
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
     re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
     re_rt_notes = models.TextField(blank=True)
-    rt_pos_cq_value = NullableNonnegativeDecimalField2010()
-    rt_pos_gc_reaction = NullableNonnegativeDecimalField120100()
-    rt_pos_invalid = models.BooleanField(default=True)
+    ext_pos_rna_rt_cq_value = NullableNonnegativeDecimalField2010()
+    ext_pos_rna_rt_invalid = models.BooleanField(default=True)
 
     # override the save method to calculate invalid flag
     def save(self, *args, **kwargs):
-        # validating the rt_pos will come in a later release of the software
-        # # assess the invalid flag
-        # # invalid flag defaults to True (i.e., the RT is invalid)
-        # # and can only be set to False if the cq_value of this RT is equal to zero
-        # self.rt_pos_invalid = False if self.rt_pos_cq_value == 0 else True
-        self.rt_pos_invalid = False
+        # assess the invalid flag
+        # invalid flag defaults to True (i.e., the RT is invalid)
+        # and can only be set to False if the cq_value of this RT is not null
+        self.ext_pos_rna_rt_invalid = False if self.ext_pos_rna_rt_cq_value is not None else True
 
         super(ReverseTranscription, self).save(*args, **kwargs)
 
-        # commenting out the below block of code until we are ready to incorporate positive control validation
-        # if self.rt_pos_invalid:
-        #     sampleextractions = SampleExtraction.objects.filter(
-        #         extraction_batch=self.extraction_batch)
-        #     for sampleextraction in sampleextractions:
-        #         pcrreplicates = PCRReplicate.objects.filter(sample_extraction=sampleextraction.id)
-        #         for pcrreplicate in pcrreplicates:
-        #             pcrreplicate.invalid = True
-        #             pcrreplicate.save()
-        #
-        #             # determine if all replicates for a given sample-target combo are now in the database or not
-        #             # and calculate sample mean concentration if yes or set to null if no
-        #             pcrrepbatch = PCRReplicateBatch.objects.get(id=pcrreplicate.pcrreplicate_batch.id)
-        #             fsmc = FinalSampleMeanConcentration.objects.filter(
-        #                 sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
-        #             # if the sample-target combo (fsmc) does not exist, create it
-        #             if not fsmc:
-        #                 fsmc = FinalSampleMeanConcentration.objects.create(
-        #                     sample=sampleextraction.sample, target=pcrrepbatch.target,
-        #                     created_by=self.created_by, modified_by=self.modified_by)
-        #             # update final sample mean concentration
-        #             # if all the valid related reps have replicate_concentration values the FSMC will be calculated
-        #             # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
-        #             fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
-        #             fsmc.save()
+        # Invalidate all child PCR Replicates if this (their parent RT) is invalid
+        if self.ext_pos_rna_rt_invalid:
+            PCRReplicate.objects.filter(
+                sample_extraction__extraction_batch=self.extraction_batch.id).update(invalid=True)
+
+            pcrrepbatches = PCRReplicateBatch.objects.get(extraction_batch=self.extraction_batch.id)
+            sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.extraction_batch.id)
+            for sampleextraction in sampleextractions:
+                for pcrrepbatch in pcrrepbatches:
+
+                    # determine if all replicates for a given sample-target combo are now in the database or not
+                    # and calculate sample mean concentration if yes or set to null if no
+
+                    # first find a matching sample-target combo (fsmc)
+                    fsmc = FinalSampleMeanConcentration.objects.filter(
+                        sample=sampleextraction.sample.id, target=pcrrepbatch.target.id).first()
+                    # if the sample-target combo (fsmc) does not exist, create it
+                    if not fsmc:
+                        fsmc = FinalSampleMeanConcentration.objects.create(
+                            sample=sampleextraction.sample, target=pcrrepbatch.target,
+                            created_by=self.created_by, modified_by=self.modified_by)
+                    # then update final sample mean concentration
+                    # if all the valid related reps have replicate_concentration values the FSMC will be calculated
+                    # else not all valid related reps have replicate_concentration values, so FSMC will be set to null
+                    fsmc.final_sample_mean_concentration = fsmc.calc_sample_mean_conc()
+                    fsmc.save()
 
     def __str__(self):
         return str(self.id)
@@ -988,7 +980,8 @@ class PCRReplicateBatch(HistoryModel):
         # reverse transcriptions are a special case... not every extraction batch will have a RT,
         # so if there is no RT, set rt_neg_invalid to False regardless of the value of rt_neg_cq_value,
         # but if there is a RT, apply the same logic as the other invalid flags
-        if self.extraction_batch.reversetranscriptions.count() == 0:
+        rt = ReverseTranscription.objects.filter(extraction_batch=self.extraction_batch.id, re_rt=None).first()
+        if not rt:
             self.rt_neg_invalid = False
         else:
             self.rt_neg_invalid = False if self.rt_neg_cq_value == 0 else True
@@ -1037,28 +1030,25 @@ class PCRReplicate(HistoryModel):
             # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
             peg_neg_cq_values_missing = []
             any_peg_neg_invalid = False
-            peg_neg_id = self.sample_extraction.sample.peg_neg
+            sample = self.sample_extraction.sample
+
+            peg_neg_id = sample.id if sample.record_type.id == 2 else sample.peg_neg.id
             if peg_neg_id is not None:
-                peg_neg_invalid_flags = []
                 target_id = pcrreplicate_batch.target.id
-                # only check sample extractions with the same peg_neg_id as the sample of this data rep
-                ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
-                for ext_id in ext_ids:
-                    # only check reps with the same target as this data rep
-                    reps = PCRReplicate.objects.filter(sample_extraction=ext_id,
-                                                       pcrreplicate_batch__target__exact=target_id)
-                    # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                    for rep in reps:
-                        peg_neg_invalid_flags.append(rep.invalid)
-                        if not rep.gc_reaction:
-                            peg_neg_cq_values_missing.append({str(rep.id): {
-                                "sample": rep.sample_extraction.sample.id,
-                                "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
-                                "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
-                                "replicate_number": rep.pcrreplicate_batch.replicate_number,
-                                "target": rep.pcrreplicate_batch.target.id
-                            }})
-                any_peg_neg_invalid = any(peg_neg_invalid_flags)
+                # only check reps with the same target as this data rep
+                reps = PCRReplicate.objects.filter(
+                    sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id)
+                # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
+                for rep in reps:
+                    any_peg_neg_invalid = True
+                    if not rep.gc_reaction:
+                        peg_neg_cq_values_missing.append({str(rep.id): {
+                            "sample": rep.sample_extraction.sample.id,
+                            "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
+                            "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
+                            "replicate_number": rep.pcrreplicate_batch.replicate_number,
+                            "target": rep.pcrreplicate_batch.target.id
+                        }})
 
             # then check all controls applicable to this rep
             if any_peg_neg_invalid:
@@ -1287,7 +1277,7 @@ class PCRReplicate(HistoryModel):
                     # in which case the 'old' RT is no longer valid and would have a RT ID value in the re_rt field
                     # that references the only valid RT;
                     # in other words, the re_rt value must be null for the record to be valid
-                    rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None)
+                    rt = ReverseTranscription.objects.filter(extraction_batch=eb, re_rt=None).first()
                     dl = extr.inhibition_rna.dilution_factor
                     prelim_value = prelim_value * dl * (rt.reaction_volume / rt.template_volume)
                 # then apply the final volume-or-mass ratio expression (note: liquid_manure does not use this)
@@ -1315,8 +1305,6 @@ class PCRReplicate(HistoryModel):
         else:
             return None
 
-    # TODO: if the rep itself comes from a pegneg sample, and it is invalid,
-    #  also invalidate all related reps with the same target from samples using that pegneg
     def calc_invalid(self):
         # assess the invalid flags
         # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
@@ -1326,35 +1314,48 @@ class PCRReplicate(HistoryModel):
         if self.invalid_override is None:
             if self.cq_value is not None and self.gc_reaction is not None:
                 pcrreplicate_batch = PCRReplicateBatch.objects.filter(id=self.pcrreplicate_batch.id).first()
+                sample = Sample.objects.filter(id=self.sample_extraction.sample.id).first()
+
                 # first check related peg_neg validity
                 # assume no related peg_neg, in which case this control does not apply
-                # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
+                # but if there is a related peg_neg (or if the rep itself is from a peg_neg),
+                # check the validity of all the parent sample's peg_neg reps with the same target as this data rep
                 any_peg_neg_invalid = False
-                peg_neg_id = self.sample_extraction.sample.peg_neg
+                # record_type 1 means regular data (not a control), record_type 2 means control data (not regular data)
+                peg_neg_id = sample.id if sample.record_type.id == 2 else sample.peg_neg.id
                 if peg_neg_id is not None:
-                    peg_neg_invalid_flags = []
                     target_id = pcrreplicate_batch.target.id
                     # only check sample extractions with the same peg_neg_id as the sample of this data rep
-                    ext_ids = SampleExtraction.objects.filter(sample=peg_neg_id).values_list('id', flat=True)
-                    for ext_id in ext_ids:
-                        # only check reps with the same target as this data rep
-                        reps = PCRReplicate.objects.filter(sample_extraction=ext_id,
-                                                           pcrreplicate_batch__target__exact=target_id)
-                        # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                        for rep in reps:
-                            peg_neg_invalid_flags.append(rep.invalid)
-                    any_peg_neg_invalid = any(peg_neg_invalid_flags)
-                # then check all controls applicable to this rep
+                    # only check reps with the same target as this data rep
+                    reps = list(PCRReplicate.objects.filter(
+                        sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id,
+                        invalid=True).values_list('id', flat=True))
+                    # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
+                    any_peg_neg_invalid = True if len(reps) > 0 else False
+
+                # then check all other controls applicable to this rep
+                rt = ReverseTranscription.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
+                rt_pos_invalid = rt.rt_pos_invalid if rt else False
                 if (
                         not any_peg_neg_invalid and
+                        not pcrreplicate_batch.extraction_batch.ext_pos_invalid and
+                        not rt_pos_invalid and
                         not pcrreplicate_batch.ext_neg_invalid and
                         not pcrreplicate_batch.rt_neg_invalid and
                         not pcrreplicate_batch.pcr_neg_invalid and
                         self.cq_value is not None and self.cq_value >= Decimal('0') and
                         self.gc_reaction is not None and self.gc_reaction >= Decimal('0')
                 ):
+                    # this rep is valid
                     return False
                 else:
+                    # if the rep itself comes from a peg_neg sample, and it is invalid,
+                    # then invalidate all related reps with the same target from samples using that peg_neg
+                    if sample.record_type.id == 2:
+                        PCRReplicate.objects.filter(
+                            sample_extraction__sample=self.sample_extraction.sample.id,
+                            pcrreplicate_batch__target=self.pcrreplicate_batch.target.id).update(invalid=True)
                     return True
             else:
                 return True
@@ -1369,7 +1370,6 @@ class PCRReplicate(HistoryModel):
         unique_together = ("sample_extraction", "pcrreplicate_batch")
 
 
-# TODO: this whole StandardCurve class needs to be reviewed when the time comes
 class StandardCurve(HistoryModel):
     """
     Standard Curve
