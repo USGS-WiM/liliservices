@@ -695,10 +695,11 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
     qpcr_template_volume = RStrip10DecimalField()
     elution_volume = RStrip10DecimalField()
     qpcr_reaction_volume = RStrip10DecimalField()
-    ext_pos_cq_value = NullableRStrip10DecimalField()
+    ext_pos_dna_cq_value = NullableRStrip10DecimalField()
     sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
-    rt_pos_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
+    ext_pos_rna_rt_cq_value = serializers.DecimalField(
+        write_only=True, required=False, max_digits=20, decimal_places=10)
 
     # bulk update
     def update(self, instance, validated_data):
@@ -717,7 +718,7 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
                     user = validated_data.get('modified_by', instance.modified_by)
                 data['modified_by'] = user
 
-                # if rt_pos_cq_value is included, update the related RT record
+                # if ext_pos_rna_rt_cq_value is included, update the related RT record
                 if 'ext_pos_rna_rt_cq_value' in validated_data:
                     rt = ReverseTranscription.objects.filter(extraction_batch=eb_id, re_rt=None)
                     if rt is not None:
@@ -735,8 +736,7 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
                   'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'inhibitions',
-                  'ext_pos_rna_rt_cq_value', 'ext_pos_rna_rt_invalid',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'ext_pos_rna_rt_cq_value', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ExtractionBatchSerializer(serializers.ModelSerializer):
@@ -747,13 +747,13 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     qpcr_template_volume = RStrip10DecimalField()
     elution_volume = RStrip10DecimalField()
     qpcr_reaction_volume = RStrip10DecimalField()
-    ext_pos_cq_value = NullableRStrip10DecimalField()
+    ext_pos_dna_cq_value = NullableRStrip10DecimalField()
     sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     new_rt = serializers.JSONField(write_only=True, required=False)
     new_replicates = serializers.ListField(write_only=True, required=False)
     new_sample_extractions = serializers.ListField(write_only=True, required=False)
-    rt_pos_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
+    ext_pos_rna_rt_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
 
     def validate(self, data):
         if 'request' in self.context and self.context['request'].method == 'POST':
@@ -945,14 +945,14 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.elution_volume = validated_data.get('elution_volume', instance.elution_volume)
         instance.sample_dilution_factor = validated_data.get('sample_dilution_factor', instance.sample_dilution_factor)
         instance.qpcr_reaction_volume = validated_data.get('qpcr_reaction_volume', instance.qpcr_reaction_volume)
-        instance.ext_pos_cq_value = validated_data.get('ext_pos_cq_value', instance.ext_pos_cq_value)
+        instance.ext_pos_dna_cq_value = validated_data.get('ext_pos_dna_cq_value', instance.ext_pos_dna_cq_value)
         if 'request' in self.context and hasattr(self.context['request'], 'user'):
             instance.modified_by = self.context['request'].user
         else:
             instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
 
-        # if rt_pos_cq_value is included, update the related RT record
+        # if ext_pos_rna_rt_cq_value is included, update the related RT record
         if 'ext_pos_rna_rt_cq_value' in validated_data:
             rt = ReverseTranscription.objects.filter(extraction_batch=instance.id, re_rt=None).first()
             if rt is not None:
@@ -967,8 +967,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
                   'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'inhibitions',
-                  'ext_pos_rna_rt_cq_value', 'ext_pos_rna_rt_invalid',
-                  'new_rt', 'new_replicates', 'new_sample_extractions',
+                  'ext_pos_rna_rt_cq_value', 'new_rt', 'new_replicates', 'new_sample_extractions',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = ExtractionBatchListSerializer
 
@@ -978,7 +977,7 @@ class ReverseTranscriptionListSerializer(serializers.ListSerializer):
     modified_by = serializers.StringRelatedField()
     template_volume = RStrip10DecimalField()
     reaction_volume = RStrip10DecimalField()
-    rt_pos_cq_value = NullableRStrip10DecimalField()
+    ext_pos_rna_rt_cq_value = NullableRStrip10DecimalField()
 
     # bulk create
     def create(self, validated_data):
@@ -1018,7 +1017,7 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     template_volume = RStrip10DecimalField()
     reaction_volume = RStrip10DecimalField()
-    rt_pos_cq_value = NullableRStrip10DecimalField()
+    ext_pos_rna_rt_cq_value = NullableRStrip10DecimalField()
 
     def create(self, validated_data):
         return ReverseTranscription.objects.create(**validated_data)
@@ -1323,6 +1322,77 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             return instance
         else:
             raise serializers.ValidationError(response_errors)
+
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    ext_neg_cq_value = NullableRStrip10DecimalField()
+    ext_neg_gc_reaction = NullableRStrip100DecimalField()
+    rt_neg_cq_value = NullableRStrip10DecimalField()
+    rt_neg_gc_reaction = NullableRStrip100DecimalField()
+    pcr_neg_cq_value = NullableRStrip10DecimalField()
+    pcr_neg_gc_reaction = NullableRStrip100DecimalField()
+    pcr_pos_cq_value = NullableRStrip10DecimalField()
+    pcr_pos_gc_reaction = NullableRStrip100DecimalField()
+    updated_pcrreplicates = serializers.ListField(write_only=True)
+    extraction_batch = ExtractionBatchSerializer(required=False)
+    pcrreplicates = PCRReplicateSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PCRReplicateBatch
+        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'notes', 'ext_neg_cq_value',
+                  'ext_neg_gc_reaction', 'ext_neg_gc_reaction_sci', 'ext_neg_invalid', 'rt_neg_cq_value',
+                  'rt_neg_gc_reaction', 'rt_neg_gc_reaction_sci', 'rt_neg_invalid', 'pcr_neg_cq_value',
+                  'pcr_neg_gc_reaction', 'pcr_neg_gc_reaction_sci', 'pcr_neg_invalid', 'pcr_pos_cq_value',
+                  'pcr_pos_gc_reaction', 'pcr_pos_gc_reaction_sci', 'pcr_pos_invalid', 're_pcr', 'pcrreplicates',
+                  'updated_pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        extra_kwargs = {
+            'extraction_batch': {'required': False},
+            'pcrreplicates': {'required': False}
+        }
+
+
+class PCRReplicateBatchBaseSerializer(serializers.ModelSerializer):
+
+    def update(self, instance, validated_data):
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
+            user = self.context['request'].user
+        else:
+            user = validated_data.get('modified_by', instance.modified_by)
+
+        # if the cq and gc_reaction values are not present, temporarily set them to 'NA'
+        extneg_cq = validated_data.get('ext_neg_cq_value', 'NA')
+        rtneg_cq = validated_data.get('rt_neg_cq_value', 'NA')
+        pcrneg_cq = validated_data.get('pcr_neg_cq_value', 'NA')
+        pcrpos_cq = validated_data.get('pcr_pos_cq_value', 'NA')
+        extneg_gcr = validated_data.get('ext_neg_gc_reaction', 'NA')
+        rtneg_gcr = validated_data.get('rt_neg_gc_reaction', 'NA')
+        pcrneg_gcr = validated_data.get('pcr_neg_gc_reaction', 'NA')
+        pcrpos_gcr = validated_data.get('pcr_pos_gc_reaction', 'NA')
+        # if the cq and gc_reaction values are null, set them to 0
+        if extneg_cq != 'NA':
+            instance.ext_neg_cq_value = 0 if extneg_cq is None else extneg_cq
+        if rtneg_cq != 'NA':
+            instance.rt_neg_cq_value = 0 if rtneg_cq is None else rtneg_cq
+        if pcrneg_cq != 'NA':
+            instance.pcr_neg_cq_value = 0 if pcrneg_cq is None else pcrneg_cq
+        if pcrpos_cq != 'NA':
+            instance.pcr_pos_cq_value = 0 if pcrpos_cq is None else pcrpos_cq
+        if extneg_gcr != 'NA':
+            instance.ext_neg_gc_reaction = 0 if extneg_gcr is None else extneg_gcr
+        if rtneg_gcr != 'NA':
+            instance.rt_neg_gc_reaction = 0 if rtneg_gcr is None else rtneg_gcr
+        if pcrneg_gcr != 'NA':
+            instance.pcr_neg_gc_reaction = 0 if pcrneg_gcr is None else pcrneg_gcr
+        if pcrpos_gcr != 'NA':
+            instance.pcr_pos_gc_reaction = 0 if pcrpos_gcr is None else pcrpos_gcr
+
+        # begin updating the instance, but do not save until all child replicates are valid
+        instance.notes = validated_data.get('notes', instance.notes)
+        instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
+        instance.modified_by = user
+
+        instance.save()
+        return instance
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1701,7 +1771,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'ext_pos_cq_value', 'ext_pos_invalid', 'sampleextractions',
+                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions',
                   'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

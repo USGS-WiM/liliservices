@@ -780,6 +780,67 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         return invalid_reason
 
     @action(methods=['post'], detail=False)
+    def bulk_load_negatives(self, request):
+
+        is_valid = True
+        valid_data = []
+        response_errors = []
+        for item in request.data:
+            item_validation_errors = []
+            if 'extraction_batch' not in item:
+                item_validation_errors.append("extraction_batch is required")
+            if 'target' not in item:
+                item_validation_errors.append("target is required")
+            if 'replicate_number' not in item:
+                item_validation_errors.append("replicate_number is required")
+            if 'pcr_pos_cq_value' not in item:
+                item_validation_errors.append("pcr_pos_cq_value is required")
+            if len(item_validation_errors) > 0:
+                is_valid = False
+                response_errors.append(item_validation_errors)
+                continue
+
+            pcrreplicate_batch = PCRReplicateBatch.objects.filter(
+                extraction_batch=item['extraction_batch'], target=item['target'],
+                replicate_number=item['replicate_number']).first()
+
+            if pcrreplicate_batch:
+                item.pop('extraction_batch')
+                item.pop('target')
+                item.pop('replicate_number')
+                item['ext_neg_cq_value'] = 0
+                item['ext_neg_gc_reaction'] = 0
+                item['rt_neg_cq_value'] = 0
+                item['rt_neg_gc_reaction'] = 0
+                item['pcr_neg_cq_value'] = 0
+                item['pcr_neg_gc_reaction'] = 0
+                item['pcr_pos_gc_reaction'] = 0
+                serializer = PCRReplicateBatchBaseSerializer(pcrreplicate_batch, data=item, partial=True)
+                # if this item is valid, temporarily hold it until all items are proven valid, then save all
+                # if even one item is invalid, none will be saved, and the user will be returned the error(s)
+                if serializer.is_valid():
+                    valid_data.append(serializer)
+                else:
+                    is_valid = False
+                    response_errors.append(serializer.errors)
+            else:
+                message = "No PCR replicate batch was found with extraction batch of " + str(item['extraction_batch'])
+                message += " and target of " + str(item['target'])
+                message += " and replicate number of " + str(item['replicate_number'])
+                is_valid = False
+                response_errors.append({"pcrreplicatebatch": message})
+
+        if is_valid:
+            # now that all items are proven valid, save and return them to the user
+            response_data = []
+            for item in valid_data:
+                item.save()
+                response_data.append(item.data)
+            return JsonResponse(response_data, safe=False, status=200)
+        else:
+            return JsonResponse(response_errors, safe=False, status=400)
+
+    @action(methods=['post'], detail=False)
     def validate(self, request):
         validation_errors = []
         if 'analysis_batch' not in request.data:
