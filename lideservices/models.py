@@ -1322,7 +1322,10 @@ class PCRReplicate(HistoryModel):
                 # check the validity of all the parent sample's peg_neg reps with the same target as this data rep
                 any_peg_neg_invalid = False
                 # record_type 1 means regular data (not a control), record_type 2 means control data (not regular data)
-                peg_neg_id = sample.id if sample.record_type.id == 2 else sample.peg_neg.id
+                if sample.record_type.id == 2:
+                    peg_neg_id = sample.id
+                else:
+                    peg_neg_id = sample.peg_neg.id if sample.peg_neg is not None else None
                 if peg_neg_id is not None:
                     target_id = pcrreplicate_batch.target.id
                     # only check sample extractions with the same peg_neg_id as the sample of this data rep
