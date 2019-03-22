@@ -1339,7 +1339,7 @@ class PCRReplicate(HistoryModel):
                 rt_pos_invalid = rt.rt_pos_invalid if rt else False
                 if (
                         not any_peg_neg_invalid and
-                        not pcrreplicate_batch.extraction_batch.ext_pos_invalid and
+                        not pcrreplicate_batch.extraction_batch.ext_pos_dna_invalid and
                         not rt_pos_invalid and
                         not pcrreplicate_batch.ext_neg_invalid and
                         not pcrreplicate_batch.rt_neg_invalid and
