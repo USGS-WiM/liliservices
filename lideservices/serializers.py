@@ -446,7 +446,7 @@ class SampleSerializer(serializers.ModelSerializer):
                         for replicate in replicates:
                             target_id = replicate.get('target_id')
 
-                            # get the unique target IDs for this peg neg
+                            # get the unique target IDs for this peg_neg
                             if target_id not in targets_extracted:
                                 targets_extracted.append(target_id)
 
@@ -1090,7 +1090,7 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
                 self.child.update(pcrrep, data)
                 ret.append(self.child)
 
-                # if the rep is a pegneg, find all data reps related to that pegneg and recalc their invalid flags
+                # if the rep is a peg_neg, find all data reps related to that peg_neg and recalc their invalid flags
                 sample = self.child.sample_extraction.sample
                 if sample.record_type.id == 2 and sample.peg_neg is None:
                     related_sample_ids = list(Sample.objects.filter(peg_neg=sample.id).values_list('id', flat=True))
@@ -1148,7 +1148,7 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
         else:
             instance.invalid = validated_data.get('invalid', instance.invalid)
 
-        # if the rep is a pegneg, find all data reps related to that pegneg and recalc their invalid flags
+        # if the rep is a peg_neg, find all data reps related to that peg_neg and recalc their invalid flags
         sample = instance.sample_extraction.sample
         if sample.record_type.id == 2 and sample.peg_neg is None:
             related_sample_ids = list(Sample.objects.filter(peg_neg=sample.id).values_list('id', flat=True))
@@ -1242,7 +1242,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             id__in=batch_rep_sample_extraction_ids).values_list('sample', flat=True))
         updated_pcrreplicates_real = [rep for rep in updated_pcrreps_samples if rep['sample'] in batch_rep_sample_ids]
 
-        # then ensure that any submitted reps belonging to a pegneg sample are moved to the front of the queue
+        # then ensure that any submitted reps belonging to a peg_neg sample are moved to the front of the queue
         queued_updated_pcrreplicates = PriorityQueue()
         queue_high_priority = 0
         queue_low_priority = len(updated_pcrreplicates_real)
@@ -1322,77 +1322,6 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
             return instance
         else:
             raise serializers.ValidationError(response_errors)
-
-    created_by = serializers.StringRelatedField()
-    modified_by = serializers.StringRelatedField()
-    ext_neg_cq_value = NullableRStrip10DecimalField()
-    ext_neg_gc_reaction = NullableRStrip100DecimalField()
-    rt_neg_cq_value = NullableRStrip10DecimalField()
-    rt_neg_gc_reaction = NullableRStrip100DecimalField()
-    pcr_neg_cq_value = NullableRStrip10DecimalField()
-    pcr_neg_gc_reaction = NullableRStrip100DecimalField()
-    pcr_pos_cq_value = NullableRStrip10DecimalField()
-    pcr_pos_gc_reaction = NullableRStrip100DecimalField()
-    updated_pcrreplicates = serializers.ListField(write_only=True)
-    extraction_batch = ExtractionBatchSerializer(required=False)
-    pcrreplicates = PCRReplicateSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = PCRReplicateBatch
-        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'notes', 'ext_neg_cq_value',
-                  'ext_neg_gc_reaction', 'ext_neg_gc_reaction_sci', 'ext_neg_invalid', 'rt_neg_cq_value',
-                  'rt_neg_gc_reaction', 'rt_neg_gc_reaction_sci', 'rt_neg_invalid', 'pcr_neg_cq_value',
-                  'pcr_neg_gc_reaction', 'pcr_neg_gc_reaction_sci', 'pcr_neg_invalid', 'pcr_pos_cq_value',
-                  'pcr_pos_gc_reaction', 'pcr_pos_gc_reaction_sci', 'pcr_pos_invalid', 're_pcr', 'pcrreplicates',
-                  'updated_pcrreplicates', 'created_date', 'created_by', 'modified_date', 'modified_by',)
-        extra_kwargs = {
-            'extraction_batch': {'required': False},
-            'pcrreplicates': {'required': False}
-        }
-
-
-class PCRReplicateBatchBaseSerializer(serializers.ModelSerializer):
-
-    def update(self, instance, validated_data):
-        if 'request' in self.context and hasattr(self.context['request'], 'user'):
-            user = self.context['request'].user
-        else:
-            user = validated_data.get('modified_by', instance.modified_by)
-
-        # if the cq and gc_reaction values are not present, temporarily set them to 'NA'
-        extneg_cq = validated_data.get('ext_neg_cq_value', 'NA')
-        rtneg_cq = validated_data.get('rt_neg_cq_value', 'NA')
-        pcrneg_cq = validated_data.get('pcr_neg_cq_value', 'NA')
-        pcrpos_cq = validated_data.get('pcr_pos_cq_value', 'NA')
-        extneg_gcr = validated_data.get('ext_neg_gc_reaction', 'NA')
-        rtneg_gcr = validated_data.get('rt_neg_gc_reaction', 'NA')
-        pcrneg_gcr = validated_data.get('pcr_neg_gc_reaction', 'NA')
-        pcrpos_gcr = validated_data.get('pcr_pos_gc_reaction', 'NA')
-        # if the cq and gc_reaction values are null, set them to 0
-        if extneg_cq != 'NA':
-            instance.ext_neg_cq_value = 0 if extneg_cq is None else extneg_cq
-        if rtneg_cq != 'NA':
-            instance.rt_neg_cq_value = 0 if rtneg_cq is None else rtneg_cq
-        if pcrneg_cq != 'NA':
-            instance.pcr_neg_cq_value = 0 if pcrneg_cq is None else pcrneg_cq
-        if pcrpos_cq != 'NA':
-            instance.pcr_pos_cq_value = 0 if pcrpos_cq is None else pcrpos_cq
-        if extneg_gcr != 'NA':
-            instance.ext_neg_gc_reaction = 0 if extneg_gcr is None else extneg_gcr
-        if rtneg_gcr != 'NA':
-            instance.rt_neg_gc_reaction = 0 if rtneg_gcr is None else rtneg_gcr
-        if pcrneg_gcr != 'NA':
-            instance.pcr_neg_gc_reaction = 0 if pcrneg_gcr is None else pcrneg_gcr
-        if pcrpos_gcr != 'NA':
-            instance.pcr_pos_gc_reaction = 0 if pcrpos_gcr is None else pcrpos_gcr
-
-        # begin updating the instance, but do not save until all child replicates are valid
-        instance.notes = validated_data.get('notes', instance.notes)
-        instance.re_pcr = validated_data.get('re_pcr', instance.re_pcr)
-        instance.modified_by = user
-
-        instance.save()
-        return instance
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()

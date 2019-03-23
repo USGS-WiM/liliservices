@@ -805,24 +805,34 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 replicate_number=item['replicate_number']).first()
 
             if pcrreplicate_batch:
-                item.pop('extraction_batch')
-                item.pop('target')
-                item.pop('replicate_number')
-                item['ext_neg_cq_value'] = 0
-                item['ext_neg_gc_reaction'] = 0
-                item['rt_neg_cq_value'] = 0
-                item['rt_neg_gc_reaction'] = 0
-                item['pcr_neg_cq_value'] = 0
-                item['pcr_neg_gc_reaction'] = 0
-                item['pcr_pos_gc_reaction'] = 0
-                serializer = PCRReplicateBatchBaseSerializer(pcrreplicate_batch, data=item, partial=True)
-                # if this item is valid, temporarily hold it until all items are proven valid, then save all
-                # if even one item is invalid, none will be saved, and the user will be returned the error(s)
-                if serializer.is_valid():
-                    valid_data.append(serializer)
+                if not is_valid:
+                    continue
                 else:
-                    is_valid = False
-                    response_errors.append(serializer.errors)
+                    item.pop('extraction_batch')
+                    item.pop('target')
+                    item.pop('replicate_number')
+                    item['ext_neg_cq_value'] = 0
+                    item['ext_neg_gc_reaction'] = 0
+                    item['rt_neg_cq_value'] = 0
+                    item['rt_neg_gc_reaction'] = 0
+                    item['pcr_neg_cq_value'] = 0
+                    item['pcr_neg_gc_reaction'] = 0
+                    item['pcr_pos_gc_reaction'] = 0
+                    item['updated_pcrreplicates'] = []
+
+                    pcrreplicates = PCRReplicate.objects.filter(pcrreplicate_batch=pcrreplicate_batch.id)
+                    for rep in pcrreplicates:
+                        item['updated_pcrreplicates'].append(
+                            {"sample": rep.sample_extraction.sample.id, "cq_value": 0, "gc_reaction": 0})
+
+                    serializer = self.serializer_class(pcrreplicate_batch, data=item, partial=True)
+                    # if this item is valid, temporarily hold it until all items are proven valid, then save all
+                    # if even one item is invalid, none will be saved, and the user will be returned the error(s)
+                    if serializer.is_valid():
+                        valid_data.append(serializer)
+                    else:
+                        is_valid = False
+                        response_errors.append(serializer.errors)
             else:
                 message = "No PCR replicate batch was found with extraction batch of " + str(item['extraction_batch'])
                 message += " and target of " + str(item['target'])
