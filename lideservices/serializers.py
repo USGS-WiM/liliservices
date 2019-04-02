@@ -1351,6 +1351,18 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         }
 
 
+class PCRReplicateBatchSummarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PCRReplicateBatch
+        fields = ('id', 'extraction_batch', 'target', 'replicate_number', 'notes', 'ext_neg_cq_value',
+                  'ext_neg_gc_reaction', 'ext_neg_gc_reaction_sci', 'ext_neg_invalid', 'rt_neg_cq_value',
+                  'rt_neg_gc_reaction', 'rt_neg_gc_reaction_sci', 'rt_neg_invalid', 'pcr_neg_cq_value',
+                  'pcr_neg_gc_reaction', 'pcr_neg_gc_reaction_sci', 'pcr_neg_invalid', 'pcr_pos_cq_value',
+                  'pcr_pos_gc_reaction', 'pcr_pos_gc_reaction_sci', 'pcr_pos_invalid', 're_pcr',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class StandardCurveSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1692,6 +1704,7 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
     sampleextractions = SampleExtractionSerializer(many=True, read_only=True)
     # inhibitions = serializers.SerializerMethodField()
     reverse_transcriptions = serializers.SerializerMethodField()
+    pcrreplicatebatches = PCRReplicateBatchSummarySerializer(many=True, read_only=True)
     targets = serializers.SerializerMethodField()
     extraction_method = serializers.SerializerMethodField()
 
@@ -1700,8 +1713,8 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions',
-                  'reverse_transcriptions', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'reverse_transcriptions',
+                  'pcrreplicatebatches', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
