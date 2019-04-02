@@ -775,7 +775,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             if not self.isnumber(self.request.data[field]):
                 invalid_reason = self.err_obj(field, field + synonym + " is not a number", 1)
             elif self.request.data[field] > 0 and field not in ['pcr_pos_cq_value', 'pcr_pos_gc_reaction']:
-                # TODO: eventually we will also validate pcr_pos_cq_value by testing if it is >0.5 cylces from expected
+                # eventually we will also validate pcr_pos_cq_value by testing if it is >0.5 cylces from expected
                 invalid_reason = self.err_obj(field, field + synonym + " is positive", 1)
         return invalid_reason
 
