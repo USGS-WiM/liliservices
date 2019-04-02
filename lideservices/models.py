@@ -814,13 +814,14 @@ class ExtractionBatch(HistoryModel):
         #     if self.sample_dilution_factor != old_extraction_batch.sample_dilution_factor:
         #         # recalc!!
 
+        is_new = False if self.pk else True
         super(ExtractionBatch, self).save(*args, **kwargs)
 
         # Invalidate all child PCR Replicates if this (their parent Extraction Batch) is invalid
-        if self.ext_pos_dna_invalid:
+        if self.ext_pos_dna_invalid and not is_new:
             PCRReplicate.objects.filter(sample_extraction__extraction_batch=self.id).update(invalid=True)
 
-            pcrrepbatches = PCRReplicateBatch.objects.get(extraction_batch=self.id)
+            pcrrepbatches = PCRReplicateBatch.objects.filter(extraction_batch=self.id)
             sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.id)
             for sampleextraction in sampleextractions:
                 for pcrrepbatch in pcrrepbatches:
@@ -874,14 +875,15 @@ class ReverseTranscription(HistoryModel):
         # and can only be set to False if the cq_value of this RT is not null
         self.ext_pos_rna_rt_invalid = False if self.ext_pos_rna_rt_cq_value is not None else True
 
+        is_new = False if self.pk else True
         super(ReverseTranscription, self).save(*args, **kwargs)
 
         # Invalidate all child PCR Replicates if this (their parent RT) is invalid
-        if self.ext_pos_rna_rt_invalid:
+        if self.ext_pos_rna_rt_invalid and not is_new:
             PCRReplicate.objects.filter(
                 sample_extraction__extraction_batch=self.extraction_batch.id).update(invalid=True)
 
-            pcrrepbatches = PCRReplicateBatch.objects.get(extraction_batch=self.extraction_batch.id)
+            pcrrepbatches = PCRReplicateBatch.objects.filter(extraction_batch=self.extraction_batch.id)
             sampleextractions = SampleExtraction.objects.filter(extraction_batch=self.extraction_batch.id)
             for sampleextraction in sampleextractions:
                 for pcrrepbatch in pcrrepbatches:
@@ -1339,7 +1341,7 @@ class PCRReplicate(HistoryModel):
                 # then check all other controls applicable to this rep
                 rt = ReverseTranscription.objects.filter(
                     extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
-                rt_pos_invalid = rt.rt_pos_invalid if rt else False
+                rt_pos_invalid = rt.ext_pos_rna_rt_invalid if rt else False
                 if (
                         not any_peg_neg_invalid and
                         not pcrreplicate_batch.extraction_batch.ext_pos_dna_invalid and
