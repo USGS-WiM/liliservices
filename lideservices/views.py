@@ -845,6 +845,11 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             response_data = []
             for item in valid_data:
                 item.save()
+                # recalc the child rep validity
+                reps = PCRReplicate.objects.filter(pcrreplicate_batch=item.data['id'])
+                for rep in reps:
+                    rep.invalid = rep.calc_invalid()
+                    rep.save()
                 response_data.append(item.data)
             return JsonResponse(response_data, safe=False, status=200)
         else:
