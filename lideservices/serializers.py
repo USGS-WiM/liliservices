@@ -463,6 +463,7 @@ class SampleSerializer(serializers.ModelSerializer):
     total_volume_sampled_initial = NullableRStrip10DecimalField()
     total_volume_or_mass_sampled = RStrip10DecimalField()
     sample_volume_initial = NullableRStrip10DecimalField()
+    record_type_string = serializers.StringRelatedField(source='record_type')
     dissolution_volume = NullableRStrip10DecimalField()
     post_dilution_volume = NullableRStrip10DecimalField()
     aliquots = AliquotSerializer(many=True, read_only=True)
@@ -478,9 +479,9 @@ class SampleSerializer(serializers.ModelSerializer):
                   'meter_reading_initial', 'meter_reading_final', 'meter_reading_unit', 'total_volume_sampled_initial',
                   'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled', 'sample_volume_initial',
                   'filter_born_on_date', 'filter_flag', 'secondary_concentration_flag', 'elution_notes', 'record_type',
-                  'technician_initials', 'dissolution_volume', 'post_dilution_volume', 'peg_neg', 'samplegroups',
-                  'analysisbatches', 'peg_neg_targets_extracted', 'final_concentrated_sample_volume', 'aliquots',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'record_type_string', 'technician_initials', 'dissolution_volume', 'post_dilution_volume', 'peg_neg',
+                  'samplegroups', 'analysisbatches', 'peg_neg_targets_extracted', 'final_concentrated_sample_volume',
+                  'aliquots', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleTypeSerializer(serializers.ModelSerializer):
