@@ -60,6 +60,71 @@ class SampleViewSet(HistoryViewSet):
     serializer_class = SampleSerializer
 
     @action(detail=False)
+    def fsmc_by_target(self, request):
+        queryset = Sample.objects.prefetch_related('final_sample_mean_concentrations').all()
+        query_params = self.request.query_params
+        # filter by sample IDs, exact list
+        sample = query_params.get('sample', None)
+        if sample is not None:
+            if LIST_DELIMETER in sample:
+                sample_list = sample.split(LIST_DELIMETER)
+                queryset = queryset.filter(id__in=sample_list)
+            else:
+                queryset = queryset.filter(id__exact=sample)
+        # filter by target IDs, exact list
+        target = query_params.get('target', None)
+        target_list = []
+        if target is not None:
+            if LIST_DELIMETER in target:
+                target_list = target.split(LIST_DELIMETER)
+                queryset = queryset.filter(final_sample_mean_concentrations__target__in=target_list)
+            else:
+                target_list = [target]
+                queryset = queryset.filter(final_sample_mean_concentrations__target__exact=target)
+
+        # start building up the response object
+        resp = []
+        for sample in queryset:
+            sample_target_list = [int(target) for target in target_list]
+            item = {
+                "id": sample.id,
+                "collaborator_sample_id": sample.collaborator_sample_id,
+                "collection_start_date": sample.collection_start_date,
+                "final_sample_mean_concentrations": []
+            }
+            fsmcs = list(FinalSampleMeanConcentration.objects.filter(sample=sample.id))
+            for fsmc in fsmcs:
+                # attempt to find the matching target in the fsmc list
+                try:
+                    sample_target_index = sample_target_list.index(fsmc.target.id)
+                    # pop the matching fsmc target from its list so that we eventually end up with an empty list,
+                    # or a list of extraneous targets
+                    sample_target_list.pop(sample_target_index)
+
+                    # start building up the nested response object
+                    item["final_sample_mean_concentrations"].append({
+                        "target": fsmc.target.id,
+                        "target_string": fsmc.target.name,
+                        "final_sample_mean_concentration": fsmc.final_sample_mean_concentration
+                    })
+                # no matching target was found in the fsmc list
+                except ValueError:
+                    # do not include this fsmc in the response because its target was not requested
+                    continue
+            # now list out the other targets that were requested but do not exist for this sample
+            for extraneous_target in sample_target_list:
+                # start building up the nested response object
+                target_name = list(Target.objects.filter(id=extraneous_target).values_list('name', flat=True))
+                item["final_sample_mean_concentrations"].append({
+                    "target": extraneous_target,
+                    "target_string": target_name[0],
+                    "final_sample_mean_concentration": "N/A"
+                })
+            resp.append(item)
+
+        return Response(resp)
+
+    @action(detail=False)
     def get_count(self, request):
         # Sample.objects.filter(matrix__in=matrix_list).count()
         query_params = self.request.query_params
