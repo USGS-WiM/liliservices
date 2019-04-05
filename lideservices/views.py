@@ -60,7 +60,7 @@ class SampleViewSet(HistoryViewSet):
     serializer_class = SampleSerializer
 
     @action(detail=False)
-    def fsmc_by_target(self, request):
+    def finalsamplemeanconcentrations(self, request):
         queryset = Sample.objects.prefetch_related('final_sample_mean_concentrations').all()
         query_params = self.request.query_params
         # filter by sample IDs, exact list
