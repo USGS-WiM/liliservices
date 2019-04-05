@@ -481,7 +481,8 @@ class SampleSerializer(serializers.ModelSerializer):
                   'filter_born_on_date', 'filter_flag', 'secondary_concentration_flag', 'elution_notes', 'record_type',
                   'record_type_string', 'technician_initials', 'dissolution_volume', 'post_dilution_volume', 'peg_neg',
                   'samplegroups', 'analysisbatches', 'peg_neg_targets_extracted', 'final_concentrated_sample_volume',
-                  'aliquots', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'final_sample_mean_concentrations', 'aliquots',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class SampleTypeSerializer(serializers.ModelSerializer):
