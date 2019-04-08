@@ -61,7 +61,7 @@ class SampleViewSet(HistoryViewSet):
 
     @action(detail=False)
     def finalsamplemeanconcentrations(self, request):
-        queryset = Sample.objects.prefetch_related('final_sample_mean_concentrations').all()
+        queryset = Sample.objects.prefetch_related('final_sample_mean_concentrations').distinct()
         query_params = self.request.query_params
         # filter by sample IDs, exact list
         sample = query_params.get('sample', None)
