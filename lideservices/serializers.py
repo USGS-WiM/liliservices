@@ -210,7 +210,7 @@ class AliquotListSerializer(serializers.ListSerializer):
                     details.append("freezer_location is a required field")
                 if 'rack' in item or 'box' in item or 'row' in item or 'spot' in item:
                     is_valid = False
-                    message = "coordinates (freezer, rack, box, row, spot) are not allowed in updates; "
+                    message = "Coordinates (freezer, rack, box, row, spot) are not allowed in updates; "
                     message += "use freezer_location ID instead"
                     details.append(message)
                 if 'aliquot_number' not in item or item['aliquot_number'] == 0:
@@ -574,7 +574,7 @@ class SampleAnalysisBatchSerializer(serializers.ModelSerializer):
             ebs = ExtractionBatch.objects.filter(analysis_batch=ab_id)
             if len(ebs) > 0:
                 # if yes, raise a validation error
-                message = "the samples list of an analysis batch cannot be altered"
+                message = "The samples list of an analysis batch cannot be altered"
                 message += " after the analysis batch has one or more extraction batches"
                 raise serializers.ValidationError(message)
 
@@ -635,6 +635,22 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         else:
             new_samples = []
 
+        # identify relates where sample IDs are present in old list but not new list
+        delete_samples = list(set(old_samples) - set(new_samples))
+
+        # identify relates where sample IDs are present in new list but not old list
+        add_samples = list(set(new_samples) - set(old_samples))
+
+        # check if this Analysis Batch has any Extraction Batches
+        ebs = ExtractionBatch.objects.filter(analysis_batch=instance.id)
+        if len(ebs) > 0:
+            # if yes, check if the samples list has changed
+            if len(delete_samples) > 0 or len(add_samples) > 0:
+                # if yes, raise a validation error
+                message = "The samples list of an analysis batch cannot be altered"
+                message += " after the analysis batch has one or more extraction batches"
+                raise serializers.ValidationError(message)
+
         # update the Analysis Batch object
         instance.name = validated_data.get('name', instance.name)
         instance.analysis_batch_description = validated_data.get('analysis_batch_description',
@@ -643,14 +659,12 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
         instance.modified_by = user
         instance.save()
 
-        # identify and delete relates where sample IDs are present in old list but not new list
-        delete_samples = list(set(old_samples) - set(new_samples))
+        # delete relates where sample IDs are present in old list but not new list
         for sample_id in delete_samples:
             delete_sample = SampleAnalysisBatch.objects.filter(analysis_batch=instance, sample=sample_id)
             delete_sample.delete()
 
-        # identify and create relates where sample IDs are present in new list but not old list
-        add_samples = list(set(new_samples) - set(old_samples))
+        # create relates where sample IDs are present in new list but not old list
         for sample_id in add_samples:
             SampleAnalysisBatch.objects.create(analysis_batch=instance, sample=sample_id,
                                                created_by=user, modified_by=user)
@@ -700,6 +714,7 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
     ext_pos_dna_cq_value = NullableRStrip10DecimalField()
     sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    reversetranscriptions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     ext_pos_rna_rt_cq_value = serializers.DecimalField(
         write_only=True, required=False, max_digits=20, decimal_places=10)
 
@@ -738,7 +753,8 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
                   'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'inhibitions',
-                  'ext_pos_rna_rt_cq_value', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'reversetranscriptions', 'ext_pos_rna_rt_cq_value',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class ExtractionBatchSerializer(serializers.ModelSerializer):
@@ -752,6 +768,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     ext_pos_dna_cq_value = NullableRStrip10DecimalField()
     sampleextractions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     inhibitions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
+    reversetranscriptions = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
     new_rt = serializers.JSONField(write_only=True, required=False)
     new_replicates = serializers.ListField(write_only=True, required=False)
     new_sample_extractions = serializers.ListField(write_only=True, required=False)
@@ -776,7 +793,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         is_valid = False
                         message = ""
                         if 'sample' in item:
-                            message += "new sample_extraction with sample_id " + str(item['sample'])
+                            message += "New sample_extraction with sample_id " + str(item['sample'])
                             message += " is missing an inhibition; "
                         message += "Either inhibition_dna or inhibition_rna is required within new_sample_extractions"
                         message += " (these two fields cannot both be null) "
@@ -969,8 +986,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
                   'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'inhibitions',
-                  'ext_pos_rna_rt_cq_value', 'new_rt', 'new_replicates', 'new_sample_extractions',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'reversetranscriptions', 'ext_pos_rna_rt_cq_value', 'new_rt', 'new_replicates',
+                  'new_sample_extractions', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = ExtractionBatchListSerializer
 
 

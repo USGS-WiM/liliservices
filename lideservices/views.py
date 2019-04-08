@@ -3,6 +3,7 @@ from rest_framework import views, viewsets, generics, permissions, authenticatio
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
+from rest_framework.exceptions import APIException
 from lideservices.serializers import *
 from lideservices.models import *
 from lideservices.permissions import *
@@ -505,6 +506,15 @@ class AnalysisBatchViewSet(HistoryViewSet):
     queryset = AnalysisBatch.objects.all()
     serializer_class = AnalysisBatchSerializer
 
+    # override the default DELETE method to prevent deletion of an AnalysisBatch with any results data entered
+    def destroy(self, request, *args, **kwargs):
+        nonnull_pcrreplicates = PCRReplicate.objects.filter(
+            pcrreplicate_batch__extraction_batch__analysis_batch=self.get_object().id).exclude(cq_value__isnull=True)
+        if any(nonnull_pcrreplicates):
+            message = "An Analysis Batch may not be deleted if any related PCR Replicates have results data entered."
+            raise APIException(message)
+        return super(AnalysisBatchViewSet, self).destroy(request, *args, **kwargs)
+
 
 class AnalysisBatchDetailViewSet(HistoryViewSet):
     serializer_class = AnalysisBatchDetailSerializer
@@ -590,7 +600,6 @@ class ExtractionMethodViewSet(HistoryViewSet):
 
 class ExtractionBatchViewSet(HistoryViewSet):
     queryset = ExtractionBatch.objects.all()
-    # serializer_class = ExtractionBatchSerializer
 
     # override the default serializer_class if summary fields are requested
     def get_serializer_class(self):
@@ -609,6 +618,15 @@ class ExtractionBatchViewSet(HistoryViewSet):
                 kwargs['many'] = True
 
         return super(ExtractionBatchViewSet, self).get_serializer(*args, **kwargs)
+
+    # override the default DELETE method to prevent deletion of an ExtractionBatch with any results data entered
+    def destroy(self, request, *args, **kwargs):
+        nonnull_pcrreplicates = PCRReplicate.objects.filter(
+            pcrreplicate_batch__extraction_batch=self.get_object().id).exclude(cq_value__isnull=True)
+        if any(nonnull_pcrreplicates):
+            message = "An Extraction Batch may not be deleted if any related PCR Replicates have results data entered."
+            raise APIException(message)
+        return super(ExtractionBatchViewSet, self).destroy(request, *args, **kwargs)
 
     # override the default PATCH method to allow bulk processing
     def patch(self, request, pk=None):
@@ -678,6 +696,17 @@ class ReverseTranscriptionViewSet(HistoryViewSet):
 
         return super(ReverseTranscriptionViewSet, self).get_serializer(*args, **kwargs)
 
+    # override the default DELETE method to prevent deletion of a ReverseTranscription with any results data entered
+    def destroy(self, request, *args, **kwargs):
+        nonnull_pcrreplicates = PCRReplicate.objects.filter(
+            pcrreplicate_batch__extraction_batch__reversetranscriptions=self.get_object().id).exclude(
+            cq_value__isnull=True)
+        if any(nonnull_pcrreplicates):
+            message = "A Reverse Transcription may not be deleted"
+            message += " if any related PCR Replicates have results data entered."
+            raise APIException(message)
+        return super(ReverseTranscriptionViewSet, self).destroy(request, *args, **kwargs)
+
     # override the default PATCH method to allow bulk processing
     def patch(self, request, pk=None):
         request_data = JSONParser().parse(request)
@@ -735,6 +764,15 @@ class SampleExtractionViewSet(HistoryViewSet):
     queryset = SampleExtraction.objects.all()
     serializer_class = SampleExtractionSerializer
 
+    # override the default DELETE method to prevent deletion of a SampleExtraction with any results data entered
+    def destroy(self, request, *args, **kwargs):
+        nonnull_pcrreplicates = PCRReplicate.objects.filter(
+            sample_extraction=self.get_object().id).exclude(cq_value__isnull=True)
+        if any(nonnull_pcrreplicates):
+            message = "A Sample Extraction may not be deleted if any related PCR Replicates have results data entered."
+            raise APIException(message)
+        return super(SampleExtractionViewSet, self).destroy(request, *args, **kwargs)
+
 
 class PCRReplicateViewSet(HistoryViewSet):
     serializer_class = PCRReplicateSerializer
@@ -760,7 +798,7 @@ class PCRReplicateViewSet(HistoryViewSet):
                 queryset = queryset.filter(id__exact=id)
         return queryset
 
-# override the default PATCH method to allow bulk processing
+    # override the default PATCH method to allow bulk processing
     def patch(self, request, pk=None):
         request_data = JSONParser().parse(request)
         # if there is no pk, assume this is a bulk request
@@ -1115,6 +1153,16 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 queryset = queryset.filter(replicate_number__exact=replicate_number)
         return queryset
 
+    # override the default DELETE method to prevent deletion of a PCRReplicateBatch with any results data entered
+    def destroy(self, request, *args, **kwargs):
+        nonnull_pcrreplicates = PCRReplicate.objects.filter(
+            pcrreplicate_batch=self.get_object().id).exclude(cq_value__isnull=True)
+        if any(nonnull_pcrreplicates):
+            message = "A PCR Replicate Batch may not be deleted"
+            message += " if any related PCR Replicates have results data entered."
+            raise APIException(message)
+        return super(PCRReplicateBatchViewSet, self).destroy(request, *args, **kwargs)
+
 
 class StandardCurveViewSet(HistoryViewSet):
     queryset = StandardCurve.objects.all()
@@ -1134,6 +1182,18 @@ class InhibitionViewSet(HistoryViewSet):
                 kwargs['many'] = True
 
         return super(InhibitionViewSet, self).get_serializer(*args, **kwargs)
+
+    # override the default DELETE method to prevent deletion of an Inhibition with any results data entered
+    def destroy(self, request, *args, **kwargs):
+        nonnull_pcrreplicates_dna = PCRReplicate.objects.filter(
+            sample_extraction__inhibition_dna=self.get_object().id).exclude(cq_value__isnull=True)
+        nonnull_pcrreplicates_rna = PCRReplicate.objects.filter(
+            sample_extraction__inhibition_rna=self.get_object().id).exclude(cq_value__isnull=True)
+        nonnull_pcrreplicates = nonnull_pcrreplicates_dna.union(nonnull_pcrreplicates_rna).distinct()
+        if any(nonnull_pcrreplicates):
+            message = "An Inhibition may not be deleted if any related PCR Replicates have results data entered."
+            raise APIException(message)
+        return super(InhibitionViewSet, self).destroy(request, *args, **kwargs)
 
     # override the default PATCH method to allow bulk processing
     def patch(self, request, pk=None):
