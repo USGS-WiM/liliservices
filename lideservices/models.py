@@ -120,12 +120,12 @@ class HistoryModel(models.Model):
     """
 
     created_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, db_index=True,
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT, null=True, blank=True, db_index=True,
                                    related_name='%(class)s_creator')
     modified_date = models.DateField(auto_now=True, null=True, blank=True)
-    modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, db_index=True,
+    modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT, null=True, blank=True, db_index=True,
                                     related_name='%(class)s_modifier')
-    history = HistoricalRecords()
+    history = HistoricalRecords(inherit=True)
 
     class Meta:
         abstract = True
@@ -155,10 +155,10 @@ class Sample(HistoryModel):
     Sample
     """
 
-    sample_type = models.ForeignKey('SampleType', related_name='samples')
-    matrix = models.ForeignKey('Matrix', related_name='samples')
-    filter_type = models.ForeignKey('FilterType', null=True, related_name='samples')
-    study = models.ForeignKey('Study', related_name='samples')
+    sample_type = models.ForeignKey('SampleType', models.PROTECT, related_name='samples')
+    matrix = models.ForeignKey('Matrix', models.PROTECT, related_name='samples')
+    filter_type = models.ForeignKey('FilterType', models.PROTECT, null=True, related_name='samples')
+    study = models.ForeignKey('Study', models.PROTECT, related_name='samples')
     study_site_name = models.CharField(max_length=128, blank=True)
     collaborator_sample_id = models.CharField(max_length=128, unique=True)
     sampler_name = models.CharField(max_length=128, blank=True)
@@ -172,9 +172,10 @@ class Sample(HistoryModel):
     collection_end_time = models.TimeField(null=True, blank=True)
     meter_reading_initial = NullableNonnegativeDecimalField2010()
     meter_reading_final = NullableNonnegativeDecimalField2010()
-    meter_reading_unit = models.ForeignKey('Unit', null=True, related_name='samples_meter_units')
+    meter_reading_unit = models.ForeignKey('Unit', models.PROTECT, null=True, related_name='samples_meter_units')
     total_volume_sampled_initial = NullableNonnegativeDecimalField2010()
-    total_volume_sampled_unit_initial = models.ForeignKey('Unit', null=True, related_name='samples_tvs_units')
+    total_volume_sampled_unit_initial = models.ForeignKey(
+        'Unit', models.PROTECT, null=True, related_name='samples_tvs_units')
     total_volume_or_mass_sampled = NonnegativeDecimalField2010()
     sample_volume_initial = NullableNonnegativeDecimalField2010()
     filter_born_on_date = models.DateField(null=True, blank=True)
@@ -187,8 +188,8 @@ class Sample(HistoryModel):
     analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
                                              related_name='sampleanalysisbatches')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
-    peg_neg = models.ForeignKey('self', null=True, related_name='samples')
-    record_type = models.ForeignKey('RecordType', default=1)
+    peg_neg = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='samples')
+    record_type = models.ForeignKey('RecordType', models.PROTECT, default=1)
 
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
@@ -230,8 +231,8 @@ class Aliquot(HistoryModel):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.sample, self.aliquot_number)
 
-    sample = models.ForeignKey('Sample', related_name='aliquots')
-    freezer_location = models.ForeignKey('FreezerLocation', related_name='aliquot')
+    sample = models.ForeignKey('Sample', models.PROTECT, related_name='aliquots')
+    freezer_location = models.ForeignKey('FreezerLocation', models.PROTECT, related_name='aliquot')
     aliquot_number = NonnegativeIntegerField()
     frozen = models.BooleanField(default=True)
 
@@ -277,7 +278,7 @@ class FilterType(NameModel):
     Filter Type
     """
 
-    matrix = models.ForeignKey('Matrix', related_name='filters')
+    matrix = models.ForeignKey('Matrix', models.PROTECT, related_name='filters')
 
     def __str__(self):
         return self.name
@@ -470,7 +471,7 @@ class FreezerLocation(HistoryModel):
     Freezer Location
     """
 
-    freezer = models.ForeignKey('Freezer', related_name='freezerlocations')
+    freezer = models.ForeignKey('Freezer', models.PROTECT, related_name='freezerlocations')
     rack = NonnegativeIntegerField()
     box = NonnegativeIntegerField()
     row = NonnegativeIntegerField()
@@ -518,8 +519,9 @@ class FinalConcentratedSampleVolume(HistoryModel):
     def final_concentrated_sample_volume_sci(self):
         return get_sci_val(self.final_concentrated_sample_volume)
 
-    sample = models.OneToOneField('Sample', related_name='final_concentrated_sample_volume')
-    concentration_type = models.ForeignKey('ConcentrationType', related_name='final_concentrated_sample_volumes')
+    sample = models.OneToOneField('Sample', models.CASCADE, related_name='final_concentrated_sample_volume')
+    concentration_type = models.ForeignKey(
+        'ConcentrationType', models.PROTECT, related_name='final_concentrated_sample_volumes')
     final_concentrated_sample_volume = models.DecimalField(
         max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
     notes = models.TextField(blank=True)
@@ -642,8 +644,8 @@ class FinalSampleMeanConcentration(HistoryModel):
         return data
 
     final_sample_mean_concentration = NullableNonnegativeDecimalField120100()
-    sample = models.ForeignKey('Sample', related_name='final_sample_mean_concentrations')
-    target = models.ForeignKey('Target', related_name='final_sample_mean_concentrations')
+    sample = models.ForeignKey('Sample', models.CASCADE, related_name='final_sample_mean_concentrations')
+    target = models.ForeignKey('Target', models.PROTECT, related_name='final_sample_mean_concentrations')
 
     # Calculate sample mean concentration for all samples whose target replicates are now in the database
     # Concentrations from replicates are used to determine the Mean Sample Concentration
@@ -690,8 +692,8 @@ class SampleSampleGroup(HistoryModel):
     Table to allow many-to-many relationship between SampleGroups and Samples.
     """
 
-    sample = models.ForeignKey('Sample')
-    samplegroup = models.ForeignKey('SampleGroup')
+    sample = models.ForeignKey('Sample', models.CASCADE)
+    samplegroup = models.ForeignKey('SampleGroup', models.CASCADE)
 
     def __str__(self):
         return str(self.id)
@@ -727,8 +729,8 @@ class SampleAnalysisBatch(HistoryModel):
     Table to allow many-to-many relationship between Samples and Analysis Batches.
     """
 
-    sample = models.ForeignKey('Sample')
-    analysis_batch = models.ForeignKey('AnalysisBatch')
+    sample = models.ForeignKey('Sample', models.CASCADE)
+    analysis_batch = models.ForeignKey('AnalysisBatch', models.CASCADE)
 
     def __str__(self):
         return str(self.id)
@@ -761,7 +763,7 @@ class AnalysisBatchTemplate(NameModel):
     Analysis Batch Template
     """
 
-    target = models.ForeignKey('Target', related_name='analysisbatchtemplates')
+    target = models.ForeignKey('Target', models.PROTECT, related_name='analysisbatchtemplates')
     description = models.TextField(blank=True)
     extraction_volume = NonnegativeDecimalField2010()
     elution_volume = NonzeroDecimalField2010()
@@ -802,9 +804,9 @@ class ExtractionBatch(HistoryModel):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.analysis_batch, self.extraction_number)
 
-    analysis_batch = models.ForeignKey('AnalysisBatch', related_name='extractionbatches')
-    extraction_method = models.ForeignKey('ExtractionMethod', related_name='extractionbatches')
-    re_extraction = models.ForeignKey('self', null=True, related_name='extractionbatches')
+    analysis_batch = models.ForeignKey('AnalysisBatch', models.CASCADE, related_name='extractionbatches')
+    extraction_method = models.ForeignKey('ExtractionMethod', models.CASCADE, related_name='extractionbatches')
+    re_extraction = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='extractionbatches')
     re_extraction_notes = models.TextField(blank=True)
     extraction_number = NonnegativeIntegerField()
     extraction_volume = NonnegativeDecimalField2010()
@@ -868,13 +870,13 @@ class ReverseTranscription(HistoryModel):
     Reverse Transcription
     """
 
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='reversetranscriptions')
+    extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='reversetranscriptions')
     template_volume = models.DecimalField(
         max_digits=20, decimal_places=10, default=8.6, validators=[MINVAL_ZERO])
     reaction_volume = models.DecimalField(
         max_digits=20, decimal_places=10, default=50, validators=[MINVAL_DECIMAL_10])
     rt_date = models.DateField(default=date.today, null=True, blank=True, db_index=True)
-    re_rt = models.ForeignKey('self', null=True, related_name='reversetranscriptions')
+    re_rt = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='reversetranscriptions')
     re_rt_notes = models.TextField(blank=True)
     ext_pos_rna_rt_cq_value = NullableNonnegativeDecimalField2010()
     ext_pos_rna_rt_invalid = models.BooleanField(default=True)
@@ -912,10 +914,10 @@ class SampleExtraction(HistoryModel):
     Sample Extraction
     """
 
-    sample = models.ForeignKey('Sample', related_name='sampleextractions')
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='sampleextractions')
-    inhibition_dna = models.ForeignKey('Inhibition', null=True, related_name='sampleextractions_dna')
-    inhibition_rna = models.ForeignKey('Inhibition', null=True, related_name='sampleextractions_rna')
+    sample = models.ForeignKey('Sample', models.CASCADE, related_name='sampleextractions')
+    extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='sampleextractions')
+    inhibition_dna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractions_dna')
+    inhibition_rna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractions_rna')
 
     def __str__(self):
         return str(self.id)
@@ -947,8 +949,8 @@ class PCRReplicateBatch(HistoryModel):
     def pcr_pos_gc_reaction_sci(self):
         return get_sci_val(self.pcr_pos_gc_reaction)
 
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='pcrreplicatebatches')
-    target = models.ForeignKey('Target', related_name='pcrreplicatebatches')
+    extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='pcrreplicatebatches')
+    target = models.ForeignKey('Target', models.PROTECT, related_name='pcrreplicatebatches')
     replicate_number = NonnegativeIntegerField()
     notes = models.TextField(blank=True)
     ext_neg_cq_value = NullableNonnegativeDecimalField2010()
@@ -963,7 +965,7 @@ class PCRReplicateBatch(HistoryModel):
     pcr_pos_cq_value = NullableNonnegativeDecimalField2010()
     pcr_pos_gc_reaction = NullableNonnegativeDecimalField120100()
     pcr_pos_invalid = models.BooleanField(default=True)
-    re_pcr = models.ForeignKey('self', null=True, related_name='pcrreplicatebatches')
+    re_pcr = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='pcrreplicatebatches')
 
     # override the save method to calculate and invalid flags
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
@@ -1191,15 +1193,16 @@ class PCRReplicate(HistoryModel):
         #     'final_concentrated_sample_volume', flat=True).get(sample=self.sample_extraction.sample.id)
         return calc_vals
 
-    sample_extraction = models.ForeignKey('SampleExtraction', related_name='pcrreplicates')
-    pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', related_name='pcrreplicates')
+    sample_extraction = models.ForeignKey('SampleExtraction', models.CASCADE, related_name='pcrreplicates')
+    pcrreplicate_batch = models.ForeignKey('PCRReplicateBatch', models.CASCADE, related_name='pcrreplicates')
     cq_value = NullableNonnegativeDecimalField2010()
     gc_reaction = NullableNonnegativeDecimalField120100()
     replicate_concentration = models.DecimalField(
         max_digits=120, decimal_places=100, null=True, blank=True, validators=[MINVAL_DECIMAL_100])
-    concentration_unit = models.ForeignKey('Unit', related_name='pcrreplicates')
+    concentration_unit = models.ForeignKey('Unit', models.PROTECT, related_name='pcrreplicates')
     invalid = models.BooleanField(default=True)
-    invalid_override = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='pcrreplicates')
+    invalid_override = models.ForeignKey(
+        settings.AUTH_USER_MODEL, models.PROTECT, null=True, related_name='pcrreplicates')
 
     # override the save method to assign or calculate concentration_unit, replicate_concentration, and invalid flag
     def save(self, *args, **kwargs):
@@ -1400,10 +1403,10 @@ class Inhibition(HistoryModel):
     Inhibition
     """
 
-    sample = models.ForeignKey('Sample', related_name='inhibitions')
-    extraction_batch = models.ForeignKey('ExtractionBatch', related_name='inhibitions')
+    sample = models.ForeignKey('Sample', models.CASCADE, related_name='inhibitions')
+    extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='inhibitions')
     inhibition_date = models.DateField(default=date.today, db_index=True)
-    nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
+    nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, default=1)
     dilution_factor = models.IntegerField(null=True, blank=True, validators=[MINVAL_ZERO])
 
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
@@ -1436,7 +1439,7 @@ class Target(NameModel):
     """
 
     code = models.CharField(max_length=128, unique=True)
-    nucleic_acid_type = models.ForeignKey('NucleicAcidType', default=1)
+    nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, default=1)
     notes = models.TextField(blank=True)
 
     def __str__(self):
@@ -1460,7 +1463,7 @@ class FieldUnit(HistoryModel):
 
     table = models.CharField(max_length=64)
     field = models.CharField(max_length=64)
-    unit = models.ForeignKey('Unit', related_name='fieldunits')
+    unit = models.ForeignKey('Unit', models.PROTECT, related_name='fieldunits')
 
     def __str__(self):
         return str(self.id)

@@ -1,6 +1,9 @@
-django==1.11.18
-django-cors-headers==2.1.0
-django-simple-history==1.8.2
-djangorestframework==3.8.2
-psycopg2==2.7.7
-pytz==2017.2
+Django==2.2
+django-cors-headers==2.5.2
+django-simple-history==2.7.0
+djangorestframework==3.9.2
+djangorestframework-stubs==0.1.0
+jsonpickle==1.1
+psycopg2==2.8.1
+pytz==2018.9
+sqlparse==0.3.0

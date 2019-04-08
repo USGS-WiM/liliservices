@@ -177,6 +177,12 @@ class AliquotListSerializer(serializers.ListSerializer):
                 if 'samples' not in item:
                     is_valid = False
                     details.append("A list of sample IDs is required")
+                else:
+                    for sample_id in item['samples']:
+                        sample = Sample.objects.filter(id=sample_id).first()
+                        if not sample:
+                            is_valid = False
+                            details.append("No sample exists with ID of " + str(sample_id))
                 if 'freezer_location' not in item:
                     if ('freezer' not in item or 'rack' not in item or 'box' not in item or 'row' not in item
                             or 'spot' not in item):
@@ -205,6 +211,12 @@ class AliquotListSerializer(serializers.ListSerializer):
                 if 'sample' not in item:
                     is_valid = False
                     details.append("sample is a required field")
+                else:
+                    sample_id = item['sample']
+                    sample = Sample.objects.filter(id=sample_id).first()
+                    if not sample:
+                        is_valid = False
+                        details.append("No sample exists with ID of " + str(sample_id))
                 if 'freezer_location' not in item:
                     is_valid = False
                     details.append("freezer_location is a required field")
@@ -469,6 +481,7 @@ class SampleSerializer(serializers.ModelSerializer):
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
     final_concentrated_sample_volume = FinalConcentratedSampleVolumeSerializer(read_only=True)
+    final_sample_mean_concentrations= FinalSampleMeanConcentrationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sample
