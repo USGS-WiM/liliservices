@@ -220,6 +220,14 @@ class SampleViewSet(HistoryViewSet):
                 queryset = queryset.filter(record_type__in=record_type_list)
             else:
                 queryset = queryset.filter(record_type__exact=record_type)
+        # filter by peg_neg, exact list
+        peg_neg = query_params.get('peg_neg', None)
+        if peg_neg is not None:
+            if LIST_DELIMETER in peg_neg:
+                peg_neg_list = peg_neg.split(LIST_DELIMETER)
+                queryset = queryset.filter(peg_neg__in=peg_neg_list)
+            else:
+                queryset = queryset.filter(peg_neg__exact=peg_neg)
         return queryset
 
 

@@ -1407,6 +1407,7 @@ class Inhibition(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='inhibitions')
     inhibition_date = models.DateField(default=date.today, db_index=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, default=1)
+    cq_value = NullableNonnegativeDecimalField2010()
     dilution_factor = models.IntegerField(null=True, blank=True, validators=[MINVAL_ZERO])
 
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC

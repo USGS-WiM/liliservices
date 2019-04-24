@@ -1450,8 +1450,8 @@ class InhibitionListSerializer(serializers.ListSerializer):
     class Meta:
         class Meta:
             model = Inhibition
-            fields = ('id', 'sample', 'extraction_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
-                      'created_date', 'created_by', 'modified_date', 'modified_by',)
+            fields = ('id', 'sample', 'extraction_batch', 'inhibition_date', 'nucleic_acid_type', 'cq_value',
+                      'dilution_factor', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class InhibitionSerializer(serializers.ModelSerializer):
@@ -1468,8 +1468,8 @@ class InhibitionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'sample', 'extraction_batch', 'inhibition_date', 'nucleic_acid_type', 'dilution_factor',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'sample', 'extraction_batch', 'inhibition_date', 'nucleic_acid_type', 'cq_value',
+                  'dilution_factor', 'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = InhibitionListSerializer
 
 
