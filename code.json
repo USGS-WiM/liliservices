@@ -2,9 +2,9 @@
   {
     "name": "lide",
     "organization": "U.S. Geological Survey",
-    "description": " ",
-    "version": "v0.32.2",
-    "status": "Development",
+    "description": "Web services for LILI (LIDE (Laboratory for Infectious Disease and the Environment) Information Management System)",
+    "version": "v0.94.2",
+    "status": "Release Candidate",
 
     "permissions": {
       "usageType": "openSource",
@@ -25,7 +25,16 @@
     "laborHours": null,
 
     "tags": [
-      
+      "lili",
+      "infectious",
+      "disease",
+      "environment",
+      "lab",
+      "laboratory",
+      "lims",
+      "web",
+      "services",
+      "api"
     ],
 
     "languages": [
@@ -38,7 +47,7 @@
     },
 
     "date": {
-      "metadataLastUpdated": "2018-02-07"
+      "metadataLastUpdated": "2019-04-25"
     }
   }
 ]
