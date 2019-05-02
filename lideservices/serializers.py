@@ -1278,17 +1278,12 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
         queued_updated_pcrreplicates = PriorityQueue()
         queue_high_priority = 0
         queue_low_priority = len(updated_pcrreplicates_real)
-        peg_negs = []
         for pcrreplicate in updated_pcrreplicates_real:
             sample_id = pcrreplicate.get('sample', None)
             sample = Sample.objects.filter(id=sample_id).first()
             if sample.record_type.id == 2 and sample.peg_neg is None:
                 queue_high_priority += 1
                 queued_updated_pcrreplicates.put((queue_high_priority, pcrreplicate))
-                peg_negs.append({
-                    "id": pcrreplicate['sample'],
-                    "target": validated_data['target']
-                })
             else:
                 queued_updated_pcrreplicates.put((queue_low_priority, pcrreplicate))
                 queue_low_priority -= 1
