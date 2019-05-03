@@ -820,6 +820,8 @@ class ExtractionBatch(HistoryModel):
         max_digits=20, decimal_places=10, default=20, validators=[MINVAL_DECIMAL_10])
     ext_pos_dna_cq_value = NullableNonnegativeDecimalField2010()
     ext_pos_dna_invalid = models.BooleanField(default=True)
+    inh_pos_cq_value = NullableNonnegativeDecimalField2010()
+    inh_pos_nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, null=True)
 
     # override the save method to calculate invalid flag
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC

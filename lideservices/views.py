@@ -772,6 +772,19 @@ class SampleExtractionViewSet(HistoryViewSet):
     queryset = SampleExtraction.objects.all()
     serializer_class = SampleExtractionSerializer
 
+    @action(detail=False)
+    def inhibition_report(self, request):
+        queryset = SampleExtraction.objects.all()
+        sample = request.query_params.get('sample', None)
+        if sample is not None:
+            if LIST_DELIMETER in sample:
+                sample_list = sample.split(',')
+                queryset = queryset.filter(sample__in=sample_list)
+            else:
+                queryset = queryset.filter(sample__exact=sample)
+        data = SampleExtractionReportSerializer(queryset, many=True).data
+        return Response(data)
+
     # override the default DELETE method to prevent deletion of a SampleExtraction with any results data entered
     def destroy(self, request, *args, **kwargs):
         nonnull_pcrreplicates = PCRReplicate.objects.filter(

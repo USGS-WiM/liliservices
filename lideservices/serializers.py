@@ -765,8 +765,8 @@ class ExtractionBatchListSerializer(serializers.ListSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'inhibitions',
-                  'reversetranscriptions', 'ext_pos_rna_rt_cq_value',
+                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'inh_pos_cq_value', 'inh_pos_nucleic_acid_type',
+                  'sampleextractions', 'inhibitions', 'reversetranscriptions', 'ext_pos_rna_rt_cq_value',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
@@ -978,6 +978,9 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         instance.sample_dilution_factor = validated_data.get('sample_dilution_factor', instance.sample_dilution_factor)
         instance.qpcr_reaction_volume = validated_data.get('qpcr_reaction_volume', instance.qpcr_reaction_volume)
         instance.ext_pos_dna_cq_value = validated_data.get('ext_pos_dna_cq_value', instance.ext_pos_dna_cq_value)
+        instance.inh_pos_cq_value = validated_data.get('inh_pos_cq_value', instance.inh_pos_cq_value)
+        instance.inh_pos_nucleic_acid_type = validated_data.get(
+            'inh_pos_nucleic_acid_type', instance.inh_pos_nucleic_acid_type)
         if 'request' in self.context and hasattr(self.context['request'], 'user'):
             instance.modified_by = self.context['request'].user
         else:
@@ -998,9 +1001,10 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'inhibitions',
-                  'reversetranscriptions', 'ext_pos_rna_rt_cq_value', 'new_rt', 'new_replicates',
-                  'new_sample_extractions', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'inh_pos_cq_value', 'inh_pos_nucleic_acid_type',
+                  'sampleextractions', 'inhibitions', 'reversetranscriptions', 'ext_pos_rna_rt_cq_value', 'new_rt',
+                  'new_replicates', 'new_sample_extractions',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = ExtractionBatchListSerializer
 
 
@@ -1079,6 +1083,41 @@ class ReverseTranscriptionSerializer(serializers.ModelSerializer):
                   'ext_pos_rna_rt_cq_value', 'ext_pos_rna_rt_invalid',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
         list_serializer_class = ReverseTranscriptionListSerializer
+
+
+class SampleExtractionReportSerializer(serializers.ModelSerializer):
+
+    def get_inhibition_dna_control_cq_value(self, obj):
+        if obj.extraction_batch.inh_pos_nucleic_acid_type and obj.extraction_batch.inh_pos_nucleic_acid_type.id == 1:
+            cq = obj.extraction_batch.inh_pos_cq_value
+        else:
+            cq = None
+        return cq
+
+    def get_inhibition_rna_control_cq_value(self, obj):
+        if obj.extraction_batch.inh_pos_nucleic_acid_type and obj.extraction_batch.inh_pos_nucleic_acid_type.id == 2:
+            cq = obj.extraction_batch.inh_pos_cq_value
+        else:
+            cq = None
+        return cq
+
+    study = serializers.CharField(source='sample.study', read_only=True)
+    collaborator_sample_id = serializers.CharField(source='sample.collaborator_sample_id', read_only=True)
+    analysis_batch = serializers.IntegerField(source='extraction_batch.analysis_batch.id', read_only=True)
+    extraction_number = serializers.IntegerField(source='extraction_batch.extraction_number', read_only=True)
+    inhibition_dna_cq_value = serializers.DecimalField(20, 10, source='inhibition_dna.cq_value', read_only=True)
+    inhibition_dna_control_cq_value = serializers.SerializerMethodField()
+    inhibition_dna_dilution_factor = serializers.IntegerField(source='inhibition_dna.dilution_factor', read_only=True)
+    inhibition_rna_cq_value = serializers.DecimalField(20, 10, source='inhibition_rna.cq_value', read_only=True)
+    inhibition_rna_control_cq_value = serializers.SerializerMethodField()
+    inhibition_rna_dilution_factor = serializers.IntegerField(source='inhibition_rna.dilution_factor', read_only=True)
+
+    class Meta:
+        model = SampleExtraction
+        fields = ('id', 'sample', 'study', 'collaborator_sample_id', 'analysis_batch', 'extraction_number',
+                  'extraction_batch', 'inhibition_dna', 'inhibition_dna_cq_value', 'inhibition_dna_control_cq_value',
+                  'inhibition_dna_dilution_factor', 'inhibition_rna', 'inhibition_rna_cq_value',
+                  'inhibition_rna_control_cq_value', 'inhibition_rna_dilution_factor',)
 
 
 class SampleExtractionSerializer(serializers.ModelSerializer):
@@ -1740,8 +1779,9 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
         fields = ('id', 'extraction_string', 'analysis_batch', 'extraction_method', 're_extraction',
                   're_extraction_notes', 'extraction_number', 'extraction_volume', 'extraction_date', 'pcr_date',
                   'qpcr_template_volume', 'elution_volume', 'sample_dilution_factor', 'qpcr_reaction_volume',
-                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'sampleextractions', 'reverse_transcriptions',
-                  'pcrreplicatebatches', 'targets', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+                  'ext_pos_dna_cq_value', 'ext_pos_dna_invalid', 'inh_pos_cq_value', 'inh_pos_nucleic_acid_type',
+                  'sampleextractions', 'reverse_transcriptions', 'pcrreplicatebatches', 'targets',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class AnalysisBatchDetailSerializer(serializers.ModelSerializer):
