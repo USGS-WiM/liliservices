@@ -480,8 +480,8 @@ class SampleSerializer(serializers.ModelSerializer):
     post_dilution_volume = NullableRStrip10DecimalField()
     aliquots = AliquotSerializer(many=True, read_only=True)
     peg_neg_targets_extracted = serializers.SerializerMethodField()
-    final_concentrated_sample_volume = FinalConcentratedSampleVolumeSerializer(read_only=True)
-    final_sample_mean_concentrations= FinalSampleMeanConcentrationSerializer(many=True, read_only=True)
+    finalconcentratedsamplevolume = FinalConcentratedSampleVolumeSerializer(read_only=True)
+    finalsamplemeanconcentrations = FinalSampleMeanConcentrationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sample
@@ -494,7 +494,7 @@ class SampleSerializer(serializers.ModelSerializer):
                   'filter_born_on_date', 'filter_flag', 'secondary_concentration_flag', 'elution_notes', 'record_type',
                   'record_type_string', 'technician_initials', 'dissolution_volume', 'post_dilution_volume', 'peg_neg',
                   'samplegroups', 'analysisbatches', 'peg_neg_targets_extracted', 'final_concentrated_sample_volume',
-                  'final_sample_mean_concentrations', 'aliquots',
+                  'finalsamplemeanconcentrations', 'aliquots',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 

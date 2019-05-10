@@ -517,7 +517,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
     def final_concentrated_sample_volume_sci(self):
         return get_sci_val(self.final_concentrated_sample_volume)
 
-    sample = models.OneToOneField('Sample', models.CASCADE, related_name='finalconcentratedsamplevolumes')
+    sample = models.OneToOneField('Sample', models.CASCADE, related_name='finalconcentratedsamplevolume')
     concentration_type = models.ForeignKey(
         'ConcentrationType', models.PROTECT, related_name='finalconcentratedsamplevolumes')
     final_concentrated_sample_volume = models.DecimalField(
