@@ -1,4 +1,3 @@
-import json
 from decimal import Decimal
 from datetime import date
 from django.db import models
@@ -172,10 +171,10 @@ class Sample(HistoryModel):
     collection_end_time = models.TimeField(null=True, blank=True)
     meter_reading_initial = NullableNonnegativeDecimalField2010()
     meter_reading_final = NullableNonnegativeDecimalField2010()
-    meter_reading_unit = models.ForeignKey('Unit', models.PROTECT, null=True, related_name='samples_meter_units')
+    meter_reading_unit = models.ForeignKey('Unit', models.PROTECT, null=True, related_name='samplesmeterunits')
     total_volume_sampled_initial = NullableNonnegativeDecimalField2010()
     total_volume_sampled_unit_initial = models.ForeignKey(
-        'Unit', models.PROTECT, null=True, related_name='samples_tvs_units')
+        'Unit', models.PROTECT, null=True, related_name='samplestvsunits')
     total_volume_or_mass_sampled = NonnegativeDecimalField2010()
     sample_volume_initial = NullableNonnegativeDecimalField2010()
     filter_born_on_date = models.DateField(null=True, blank=True)
@@ -185,8 +184,7 @@ class Sample(HistoryModel):
     technician_initials = models.CharField(max_length=128, blank=True)
     dissolution_volume = NullableNonzeroDecimalField2010()
     post_dilution_volume = NullableNonzeroDecimalField2010()
-    analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch',
-                                             related_name='sampleanalysisbatches')
+    analysisbatches = models.ManyToManyField('AnalysisBatch', through='SampleAnalysisBatch', related_name='samples')
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
     peg_neg = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='samples')
     record_type = models.ForeignKey('RecordType', models.PROTECT, default=1)
@@ -232,7 +230,7 @@ class Aliquot(HistoryModel):
         return '%s-%s' % (self.sample, self.aliquot_number)
 
     sample = models.ForeignKey('Sample', models.PROTECT, related_name='aliquots')
-    freezer_location = models.ForeignKey('FreezerLocation', models.PROTECT, related_name='aliquot')
+    freezer_location = models.ForeignKey('FreezerLocation', models.PROTECT, related_name='aliquots')
     aliquot_number = NonnegativeIntegerField()
     frozen = models.BooleanField(default=True)
 
@@ -278,7 +276,7 @@ class FilterType(NameModel):
     Filter Type
     """
 
-    matrix = models.ForeignKey('Matrix', models.PROTECT, related_name='filters')
+    matrix = models.ForeignKey('Matrix', models.PROTECT, related_name='filtertypes')
 
     def __str__(self):
         return self.name
@@ -519,9 +517,9 @@ class FinalConcentratedSampleVolume(HistoryModel):
     def final_concentrated_sample_volume_sci(self):
         return get_sci_val(self.final_concentrated_sample_volume)
 
-    sample = models.OneToOneField('Sample', models.CASCADE, related_name='final_concentrated_sample_volume')
+    sample = models.OneToOneField('Sample', models.CASCADE, related_name='finalconcentratedsamplevolumes')
     concentration_type = models.ForeignKey(
-        'ConcentrationType', models.PROTECT, related_name='final_concentrated_sample_volumes')
+        'ConcentrationType', models.PROTECT, related_name='finalconcentratedsamplevolumes')
     final_concentrated_sample_volume = models.DecimalField(
         max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
     notes = models.TextField(blank=True)
@@ -644,8 +642,8 @@ class FinalSampleMeanConcentration(HistoryModel):
         return data
 
     final_sample_mean_concentration = NullableNonnegativeDecimalField120100()
-    sample = models.ForeignKey('Sample', models.CASCADE, related_name='final_sample_mean_concentrations')
-    target = models.ForeignKey('Target', models.PROTECT, related_name='final_sample_mean_concentrations')
+    sample = models.ForeignKey('Sample', models.CASCADE, related_name='finalsamplemeanconcentrations')
+    target = models.ForeignKey('Target', models.PROTECT, related_name='finalsamplemeanconcentrations')
 
     # Calculate sample mean concentration for all samples whose target replicates are now in the database
     # Concentrations from replicates are used to determine the Mean Sample Concentration
@@ -746,7 +744,6 @@ class AnalysisBatch(NameModel):
     Analysis Batch
     """
 
-    samples = models.ManyToManyField('Sample', through='SampleAnalysisBatch', related_name='sampleanalysisbatches')
     analysis_batch_description = models.CharField(max_length=128, blank=True)
     analysis_batch_notes = models.CharField(max_length=128, blank=True)
 
@@ -918,8 +915,8 @@ class SampleExtraction(HistoryModel):
 
     sample = models.ForeignKey('Sample', models.CASCADE, related_name='sampleextractions')
     extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='sampleextractions')
-    inhibition_dna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractions_dna')
-    inhibition_rna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractions_rna')
+    inhibition_dna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractionsdna')
+    inhibition_rna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractionsrna')
 
     def __str__(self):
         return str(self.id)
@@ -1009,6 +1006,32 @@ class PCRReplicateBatch(HistoryModel):
         db_table = "lide_pcrreplicatebatch"
         unique_together = ("extraction_batch", "target", "replicate_number", "re_pcr")
         verbose_name_plural = "pcrreplicatebatches"
+
+
+# class PCRReplicateManager(models.Manager):
+#     def replicate_count(self, target_ids=[], sample_ids=[]):
+#         target_sample_combos = ResultsSummaryReport.objects.filter(target__in=target_ids, sample__in=sample_ids)
+#         rep_count = target_sample_combos.
+
+    # def positive_count(self, target_ids=[], sample_ids=[]):
+    #     from django.db import connection
+    #     with connection.cursor() as cursor:
+    #         cursor.execute("""
+    #             SELECT (SELECT name FROM lide_target t WHERE t.id = rb.target_id) AS target_name, COUNT(se.sample_id)
+    #             FROM lide_pcrreplicate r
+    #             JOIN lide_sampleextraction se
+    #             ON r.sample_extraction_id = se.id
+    #             JOIN lide_pcrreplicatebatch rb
+    #             ON r.pcrreplicate_batch_id = rb.id
+    #             WHERE r.pcrreplicate_batch_id IN (
+    #             SELECT id FROM lide_pcrreplicatebatch rb WHERE target_id = ANY(%s)
+    #             )
+    #             AND se.sample_id =ANY(%s)
+    #             AND cq_value > 0
+    #             GROUP BY rb.target_id
+    #             ORDER BY target_name""",
+    #                        [target_ids, sample_ids])
+    #         return cursor.fetchall()
 
 
 class PCRReplicate(HistoryModel):
@@ -1205,6 +1228,7 @@ class PCRReplicate(HistoryModel):
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(
         settings.AUTH_USER_MODEL, models.PROTECT, null=True, related_name='pcrreplicates')
+    # objects = PCRReplicateManager()
 
     # override the save method to assign or calculate concentration_unit, replicate_concentration, and invalid flag
     def save(self, *args, **kwargs):

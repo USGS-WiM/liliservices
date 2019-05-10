@@ -1,5 +1,7 @@
 from django.http import JsonResponse
-from rest_framework import views, viewsets, generics, permissions, authentication, status
+from django.db.models import F, Q, Count, Max, Min, Avg, FloatField
+from django.db.models.functions import Cast
+from rest_framework import views, viewsets, permissions, authentication, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
@@ -7,6 +9,7 @@ from rest_framework.exceptions import APIException
 from lideservices.serializers import *
 from lideservices.models import *
 from lideservices.permissions import *
+from lideservices.aggregates import *
 
 
 ########################################################################################################################
@@ -797,6 +800,69 @@ class SampleExtractionViewSet(HistoryViewSet):
 
 class PCRReplicateViewSet(HistoryViewSet):
     serializer_class = PCRReplicateSerializer
+
+    @action(detail=False)
+    def summary_statistics(self, request):
+
+        STATISTICS = ['replicate_count', 'positive_count', 'percent_positive', 'max_concentration', 'min_concentration',
+                      'median_concentration', 'average_concentration', 'min_concentration_positive',
+                      'median_concentration_positive', 'average_concentration_positive']
+
+        queryset = PCRReplicate.objects.all()
+        query_params = request.query_params
+        # filter by sample IDs, exact list
+        sample = query_params.get('sample', None)
+        if sample is not None:
+            if LIST_DELIMETER in sample:
+                sample_list = sample.split(LIST_DELIMETER)
+                queryset = queryset.filter(sample_extraction__sample__id__in=sample_list)
+            else:
+                queryset = queryset.filter(sample_extraction__sample__id__exact=sample)
+        # filter by target IDs, exact list
+        target = query_params.get('target', None)
+        if target is not None:
+            if LIST_DELIMETER in target:
+                target_list = target.split(LIST_DELIMETER)
+                queryset = queryset.filter(pcrreplicate_batch__target__id__in=target_list)
+            else:
+                queryset = queryset.filter(pcrreplicate_batch__target__id__exact=target)
+        # get the requested statistics, exact list
+        statistic = query_params.get('statistic', None)
+        statistic_list = statistic.split(LIST_DELIMETER) if statistic is not None else STATISTICS
+
+        # group by target name
+        queryset = queryset.values(target_name=F('pcrreplicate_batch__target__name')).order_by('target_name')
+
+        # calculate the requested statistics per object
+        if 'replicate_count' in statistic_list:
+            # queryset = queryset.annotate(replicate_count=Count(Subquery(all_reps.values('id'))))
+            queryset = queryset.annotate(replicate_count=Count('id'))
+        if 'positive_count' in statistic_list:
+            # queryset = queryset.annotate(positive_count=Count(Subquery(pos_reps.values('id'))))
+            queryset = queryset.annotate(positive_count=Count('id', filter=Q(replicate_concentration__gt=0)))
+        if 'percent_positive' in statistic_list:
+            queryset = queryset.annotate(
+                percent_positive=Cast('positive_count', FloatField()) / Cast('replicate_count', FloatField()))
+        if 'max_concentration' in statistic_list:
+            queryset = queryset.annotate(max_concentration=Max('replicate_concentration'))
+        if 'min_concentration' in statistic_list:
+            queryset = queryset.annotate(min_concentration=Min('replicate_concentration'))
+        if 'median_concentration' in statistic_list:
+            queryset = queryset.annotate(median_concentration=Median('replicate_concentration'))
+        if 'average_concentration' in statistic_list:
+            queryset = queryset.annotate(average_concentration=Avg('replicate_concentration'))
+        if 'min_concentration_positive' in statistic_list:
+            queryset = queryset.annotate(
+                min_concentration_positive=Min('replicate_concentration', filter=Q(replicate_concentration__gt=0)))
+        if 'median_concentration_positive' in statistic_list:
+            queryset = queryset.annotate(
+                median_concentration_positive=Median('replicate_concentration',
+                                                     filter=Q(replicate_concentration__gt=0)))
+        if 'average_concentration_positive' in statistic_list:
+            queryset = queryset.annotate(
+                average_concentration_positive=Avg('replicate_concentration', filter=Q(replicate_concentration__gt=0)))
+
+        return Response(queryset)
 
     def get_serializer(self, *args, **kwargs):
         if 'data' in kwargs:
