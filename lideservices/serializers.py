@@ -1557,6 +1557,7 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
     modified_by = serializers.StringRelatedField()
     analysis_batch = serializers.IntegerField(write_only=True)
     extraction_number = serializers.IntegerField(write_only=True)
+    extraction_batch = serializers.IntegerField(read_only=True)
     inh_pos_cq_value = serializers.FloatField(write_only=True)
     inhibitions = serializers.ListField(write_only=True)
     sample = serializers.IntegerField(read_only=True)
@@ -1564,9 +1565,9 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Inhibition
-        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'inhibition_date', 'nucleic_acid_type',
-                  'dilution_factor', 'inh_pos_cq_value', 'inhibitions', 'suggested_dilution_factor',
-                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'sample', 'analysis_batch', 'extraction_number', 'extraction_batch', 'inhibition_date',
+                  'nucleic_acid_type', 'dilution_factor', 'inh_pos_cq_value', 'inhibitions',
+                  'suggested_dilution_factor', 'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
 class TargetSerializer(serializers.ModelSerializer):
