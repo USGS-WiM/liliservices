@@ -65,7 +65,7 @@ class SampleViewSet(HistoryViewSet):
 
     @action(detail=False)
     def finalsamplemeanconcentrations(self, request):
-        queryset = Sample.objects.prefetch_related('final_sample_mean_concentrations').distinct()
+        queryset = Sample.objects.prefetch_related('finalsamplemeanconcentrations').distinct()
         query_params = self.request.query_params
         # filter by sample IDs, exact list
         sample = query_params.get('sample', None)
@@ -81,10 +81,10 @@ class SampleViewSet(HistoryViewSet):
         if target is not None:
             if LIST_DELIMETER in target:
                 target_list = target.split(LIST_DELIMETER)
-                queryset = queryset.filter(final_sample_mean_concentrations__target__in=target_list)
+                queryset = queryset.filter(finalsamplemeanconcentrations__target__in=target_list)
             else:
                 target_list = [target]
-                queryset = queryset.filter(final_sample_mean_concentrations__target__exact=target)
+                queryset = queryset.filter(finalsamplemeanconcentrations__target__exact=target)
 
         # start building up the response object
         resp = []
