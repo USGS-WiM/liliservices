@@ -1429,7 +1429,8 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                         # if cq > 36.0 or cq is None:
                         #     suggested_dilution_factor = 10
                         new_data = {"id": inhib.id, "sample": sample, "cq_value": cq,
-                                    "suggested_dilution_factor": suggested_dilution_factor}
+                                    "suggested_dilution_factor": suggested_dilution_factor,
+                                    "extraction_batch": eb.id}
                         response_data.append(new_data)
                     else:
                         is_valid = False
