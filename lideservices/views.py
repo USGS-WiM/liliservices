@@ -843,12 +843,12 @@ class PCRReplicateViewSet(HistoryViewSet):
         totals = {'target_name': 'All targets', 'target_id': None}
 
         # calculate the requested statistics per object
-        if 'replicate_count' in statistic_list:
-            # queryset = queryset.annotate(replicate_count=Count(Subquery(all_reps.values('id'))))
+        if ('replicate_count' in statistic_list
+                or ('percent_positive' in statistic_list and 'replicate_count' not in statistic_list)):
             queryset = queryset.annotate(replicate_count=Count('id'))
             totals['replicate_count'] = queryset.aggregate(Sum('replicate_count'))['replicate_count__sum']
-        if 'positive_count' in statistic_list:
-            # queryset = queryset.annotate(positive_count=Count(Subquery(pos_reps.values('id'))))
+        if ('positive_count' in statistic_list
+                or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
             queryset = queryset.annotate(positive_count=Count('id', filter=Q(replicate_concentration__gt=0)))
             totals['positive_count'] = queryset.aggregate(Sum('positive_count'))['positive_count__sum']
         if 'percent_positive' in statistic_list:
