@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from django.db.models import F, Q, Count, Sum, Max, Min, Avg, FloatField
+from django.db.models import F, Q, Count, Sum, Max, Min, Avg, FloatField, IntegerField
 from django.db.models.functions import Cast
 from rest_framework import views, viewsets, permissions, authentication, status
 from rest_framework.decorators import action
@@ -1518,3 +1518,96 @@ class AuthView(views.APIView):
 
     def post(self, request):
         return Response(self.serializer_class(request.user).data)
+
+
+######
+#
+#  Reports
+#
+######
+
+
+class QualityControlReportView(views.APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        queryset = Sample.objects.all()
+        request_data = JSONParser().parse(request)
+
+        samples = request_data.get('samples', None)
+        if samples is not None:
+            queryset = queryset.filter(id__in=samples)
+        matrix_counts = queryset.values('matrix__name').order_by().annotate(count=Count('matrix'))
+        sample_type_counts = queryset.values('sample_type__name').order_by().annotate(count=Count('sample_type'))
+        total_volume_sampled_unit_initial_counts = queryset.values(
+            'total_volume_sampled_unit_initial__name').order_by().annotate(
+            count=Count('total_volume_sampled_unit_initial'))
+        post_dilution_volume_min = queryset.aggregate(min=Min('post_dilution_volume'))
+        post_dilution_volume_max = queryset.aggregate(max=Max('post_dilution_volume'))
+        total_volume_or_mass_sampled_min = queryset.aggregate(min=Min('total_volume_or_mass_sampled'))
+        total_volume_or_mass_sampled_max = queryset.aggregate(max=Max('total_volume_or_mass_sampled'))
+        final_concentrated_sample_volume_min = queryset.aggregate(
+            min=Min('finalconcentratedsamplevolume__final_concentrated_sample_volume'))
+        final_concentrated_sample_volume_max = queryset.aggregate(
+            max=Max('finalconcentratedsamplevolume__final_concentrated_sample_volume'))
+
+        resp = []
+        for matrix in matrix_counts:
+            resp.append({
+                "metric": "sample_matrix",
+                "value": matrix['matrix__name'],
+                "count": matrix['count'],
+                "min": None,
+                "max": None
+            })
+        for sample_type in sample_type_counts:
+            resp.append({
+                "metric": "sample_type",
+                "value": sample_type['sample_type__name'],
+                "count": sample_type['count'],
+                "min": None,
+                "max": None
+            })
+        for unit in total_volume_sampled_unit_initial_counts:
+            resp.append({
+                "metric": "total_volume_sampled_unit_initial",
+                "value": unit['total_volume_sampled_unit_initial__name'],
+                "count": unit['count'],
+                "min": None,
+                "max": None
+            })
+        resp.append({
+            "metric": "post_dilution_volume",
+            "value": None,
+            "count": None,
+            "min": post_dilution_volume_min['min'],
+            "max": post_dilution_volume_max['max']
+        })
+        resp.append({
+            "metric": "total_volume_or_mass_sampled",
+            "value": None,
+            "count": None,
+            "min": total_volume_or_mass_sampled_min['min'],
+            "max": total_volume_or_mass_sampled_max['max']
+        })
+        resp.append({
+            "metric": "final_concentrated_sample_volume",
+            "value": None,
+            "count": None,
+            "min": final_concentrated_sample_volume_min['min'],
+            "max": final_concentrated_sample_volume_max['max']
+        })
+
+        # resp = {
+        #     "matrix_counts": matrix_counts,
+        #     "sample_type_counts": sample_type_counts,
+        #     "total_volume_sampled_unit_initial_counts": total_volume_sampled_unit_initial_counts,
+        #     "post_dilution_volume_min": post_dilution_volume_min,
+        #     "post_dilution_volume_max": post_dilution_volume_max,
+        #     "total_volume_or_mass_sampled_min": total_volume_or_mass_sampled_min,
+        #     "total_volume_or_mass_sampled_max": total_volume_or_mass_sampled_max,
+        #     "final_concentrated_sample_volume_min": final_concentrated_sample_volume_min,
+        #     "final_concentrated_sample_volume_max": final_concentrated_sample_volume_max,
+        # }
+
+        return Response(resp)

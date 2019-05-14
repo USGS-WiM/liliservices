@@ -47,4 +47,6 @@ urlpatterns = [
     url(r'^auth/$', views.AuthView.as_view(), name='authenticate'),
     url(r'^inhibitionscalculatedilutionfactor/$', views.InhibitionCalculateDilutionFactorView.as_view(),
         name='inhibitionscalculatedilutionfactor'),
+    url(r'^qualitycontrolreport/$', views.QualityControlReportView.as_view(),
+        name='qualitycontrolreport'),
 ]
