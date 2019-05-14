@@ -130,6 +130,21 @@ class FinalSampleMeanConcentrationSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class FinalSampleMeanConcentrationResultsSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    final_sample_mean_concentration = NullableRStrip100DecimalField()
+    target_string = serializers.StringRelatedField(source='target')
+    collaborator_sample_id = serializers.CharField(source='sample.collaborator_sample_id', read_only=True)
+    collection_start_date = serializers.DateField(source='sample.collection_start_date', read_only=True)
+
+    class Meta:
+        model = FinalSampleMeanConcentration
+        fields = ('sample', 'target', 'target_string', 'id', 'result', 'final_sample_mean_concentration',
+                  'final_sample_mean_concentration_sci', 'collaborator_sample_id', 'collection_start_date',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 ######
 #
 #  Freezer Locations

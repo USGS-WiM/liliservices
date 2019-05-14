@@ -566,6 +566,18 @@ class FinalSampleMeanConcentration(HistoryModel):
     """
 
     @property
+    def result(self):
+        conc = self.final_sample_mean_concentration
+        if conc is None:
+            return "No Result"
+        elif conc == Decimal(0.0):
+            return "Negative"
+        elif conc >= 0:
+            return "Positive"
+        else:
+            return "No Result"
+
+    @property
     def final_sample_mean_concentration_sci(self):
         return get_sci_val(self.final_sample_mean_concentration)
 
@@ -676,6 +688,7 @@ class FinalSampleMeanConcentration(HistoryModel):
     class Meta:
         db_table = "lide_finalsamplemeanconcentration"
         unique_together = ("sample", "target")
+        ordering = ['sample', 'id']
 
 
 ######
