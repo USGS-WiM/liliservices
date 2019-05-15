@@ -1,5 +1,6 @@
+from collections import Counter
 from django.http import JsonResponse
-from django.db.models import F, Q, Count, Sum, Max, Min, Avg, FloatField, IntegerField
+from django.db.models import F, Q, Count, Sum, Min, Max, Avg, FloatField
 from django.db.models.functions import Cast
 from rest_framework import views, viewsets, permissions, authentication, status
 from rest_framework.decorators import action
@@ -1533,6 +1534,7 @@ class QualityControlReportView(views.APIView):
     def post(self, request):
         queryset = Sample.objects.all()
         request_data = JSONParser().parse(request)
+        resp = {}
 
         samples = request_data.get('samples', None)
         if samples is not None:
@@ -1551,9 +1553,10 @@ class QualityControlReportView(views.APIView):
         final_concentrated_sample_volume_max = queryset.aggregate(
             max=Max('finalconcentratedsamplevolume__final_concentrated_sample_volume'))
 
-        resp = []
+        # Sample-level QC summary stats
+        sample_stats = []
         for matrix in matrix_counts:
-            resp.append({
+            sample_stats.append({
                 "metric": "sample_matrix",
                 "value": matrix['matrix__name'],
                 "count": matrix['count'],
@@ -1561,7 +1564,7 @@ class QualityControlReportView(views.APIView):
                 "max": None
             })
         for sample_type in sample_type_counts:
-            resp.append({
+            sample_stats.append({
                 "metric": "sample_type",
                 "value": sample_type['sample_type__name'],
                 "count": sample_type['count'],
@@ -1569,45 +1572,97 @@ class QualityControlReportView(views.APIView):
                 "max": None
             })
         for unit in total_volume_sampled_unit_initial_counts:
-            resp.append({
+            sample_stats.append({
                 "metric": "total_volume_sampled_unit_initial",
                 "value": unit['total_volume_sampled_unit_initial__name'],
                 "count": unit['count'],
                 "min": None,
                 "max": None
             })
-        resp.append({
+        sample_stats.append({
             "metric": "post_dilution_volume",
             "value": None,
             "count": None,
             "min": post_dilution_volume_min['min'],
             "max": post_dilution_volume_max['max']
         })
-        resp.append({
+        sample_stats.append({
             "metric": "total_volume_or_mass_sampled",
             "value": None,
             "count": None,
             "min": total_volume_or_mass_sampled_min['min'],
             "max": total_volume_or_mass_sampled_max['max']
         })
-        resp.append({
+        sample_stats.append({
             "metric": "final_concentrated_sample_volume",
             "value": None,
             "count": None,
             "min": final_concentrated_sample_volume_min['min'],
             "max": final_concentrated_sample_volume_max['max']
         })
+        resp['sample_quality_control'] = sample_stats
 
-        # resp = {
-        #     "matrix_counts": matrix_counts,
-        #     "sample_type_counts": sample_type_counts,
-        #     "total_volume_sampled_unit_initial_counts": total_volume_sampled_unit_initial_counts,
-        #     "post_dilution_volume_min": post_dilution_volume_min,
-        #     "post_dilution_volume_max": post_dilution_volume_max,
-        #     "total_volume_or_mass_sampled_min": total_volume_or_mass_sampled_min,
-        #     "total_volume_or_mass_sampled_max": total_volume_or_mass_sampled_max,
-        #     "final_concentrated_sample_volume_min": final_concentrated_sample_volume_min,
-        #     "final_concentrated_sample_volume_max": final_concentrated_sample_volume_max,
-        # }
+        # ExtractionBatch-level raw values
+        if samples is not None:
+            eb_raw_data = ExtractionBatch.objects.filter(analysis_batch__samples__in=samples)
+        else:
+            eb_raw_data = ExtractionBatch.objects.all()
+
+        eb_raw_data = eb_raw_data.annotate(rt_template_volume=Max(
+            'reversetranscriptions__template_volume', filter=Q(reversetranscriptions__re_rt__isnull=True)))
+        eb_raw_data = eb_raw_data.annotate(rt_reaction_volume=Max(
+            'reversetranscriptions__reaction_volume', filter=Q(reversetranscriptions__re_rt__isnull=True)))
+
+        eb_raw_data = eb_raw_data.values('analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
+                                         'rt_template_volume', 'rt_reaction_volume', 'qpcr_template_volume',
+                                         'qpcr_reaction_volume')
+        resp['extraction_raw_data'] = list(eb_raw_data)
+
+        # ExtractionBatch-level QC summary stats
+        extraction_volumes = eb_raw_data.values('extraction_volume').annotate(count=Count('extraction_volume'))
+        elution_volumes = eb_raw_data.values('elution_volume').annotate(count=Count('elution_volume'))
+        rt_template_volumes = Counter(list(eb_raw_data.values_list('rt_template_volume', flat=True)))
+        rt_reaction_volumes = Counter(list(eb_raw_data.values_list('rt_reaction_volume', flat=True)))
+        qpcr_template_volumes = eb_raw_data.values('qpcr_template_volume').annotate(count=Count('qpcr_template_volume'))
+        qpcr_reaction_volumes = eb_raw_data.values('qpcr_reaction_volume').annotate(count=Count('qpcr_reaction_volume'))
+
+        extraction_stats = []
+        for extraction_volume in extraction_volumes:
+            extraction_stats.append({
+                "metric": "extraction_volume",
+                "value": extraction_volume['extraction_volume'],
+                "count": extraction_volume['count']
+            })
+        for elution_volume in elution_volumes:
+            extraction_stats.append({
+                "metric": "elution_volume",
+                "value": elution_volume['elution_volume'],
+                "count": elution_volume['count']
+            })
+        for key, value in rt_template_volumes.items():
+            extraction_stats.append({
+                "metric": "rt_template_volume",
+                "value": key,
+                "count": value
+            })
+        for key, value in rt_reaction_volumes.items():
+            extraction_stats.append({
+                "metric": "rt_reaction_volume",
+                "value": key,
+                "count": value
+            })
+        for qpcr_template_volume in qpcr_template_volumes:
+            extraction_stats.append({
+                "metric": "qpcr_template_volumes",
+                "value": qpcr_template_volume['qpcr_template_volume'],
+                "count": qpcr_template_volume['count']
+            })
+        for qpcr_reaction_volume in qpcr_reaction_volumes:
+            extraction_stats.append({
+                "metric": "qpcr_reaction_volume",
+                "value": qpcr_reaction_volume['qpcr_reaction_volume'],
+                "count": qpcr_reaction_volume['count']
+            })
+        resp['extraction_quality_control'] = extraction_stats
 
         return Response(resp)
