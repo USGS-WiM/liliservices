@@ -36,6 +36,17 @@ def get_sci_val(decimal_val):
     return sci_val
 
 
+def calc_result_text(value):
+    if value is None:
+        return "No Result"
+    elif value == Decimal(0.0):
+        return "Negative"
+    elif value >= 0:
+        return "Positive"
+    else:
+        return "No Result"
+
+
 def recalc_reps(level, level_id):
     reps = None
     if level == 'Sample':
@@ -567,15 +578,7 @@ class FinalSampleMeanConcentration(HistoryModel):
 
     @property
     def result(self):
-        conc = self.final_sample_mean_concentration
-        if conc is None:
-            return "No Result"
-        elif conc == Decimal(0.0):
-            return "Negative"
-        elif conc >= 0:
-            return "Positive"
-        else:
-            return "No Result"
+        return calc_result_text(self.final_sample_mean_concentration)
 
     @property
     def final_sample_mean_concentration_sci(self):
@@ -810,6 +813,21 @@ class ExtractionBatch(HistoryModel):
     """
 
     @property
+    def result_ext_pos(self):
+        if self.result_rt_pos == "Positive":
+            return "Positive"
+        else:
+            return calc_result_text(self.ext_pos_dna_cq_value)
+
+    @property
+    def result_rt_pos(self):
+        rt = ReverseTranscription.objects.filter(extraction_batch=self.id, re_rt__isnull=True).first()
+        if rt:
+            return calc_result_text(rt.ext_pos_rna_rt_cq_value)
+        else:
+            return "No Result"
+
+    @property
     def extraction_string(self):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.analysis_batch, self.extraction_number)
@@ -946,6 +964,25 @@ class PCRReplicateBatch(HistoryModel):
     """
 
     @property
+    def result_ext_neg(self):
+        if self.result_rt_neg == "Positive":
+            return "Positive"
+        else:
+            return calc_result_text(self.ext_neg_cq_value)
+
+    @property
+    def result_rt_neg(self):
+        return calc_result_text(self.rt_neg_cq_value)
+
+    @property
+    def result_pcr_neg(self):
+        return calc_result_text(self.pcr_neg_cq_value)
+
+    @property
+    def result_pcr_pos(self):
+        return calc_result_text(self.pcr_pos_cq_value)
+
+    @property
     def ext_neg_gc_reaction_sci(self):
         return get_sci_val(self.ext_neg_gc_reaction)
 
@@ -1021,32 +1058,6 @@ class PCRReplicateBatch(HistoryModel):
         verbose_name_plural = "pcrreplicatebatches"
 
 
-# class PCRReplicateManager(models.Manager):
-#     def replicate_count(self, target_ids=[], sample_ids=[]):
-#         target_sample_combos = ResultsSummaryReport.objects.filter(target__in=target_ids, sample__in=sample_ids)
-#         rep_count = target_sample_combos.
-
-    # def positive_count(self, target_ids=[], sample_ids=[]):
-    #     from django.db import connection
-    #     with connection.cursor() as cursor:
-    #         cursor.execute("""
-    #             SELECT (SELECT name FROM lide_target t WHERE t.id = rb.target_id) AS target_name, COUNT(se.sample_id)
-    #             FROM lide_pcrreplicate r
-    #             JOIN lide_sampleextraction se
-    #             ON r.sample_extraction_id = se.id
-    #             JOIN lide_pcrreplicatebatch rb
-    #             ON r.pcrreplicate_batch_id = rb.id
-    #             WHERE r.pcrreplicate_batch_id IN (
-    #             SELECT id FROM lide_pcrreplicatebatch rb WHERE target_id = ANY(%s)
-    #             )
-    #             AND se.sample_id =ANY(%s)
-    #             AND cq_value > 0
-    #             GROUP BY rb.target_id
-    #             ORDER BY target_name""",
-    #                        [target_ids, sample_ids])
-    #         return cursor.fetchall()
-
-
 class PCRReplicate(HistoryModel):
     """
     Polymerase Chain Reaction Replicate
@@ -1080,7 +1091,8 @@ class PCRReplicate(HistoryModel):
                     sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id)
                 # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
                 for rep in reps:
-                    any_peg_neg_invalid = True
+                    if rep.invalid:
+                        any_peg_neg_invalid = True
                     if not rep.gc_reaction:
                         peg_neg_cq_values_missing.append({str(rep.id): {
                             "sample": rep.sample_extraction.sample.id,

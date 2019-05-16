@@ -1666,3 +1666,49 @@ class QualityControlReportView(views.APIView):
         resp['extraction_quality_control'] = extraction_stats
 
         return Response(resp)
+
+
+class ControlsReportView(views.APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        request_data = JSONParser().parse(request)
+        targets = request_data.get('targets', None)
+
+        # PCRReplicateBatch-level controls
+        # Ext Neg
+        ext_negs = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
+            result=F('result_ext_neg')).annotate(pcrreplicate_batch=F('id')).values(
+            'analysis_batch', 'extraction_number', 'target', 'pcrreplicate_batch', 'result')
+        # PCR Neg
+        pcr_negs = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
+            result=F('result_pcr_neg')).annotate(pcrreplicate_batch=F('id')).values(
+            'analysis_batch', 'extraction_number', 'target', 'pcrreplicate_batch', 'result')
+        # PCR Pos
+        pcr_poss = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
+            result=F('result_pcr_pos')).annotate(pcrreplicate_batch=F('id')).values(
+            'analysis_batch', 'extraction_number', 'target', 'pcrreplicate_batch', 'result')
+
+        # ExtractionBatch-level controls
+        # Ext Pos
+        ext_poss = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
+            result=F('result_ext_pos')).values('analysis_batch', 'extraction_number', 'target', 'result')
+
+        # Sample-level controls
+        # PegNegs
+        peg_negs = Sample.objects.filter(record_type=2)
+        for peg_neg in peg_negs:
+            for target_id in targets:
+                # only check reps with the same target as this data rep
+                reps = PCRReplicate.objects.filter(
+                    sample_extraction__sample=peg_neg.id, pcrreplicate_batch__target__exact=target_id, invalid=False)
+                # if even a single one of the peg_neg reps is greater than zero,
+                # the data rep result must be set to positive
+                for rep in reps:
+                    if rep.cq_value and rep.cq_value > 0:
+                        result = 'Positive'
+                        # TODO: MORE!
+
+        resp = {}
+
+        return Response(resp)
