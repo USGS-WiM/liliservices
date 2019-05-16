@@ -1615,7 +1615,7 @@ class QualityControlReportView(views.APIView):
 
         eb_raw_data = eb_raw_data.values('analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
                                          'rt_template_volume', 'rt_reaction_volume', 'qpcr_template_volume',
-                                         'qpcr_reaction_volume')
+                                         'qpcr_reaction_volume').order_by('analysis_batch', 'extraction_number')
         resp['extraction_raw_data'] = list(eb_raw_data)
 
         # ExtractionBatch-level QC summary stats
@@ -1653,7 +1653,7 @@ class QualityControlReportView(views.APIView):
             })
         for qpcr_template_volume in qpcr_template_volumes:
             extraction_stats.append({
-                "metric": "qpcr_template_volumes",
+                "metric": "qpcr_template_volume",
                 "value": qpcr_template_volume['qpcr_template_volume'],
                 "count": qpcr_template_volume['count']
             })
