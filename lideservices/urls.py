@@ -49,4 +49,6 @@ urlpatterns = [
         name='inhibitionscalculatedilutionfactor'),
     url(r'^qualitycontrolreport/$', views.QualityControlReportView.as_view(),
         name='qualitycontrolreport'),
+    url(r'^controlresultsreport/$', views.ControlsResultsReportView.as_view(),
+        name='controlresultsreport'),
 ]

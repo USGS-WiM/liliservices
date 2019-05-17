@@ -36,17 +36,6 @@ def get_sci_val(decimal_val):
     return sci_val
 
 
-def calc_result_text(value):
-    if value is None:
-        return "No Result"
-    elif value == Decimal(0.0):
-        return "Negative"
-    elif value >= 0:
-        return "Positive"
-    else:
-        return "No Result"
-
-
 def recalc_reps(level, level_id):
     reps = None
     if level == 'Sample':
@@ -64,6 +53,7 @@ def recalc_reps(level, level_id):
             rep.replicate_concentration = rep.calc_rep_conc()
             rep.invalid = rep.calc_invalid()
             rep.save()
+
 
 class NonnegativeIntegerField(models.IntegerField):
     def __init__(self, *args, **kwargs):
@@ -578,7 +568,15 @@ class FinalSampleMeanConcentration(HistoryModel):
 
     @property
     def result(self):
-        return calc_result_text(self.final_sample_mean_concentration)
+        value = self.final_sample_mean_concentration
+        if value is None:
+            return "No Result"
+        elif value == Decimal(0.0):
+            return "Negative"
+        elif value >= 0:
+            return "Positive"
+        else:
+            return "No Result"
 
     @property
     def final_sample_mean_concentration_sci(self):
@@ -813,21 +811,6 @@ class ExtractionBatch(HistoryModel):
     """
 
     @property
-    def result_ext_pos(self):
-        if self.result_rt_pos == "Positive":
-            return "Positive"
-        else:
-            return calc_result_text(self.ext_pos_dna_cq_value)
-
-    @property
-    def result_rt_pos(self):
-        rt = ReverseTranscription.objects.filter(extraction_batch=self.id, re_rt__isnull=True).first()
-        if rt:
-            return calc_result_text(rt.ext_pos_rna_rt_cq_value)
-        else:
-            return "No Result"
-
-    @property
     def extraction_string(self):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.analysis_batch, self.extraction_number)
@@ -962,25 +945,6 @@ class PCRReplicateBatch(HistoryModel):
     """
     Polymerase Chain Reaction Replicate Batch
     """
-
-    @property
-    def result_ext_neg(self):
-        if self.result_rt_neg == "Positive":
-            return "Positive"
-        else:
-            return calc_result_text(self.ext_neg_cq_value)
-
-    @property
-    def result_rt_neg(self):
-        return calc_result_text(self.rt_neg_cq_value)
-
-    @property
-    def result_pcr_neg(self):
-        return calc_result_text(self.pcr_neg_cq_value)
-
-    @property
-    def result_pcr_pos(self):
-        return calc_result_text(self.pcr_pos_cq_value)
 
     @property
     def ext_neg_gc_reaction_sci(self):

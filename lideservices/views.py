@@ -1,6 +1,6 @@
 from collections import Counter
 from django.http import JsonResponse
-from django.db.models import F, Q, Count, Sum, Min, Max, Avg, FloatField
+from django.db.models import F, Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
 from rest_framework import views, viewsets, permissions, authentication, status
 from rest_framework.decorators import action
@@ -1668,47 +1668,114 @@ class QualityControlReportView(views.APIView):
         return Response(resp)
 
 
-class ControlsReportView(views.APIView):
+class ControlsResultsReportView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request):
+        targets = Target.objects.all().values('id', 'name')
         request_data = JSONParser().parse(request)
-        targets = request_data.get('targets', None)
+        target_ids = request_data.get('targets', None)
+        if target_ids:
+            targets = Target.objects.filter(id__in=target_ids).values('id', 'name')
+
+        pos = "Positive"
+        neg = "Negative"
+        nr = "No Result"
 
         # PCRReplicateBatch-level controls
         # Ext Neg
-        ext_negs = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
-            result=F('result_ext_neg')).annotate(pcrreplicate_batch=F('id')).values(
-            'analysis_batch', 'extraction_number', 'target', 'pcrreplicate_batch', 'result')
-        # PCR Neg
-        pcr_negs = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
-            result=F('result_pcr_neg')).annotate(pcrreplicate_batch=F('id')).values(
-            'analysis_batch', 'extraction_number', 'target', 'pcrreplicate_batch', 'result')
-        # PCR Pos
-        pcr_poss = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
-            result=F('result_pcr_pos')).annotate(pcrreplicate_batch=F('id')).values(
-            'analysis_batch', 'extraction_number', 'target', 'pcrreplicate_batch', 'result')
+        ext_negs = PCRReplicateBatch.objects.all().annotate(
+            result=Case(
+                When(rt_neg_cq_value__gt=0, then=Value(pos)),
+                When(ext_neg_cq_value__gt=0, then=Value(pos)),
+                When(ext_neg_cq_value__exact=0, then=Value(neg)),
+                default=Value(nr), output_field=CharField()
+            )).annotate(pcrreplicate_batch=F('id')).values(
+            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__extraction_number',
+            'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+        if target_ids:
+            ext_negs = ext_negs.filter(target__in=target_ids)
+        ext_neg_results = {}
+        for ext_neg in ext_negs:
+            # if the EB is already included in our local dict, just append the current target to it
+            if ext_neg_results.get(ext_neg['extraction_batch__id'], None) is not None:
+                data = ext_neg_results[ext_neg['extraction_batch__id']]
+                data[ext_neg['target__name']] = ext_neg['result']
+            # otherwise, add the EB to our local dict and append the current target to it
+            else:
+                data = {
+                    "analysis_batch": ext_neg['extraction_batch__analysis_batch'],
+                    "extraction_number": ext_neg['extraction_batch__extraction_number'],
+                    # "replicate_number": ext_neg['replicate_number'],
+                    ext_neg['target__name']: ext_neg['result']
+                }
+            ext_neg_results[ext_neg['extraction_batch__id']] = data
+        # convert the dict of dicts into a list of dicts
+        ext_neg_results_list = ext_neg_results.values()
 
-        # ExtractionBatch-level controls
-        # Ext Pos
-        ext_poss = PCRReplicateBatch.objects.filter(target__in=targets).annotate(
-            result=F('result_ext_pos')).values('analysis_batch', 'extraction_number', 'target', 'result')
+        # # PCR Neg
+        # pcr_negs = PCRReplicateBatch.objects.all().annotate(
+        #     result=Case(
+        #         When(pcr_neg_cq_value__gt=0, then=Value(pos)),
+        #         When(pcr_neg_cq_value__exact=0, then=Value(neg)),
+        #         default=Value(nr), output_field=CharField()
+        #     )).annotate(pcrreplicate_batch=F('id')).values(
+        #     'extraction_batch__analysis_batch', 'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'id', 'result')
+        # # PCR Pos
+        # pcr_poss = PCRReplicateBatch.objects.all().annotate(
+        #     result=Case(
+        #         When(pcr_pos_cq_value__gt=0, then=Value(pos)),
+        #         When(pcr_pos_cq_value__exact=0, then=Value(neg)),
+        #         default=Value(nr), output_field=CharField()
+        #     )).annotate(pcrreplicate_batch=F('id')).values(
+        #     'extraction_batch__analysis_batch', 'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'id', 'result')
+        #
+        # # ExtractionBatch-level controls
+        # # Ext Pos
+        # ext_poss = ExtractionBatch.objects.all().annotate(
+        #     ext_pos_rna_rt_cq_value=Max('reversetranscriptions__ext_pos_rna_rt_cq_value',
+        #                                 filter=Q(reversetranscriptions__re_rt__isnull=True))
+        # ).annotate(
+        #     result=Case(
+        #         When(ext_pos_rna_rt_cq_value__gt=0, then=Value(pos)),
+        #         When(ext_pos_dna_cq_value__gt=0, then=Value(pos)),
+        #         When(ext_pos_dna_cq_value__exact=0, then=Value(neg)),
+        #         default=Value(nr), output_field=CharField()
+        #     )).values('analysis_batch', 'extraction_number', 'result')
+        #
+        # if target_ids:
+        #
+        #     pcr_negs = pcr_negs.filter(target__in=target_ids)
+        #     pcr_poss = pcr_poss.filter(target__in=target_ids)
+        #
+        #     # Sample-level controls
+        # # PegNegs
+        # peg_negs = Sample.objects.filter(record_type=2)
+        # peg_neg_results = []
+        # for peg_neg in peg_negs:
+        #     peg_neg_resp = {"id": peg_neg.id, "collection_start_date": peg_neg.collection_start_date}
+        #     for target in targets:
+        #         # only check for valid reps with the same target
+        #         reps = PCRReplicate.objects.filter(
+        #             sample_extraction__sample_id=peg_neg.id,
+        #             pcrreplicate_batch__target_id__exact=target['id'], invalid=False)
+        #         # if even a single one of the peg_neg reps is greater than zero,
+        #         # the data rep result must be set to positive
+        #         pos_result = [rep.cq_value for rep in reps if rep.cq_value is not None and rep.cq_value > 0]
+        #         if pos_result:
+        #             result = pos
+        #         else:
+        #             neg_result = [rep.cq_value for rep in reps if rep.cq_value is not None and rep.cq_value == 0]
+        #             result = neg if neg_result else nr
+        #         peg_neg_resp[target['name']] = result
+        #     peg_neg_results.append(peg_neg_resp)
 
-        # Sample-level controls
-        # PegNegs
-        peg_negs = Sample.objects.filter(record_type=2)
-        for peg_neg in peg_negs:
-            for target_id in targets:
-                # only check reps with the same target as this data rep
-                reps = PCRReplicate.objects.filter(
-                    sample_extraction__sample=peg_neg.id, pcrreplicate_batch__target__exact=target_id, invalid=False)
-                # if even a single one of the peg_neg reps is greater than zero,
-                # the data rep result must be set to positive
-                for rep in reps:
-                    if rep.cq_value and rep.cq_value > 0:
-                        result = 'Positive'
-                        # TODO: MORE!
-
-        resp = {}
+        resp = {
+            "ext_neg": ext_neg_results_list
+            # "pcr_neg": list(pcr_negs),
+            # "pcr_pos": list(pcr_poss),
+            # "ext_pos": list(ext_poss),
+            # "peg_neg": list(peg_neg_results),
+        }
 
         return Response(resp)
