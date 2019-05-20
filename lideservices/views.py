@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, OrderedDict
 from django.http import JsonResponse
 from django.db.models import F, Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
@@ -1673,14 +1673,15 @@ class ControlsResultsReportView(views.APIView):
 
     def post(self, request):
         # samples = Sample.objects.all()
-        targets = Target.objects.all().values('id', 'name')
+        targets = Target.objects.all().values('id', 'name').order_by('name')
         request_data = JSONParser().parse(request)
         sample_ids = request_data.get('samples', None)
         # if sample_ids:
         #     samples = Sample.objects.filter(id__in=sample_ids)
         target_ids = request_data.get('targets', None)
         if target_ids:
-            targets = Target.objects.filter(id__in=target_ids).values('id', 'name')
+            targets = Target.objects.filter(id__in=target_ids).values('id', 'name').order_by('name')
+        target_names = [target['name'] for target in targets]
 
         pos = "Positive"
         neg = "Negative"
@@ -1697,7 +1698,8 @@ class ControlsResultsReportView(views.APIView):
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
-            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
+        ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
         if sample_ids:
             ext_negs = ext_negs.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
@@ -1720,11 +1722,19 @@ class ControlsResultsReportView(views.APIView):
             ext_neg_results[ext_neg['extraction_batch__id']] = data
         # convert the dict of dicts into a list of dicts
         ext_neg_results_list = list(ext_neg_results.values())
+        ext_neg_results_list_ordered = []
         # include targets not analyzed
         for ext_neg_result in ext_neg_results_list:
             for target in targets:
                 if target['name'] not in ext_neg_result:
                     ext_neg_result[target['name']] = na
+            ext_neg_result_ids = OrderedDict({
+                "analysis_batch": ext_neg_result.pop('analysis_batch'),
+                "analysis_batch_string": ext_neg_result.pop('analysis_batch_string'),
+                "extraction_number": ext_neg_result.pop('extraction_number')
+            })
+            ext_neg_result_targets = OrderedDict(sorted(ext_neg_result.items()))
+            ext_neg_results_list_ordered.append(OrderedDict(**ext_neg_result_ids, **ext_neg_result_targets))
 
         # PCR Neg
         pcr_negs = PCRReplicateBatch.objects.all().annotate(
@@ -1734,7 +1744,8 @@ class ControlsResultsReportView(views.APIView):
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
-            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
+        ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
         if sample_ids:
             pcr_negs = pcr_negs.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
@@ -1757,11 +1768,19 @@ class ControlsResultsReportView(views.APIView):
             pcr_neg_results[pcr_neg['extraction_batch__id']] = data
         # convert the dict of dicts into a list of dicts
         pcr_neg_results_list = list(pcr_neg_results.values())
+        pcr_neg_results_list_ordered = []
         # include targets not analyzed
         for pcr_neg_result in pcr_neg_results_list:
             for target in targets:
                 if target['name'] not in pcr_neg_result:
                     pcr_neg_result[target['name']] = na
+            pcr_neg_result_ids = OrderedDict({
+                "analysis_batch": pcr_neg_result.pop('analysis_batch'),
+                "analysis_batch_string": pcr_neg_result.pop('analysis_batch_string'),
+                "extraction_number": pcr_neg_result.pop('extraction_number')
+            })
+            pcr_neg_result_targets = OrderedDict(sorted(pcr_neg_result.items()))
+            pcr_neg_results_list_ordered.append(OrderedDict(**pcr_neg_result_ids, **pcr_neg_result_targets))
 
         # PCR Pos
         pcr_poss = PCRReplicateBatch.objects.all().annotate(
@@ -1771,7 +1790,8 @@ class ControlsResultsReportView(views.APIView):
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
-            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
+        ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
         if sample_ids:
             pcr_poss = pcr_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
@@ -1794,11 +1814,19 @@ class ControlsResultsReportView(views.APIView):
             pcr_pos_results[pcr_pos['extraction_batch__id']] = data
         # convert the dict of dicts into a list of dicts
         pcr_pos_results_list = list(pcr_pos_results.values())
+        pcr_pos_results_list_ordered = []
         # include targets not analyzed
         for pcr_pos_result in pcr_pos_results_list:
             for target in targets:
                 if target['name'] not in pcr_pos_result:
                     pcr_pos_result[target['name']] = na
+            pcr_pos_result_ids = OrderedDict({
+                "analysis_batch": pcr_pos_result.pop('analysis_batch'),
+                "analysis_batch_string": pcr_pos_result.pop('analysis_batch_string'),
+                "extraction_number": pcr_pos_result.pop('extraction_number')
+            })
+            pcr_pos_result_targets = OrderedDict(sorted(pcr_pos_result.items()))
+            pcr_pos_results_list_ordered.append(OrderedDict(**pcr_pos_result_ids, **pcr_pos_result_targets))
 
         # ExtractionBatch-level controls
         # Ext Pos
@@ -1813,7 +1841,8 @@ class ControlsResultsReportView(views.APIView):
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
-            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
+        ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
         if sample_ids:
             ext_poss = ext_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
@@ -1836,17 +1865,25 @@ class ControlsResultsReportView(views.APIView):
             ext_pos_results[ext_pos['extraction_batch__id']] = data
         # convert the dict of dicts into a list of dicts
         ext_pos_results_list = list(ext_pos_results.values())
+        ext_pos_results_list_ordered = []
         # include targets not analyzed
         for ext_pos_result in ext_pos_results_list:
             for target in targets:
                 if target['name'] not in ext_pos_result:
                     ext_pos_result[target['name']] = na
+            ext_pos_result_ids = OrderedDict({
+                "analysis_batch": ext_pos_result.pop('analysis_batch'),
+                "analysis_batch_string": ext_pos_result.pop('analysis_batch_string'),
+                "extraction_number": ext_pos_result.pop('extraction_number')
+            })
+            ext_pos_result_targets = OrderedDict(sorted(ext_pos_result.items()))
+            ext_pos_results_list_ordered.append(OrderedDict(**ext_pos_result_ids, **ext_pos_result_targets))
 
         # Sample-level controls
         # PegNegs
         # peg_negs = Sample.objects.filter(record_type=2)
         peg_neg_ids = list(set(Sample.objects.filter(id__in=sample_ids).values_list('peg_neg', flat=True)))
-        peg_negs = Sample.objects.filter(id__in=peg_neg_ids)
+        peg_negs = Sample.objects.filter(id__in=peg_neg_ids).order_by('id')
         peg_neg_results_list = []
         for peg_neg in peg_negs:
             peg_neg_resp = {"id": peg_neg.id, "collaborator_sample_id": peg_neg.collaborator_sample_id,
@@ -1872,11 +1909,12 @@ class ControlsResultsReportView(views.APIView):
             peg_neg_results_list.append(peg_neg_resp)
 
         resp = {
-            "ext_neg": ext_neg_results_list,
-            "pcr_neg": pcr_neg_results_list,
-            "pcr_pos": pcr_pos_results_list,
-            "ext_pos": ext_pos_results_list,
-            "peg_neg": peg_neg_results_list
+            "ext_neg": ext_neg_results_list_ordered,
+            "pcr_neg": pcr_neg_results_list_ordered,
+            "pcr_pos": pcr_pos_results_list_ordered,
+            "ext_pos": ext_pos_results_list_ordered,
+            "peg_neg": peg_neg_results_list,
+            "targets": target_names
         }
 
         return Response(resp)
