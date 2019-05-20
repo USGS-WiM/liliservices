@@ -571,9 +571,9 @@ class FinalSampleMeanConcentration(HistoryModel):
         value = self.final_sample_mean_concentration
         if value is None:
             return "No Result"
-        elif value == Decimal(0.0):
+        elif value == Decimal('0'):
             return "Negative"
-        elif value >= 0:
+        elif value > Decimal('0'):
             return "Positive"
         else:
             return "No Result"
@@ -619,7 +619,7 @@ class FinalSampleMeanConcentration(HistoryModel):
                     if rep.replicate_concentration is None:
                         concentration_calc_values_missing_count += 1
                         concentration_calc_values_missing.append(make_rep_identifier_object(rep))
-                    elif rep.replicate_concentration > 0:
+                    elif rep.replicate_concentration > Decimal('0'):
                         positive_concentration_count += 1
                         positive_concentrations.append(make_rep_identifier_object(rep))
                     else:
@@ -986,8 +986,8 @@ class PCRReplicateBatch(HistoryModel):
         # assess the invalid flags
         # invalid flags default to True (i.e., the rep is invalid)
         # and can only be set to False if the cq_values of this rep batch are equal to zero
-        self.ext_neg_invalid = False if self.ext_neg_cq_value == 0 else True
-        self.pcr_neg_invalid = False if self.pcr_neg_cq_value == 0 else True
+        self.ext_neg_invalid = False if self.ext_neg_cq_value == Decimal('0') else True
+        self.pcr_neg_invalid = False if self.pcr_neg_cq_value == Decimal('0') else True
         # reverse transcriptions are a special case... not every extraction batch will have a RT,
         # so if there is no RT, set rt_neg_invalid to False regardless of the value of rt_neg_cq_value,
         # but if there is a RT, apply the same logic as the other invalid flags
@@ -995,7 +995,7 @@ class PCRReplicateBatch(HistoryModel):
         if not rt:
             self.rt_neg_invalid = False
         else:
-            self.rt_neg_invalid = False if self.rt_neg_cq_value == 0 else True
+            self.rt_neg_invalid = False if self.rt_neg_cq_value == Decimal('0') else True
         # validating the pcr_pos will come in a later release of the software
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
@@ -1081,7 +1081,7 @@ class PCRReplicate(HistoryModel):
                 reasons["ext_neg_missing"] = True
             else:
                 reasons["ext_neg_missing"] = False
-            if pcrreplicate_batch.ext_neg_cq_value is not None and pcrreplicate_batch.ext_neg_cq_value > 0:
+            if pcrreplicate_batch.ext_neg_cq_value is not None and pcrreplicate_batch.ext_neg_cq_value > Decimal('0'):
                 reasons["ext_neg_positive"] = True
             else:
                 reasons["ext_neg_positive"] = False
@@ -1093,7 +1093,7 @@ class PCRReplicate(HistoryModel):
                     reasons["rt_neg_missing"] = True
                 else:
                     reasons["rt_neg_missing"] = False
-                if pcrreplicate_batch.rt_neg_cq_value is not None and pcrreplicate_batch.rt_neg_cq_value > 0:
+                if pcrreplicate_batch.rt_neg_cq_value is not None and pcrreplicate_batch.rt_neg_cq_value > Decimal('0'):
                     reasons["rt_neg_positive"] = True
                 else:
                     reasons["rt_neg_positive"] = False
@@ -1104,7 +1104,7 @@ class PCRReplicate(HistoryModel):
                 reasons["pcr_neg_missing"] = True
             else:
                 reasons["pcr_neg_missing"] = False
-            if pcrreplicate_batch.pcr_neg_cq_value is not None and pcrreplicate_batch.pcr_neg_cq_value > 0:
+            if pcrreplicate_batch.pcr_neg_cq_value is not None and pcrreplicate_batch.pcr_neg_cq_value > Decimal('0'):
                 reasons["pcr_neg_positive"] = True
             else:
                 reasons["pcr_neg_positive"] = False

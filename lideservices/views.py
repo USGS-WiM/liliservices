@@ -1010,7 +1010,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         elif self.request.data[field] is not None:
             if not self.isnumber(self.request.data[field]):
                 invalid_reason = self.err_obj(field, field + synonym + " is not a number", 1)
-            elif self.request.data[field] > 0 and field not in ['pcr_pos_cq_value', 'pcr_pos_gc_reaction']:
+            elif self.request.data[field] > Decimal('0') and field not in ['pcr_pos_cq_value', 'pcr_pos_gc_reaction']:
                 # eventually we will also validate pcr_pos_cq_value by testing if it is >0.5 cylces from expected
                 invalid_reason = self.err_obj(field, field + synonym + " is positive", 1)
         return invalid_reason
@@ -1672,8 +1672,12 @@ class ControlsResultsReportView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request):
+        # samples = Sample.objects.all()
         targets = Target.objects.all().values('id', 'name')
         request_data = JSONParser().parse(request)
+        sample_ids = request_data.get('samples', None)
+        # if sample_ids:
+        #     samples = Sample.objects.filter(id__in=sample_ids)
         target_ids = request_data.get('targets', None)
         if target_ids:
             targets = Target.objects.filter(id__in=target_ids).values('id', 'name')
@@ -1692,8 +1696,10 @@ class ControlsResultsReportView(views.APIView):
                 When(ext_neg_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
-            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__extraction_number',
-            'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+        if sample_ids:
+            ext_negs = ext_negs.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
             ext_negs = ext_negs.filter(target__in=target_ids)
         ext_neg_results = {}
@@ -1705,6 +1711,7 @@ class ControlsResultsReportView(views.APIView):
             # otherwise, add the EB to our local dict and append the current target to it
             else:
                 data = {
+                    "analysis_batch_string": ext_neg['extraction_batch__analysis_batch__name'],
                     "analysis_batch": ext_neg['extraction_batch__analysis_batch'],
                     "extraction_number": ext_neg['extraction_batch__extraction_number'],
                     # "replicate_number": ext_neg['replicate_number'],
@@ -1726,8 +1733,10 @@ class ControlsResultsReportView(views.APIView):
                 When(pcr_neg_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
-            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__extraction_number',
-            'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+        if sample_ids:
+            pcr_negs = pcr_negs.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
             pcr_negs = pcr_negs.filter(target__in=target_ids)
         pcr_neg_results = {}
@@ -1739,6 +1748,7 @@ class ControlsResultsReportView(views.APIView):
             # otherwise, add the EB to our local dict and append the current target to it
             else:
                 data = {
+                    "analysis_batch_string": pcr_neg['extraction_batch__analysis_batch__name'],
                     "analysis_batch": pcr_neg['extraction_batch__analysis_batch'],
                     "extraction_number": pcr_neg['extraction_batch__extraction_number'],
                     # "replicate_number": pcr_neg['replicate_number'],
@@ -1760,8 +1770,10 @@ class ControlsResultsReportView(views.APIView):
                 When(pcr_pos_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
-            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__extraction_number',
-            'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+        if sample_ids:
+            pcr_poss = pcr_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
             pcr_poss = pcr_poss.filter(target__in=target_ids)
         pcr_pos_results = {}
@@ -1773,6 +1785,7 @@ class ControlsResultsReportView(views.APIView):
             # otherwise, add the EB to our local dict and append the current target to it
             else:
                 data = {
+                    "analysis_batch_string": pcr_pos['extraction_batch__analysis_batch__name'],
                     "analysis_batch": pcr_pos['extraction_batch__analysis_batch'],
                     "extraction_number": pcr_pos['extraction_batch__extraction_number'],
                     # "replicate_number": pcr_neg['replicate_number'],
@@ -1787,6 +1800,8 @@ class ControlsResultsReportView(views.APIView):
                 if target['name'] not in pcr_pos_result:
                     pcr_pos_result[target['name']] = na
 
+        # ExtractionBatch-level controls
+        # Ext Pos
         ext_poss = PCRReplicateBatch.objects.all().annotate(
             ext_pos_rna_rt_cq_value=Max('extraction_batch__reversetranscriptions__ext_pos_rna_rt_cq_value',
                                         filter=Q(extraction_batch__reversetranscriptions__re_rt__isnull=True))
@@ -1797,8 +1812,10 @@ class ControlsResultsReportView(views.APIView):
                 When(extraction_batch__ext_pos_dna_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
-            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__extraction_number',
-            'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+            'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result')
+        if sample_ids:
+            ext_poss = ext_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
             ext_poss = ext_poss.filter(target__in=target_ids)
         ext_pos_results = {}
@@ -1810,6 +1827,7 @@ class ControlsResultsReportView(views.APIView):
             # otherwise, add the EB to our local dict and append the current target to it
             else:
                 data = {
+                    "analysis_batch_string": ext_pos['extraction_batch__analysis_batch__name'],
                     "analysis_batch": ext_pos['extraction_batch__analysis_batch'],
                     "extraction_number": ext_pos['extraction_batch__extraction_number'],
                     # "replicate_number": pcr_neg['replicate_number'],
@@ -1826,10 +1844,13 @@ class ControlsResultsReportView(views.APIView):
 
         # Sample-level controls
         # PegNegs
-        peg_negs = Sample.objects.filter(record_type=2)
+        # peg_negs = Sample.objects.filter(record_type=2)
+        peg_neg_ids = list(set(Sample.objects.filter(id__in=sample_ids).values_list('peg_neg', flat=True)))
+        peg_negs = Sample.objects.filter(id__in=peg_neg_ids)
         peg_neg_results_list = []
         for peg_neg in peg_negs:
-            peg_neg_resp = {"id": peg_neg.id, "collection_start_date": peg_neg.collection_start_date}
+            peg_neg_resp = {"id": peg_neg.id, "collaborator_sample_id": peg_neg.collaborator_sample_id,
+                            "collection_start_date": peg_neg.collection_start_date}
             for target in targets:
                 # only check for valid reps with the same target
                 reps = PCRReplicate.objects.filter(
@@ -1841,11 +1862,11 @@ class ControlsResultsReportView(views.APIView):
                 else:
                     # if even a single one of the peg_neg reps is greater than zero,
                     # the data rep result must be set to positive
-                    pos_result = [rep.cq_value for rep in reps if rep.cq_value is not None and rep.cq_value > 0]
+                    pos_result = [r.cq_value for r in reps if r.cq_value is not None and r.cq_value > Decimal('0')]
                     if pos_result:
                         result = pos
                     else:
-                        neg_result = [rep.cq_value for rep in reps if rep.cq_value is not None and rep.cq_value == 0]
+                        neg_result = [r.cq_value for r in reps if r.cq_value is not None and r.cq_value == Decimal('0')]
                         result = neg if neg_result else nr
                 peg_neg_resp[target['name']] = result
             peg_neg_results_list.append(peg_neg_resp)
