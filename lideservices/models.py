@@ -330,21 +330,21 @@ class FreezerLocationManager(models.Manager):
         if study_id is not None:
             sample_ids = Sample.objects.filter(study__exact=study_id).values_list('id')
             aliquot_ids = Aliquot.objects.filter(sample__in=sample_ids).values_list('id')
-            max_freezer = self.filter(aliquot__in=aliquot_ids).aggregate(models.Max('freezer'))
+            max_freezer = self.filter(aliquots__in=aliquot_ids).aggregate(models.Max('freezer'))
             max_rack = self.filter(
-                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max']).aggregate(models.Max('rack'))
+                aliquots__in=aliquot_ids, freezer__exact=max_freezer['freezer__max']).aggregate(models.Max('rack'))
             max_box = self.filter(
-                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                aliquots__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
                 rack__exact=max_rack['rack__max']).aggregate(models.Max('box'))
             max_row = self.filter(
-                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                aliquots__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
                 rack__exact=max_rack['rack__max'], box__exact=max_box['box__max']).aggregate(models.Max('row'))
             max_spot = self.filter(
-                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                aliquots__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
                 rack__exact=max_rack['rack__max'], box__exact=max_box['box__max'],
                 row__exact=max_row['row__max']).aggregate(models.Max('spot'))
             last_spot = self.filter(
-                aliquot__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
+                aliquots__in=aliquot_ids, freezer__exact=max_freezer['freezer__max'],
                 rack__exact=max_rack['rack__max'], box__exact=max_box['box__max'],
                 row__exact=max_row['row__max'], spot__exact=max_spot['spot__max']).first()
         else:
