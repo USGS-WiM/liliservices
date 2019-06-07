@@ -1717,6 +1717,7 @@ class ControlsResultsReportView(views.APIView):
                     "analysis_batch": ext_neg['extraction_batch__analysis_batch'],
                     "extraction_number": ext_neg['extraction_batch__extraction_number'],
                     # "replicate_number": ext_neg['replicate_number'],
+                    "pcrreplicate_batch": ext_neg['pcrreplicate_batch'],
                     ext_neg['target__name']: ext_neg['result']
                 }
             ext_neg_results[ext_neg['extraction_batch__id']] = data
@@ -1731,7 +1732,8 @@ class ControlsResultsReportView(views.APIView):
             ext_neg_result_ids = OrderedDict({
                 "analysis_batch": ext_neg_result.pop('analysis_batch'),
                 "analysis_batch_string": ext_neg_result.pop('analysis_batch_string'),
-                "extraction_number": ext_neg_result.pop('extraction_number')
+                "extraction_number": ext_neg_result.pop('extraction_number'),
+                "pcrreplicate_batch": ext_neg_result.pop('pcrreplicate_batch')
             })
             ext_neg_result_targets = OrderedDict(sorted(ext_neg_result.items()))
             ext_neg_results_list_ordered.append(OrderedDict(**ext_neg_result_ids, **ext_neg_result_targets))
@@ -1763,6 +1765,7 @@ class ControlsResultsReportView(views.APIView):
                     "analysis_batch": pcr_neg['extraction_batch__analysis_batch'],
                     "extraction_number": pcr_neg['extraction_batch__extraction_number'],
                     # "replicate_number": pcr_neg['replicate_number'],
+                    "pcrreplicate_batch": pcr_neg['pcrreplicate_batch'],
                     pcr_neg['target__name']: pcr_neg['result']
                 }
             pcr_neg_results[pcr_neg['extraction_batch__id']] = data
@@ -1777,7 +1780,8 @@ class ControlsResultsReportView(views.APIView):
             pcr_neg_result_ids = OrderedDict({
                 "analysis_batch": pcr_neg_result.pop('analysis_batch'),
                 "analysis_batch_string": pcr_neg_result.pop('analysis_batch_string'),
-                "extraction_number": pcr_neg_result.pop('extraction_number')
+                "extraction_number": pcr_neg_result.pop('extraction_number'),
+                "pcrreplicate_batch": pcr_neg_result.pop('pcrreplicate_batch')
             })
             pcr_neg_result_targets = OrderedDict(sorted(pcr_neg_result.items()))
             pcr_neg_results_list_ordered.append(OrderedDict(**pcr_neg_result_ids, **pcr_neg_result_targets))
@@ -1808,7 +1812,8 @@ class ControlsResultsReportView(views.APIView):
                     "analysis_batch_string": pcr_pos['extraction_batch__analysis_batch__name'],
                     "analysis_batch": pcr_pos['extraction_batch__analysis_batch'],
                     "extraction_number": pcr_pos['extraction_batch__extraction_number'],
-                    # "replicate_number": pcr_neg['replicate_number'],
+                    # "replicate_number": pcr_pos['replicate_number'],
+                    "pcrreplicate_batch": pcr_pos['pcrreplicate_batch'],
                     pcr_pos['target__name']: pcr_pos['result']
                 }
             pcr_pos_results[pcr_pos['extraction_batch__id']] = data
@@ -1823,16 +1828,18 @@ class ControlsResultsReportView(views.APIView):
             pcr_pos_result_ids = OrderedDict({
                 "analysis_batch": pcr_pos_result.pop('analysis_batch'),
                 "analysis_batch_string": pcr_pos_result.pop('analysis_batch_string'),
-                "extraction_number": pcr_pos_result.pop('extraction_number')
+                "extraction_number": pcr_pos_result.pop('extraction_number'),
+                "pcrreplicate_batch": pcr_pos_result.pop('pcrreplicate_batch')
             })
             pcr_pos_result_targets = OrderedDict(sorted(pcr_pos_result.items()))
             pcr_pos_results_list_ordered.append(OrderedDict(**pcr_pos_result_ids, **pcr_pos_result_targets))
 
         # ExtractionBatch-level controls
         # Ext Pos
-        ext_poss = PCRReplicateBatch.objects.all().annotate(
-            ext_pos_rna_rt_cq_value=Max('extraction_batch__reversetranscriptions__ext_pos_rna_rt_cq_value',
-                                        filter=Q(extraction_batch__reversetranscriptions__re_rt__isnull=True))
+        ext_poss = PCRReplicateBatch.objects.filter(
+            extraction_batch__reversetranscriptions__re_rt__isnull=True
+        ).annotate(
+            ext_pos_rna_rt_cq_value=F('extraction_batch__reversetranscriptions__ext_pos_rna_rt_cq_value')
         ).annotate(
             result=Case(
                 When(ext_pos_rna_rt_cq_value__gt=0, then=Value(pos)),
@@ -1843,6 +1850,7 @@ class ControlsResultsReportView(views.APIView):
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
             'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
         ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
+        print(ext_poss.query)
         if sample_ids:
             ext_poss = ext_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
@@ -1859,7 +1867,8 @@ class ControlsResultsReportView(views.APIView):
                     "analysis_batch_string": ext_pos['extraction_batch__analysis_batch__name'],
                     "analysis_batch": ext_pos['extraction_batch__analysis_batch'],
                     "extraction_number": ext_pos['extraction_batch__extraction_number'],
-                    # "replicate_number": pcr_neg['replicate_number'],
+                    "pcrreplicate_batch": ext_pos['pcrreplicate_batch'],
+                    # "replicate_number": ext_pos['replicate_number'],
                     ext_pos['target__name']: ext_pos['result']
                 }
             ext_pos_results[ext_pos['extraction_batch__id']] = data
@@ -1874,7 +1883,8 @@ class ControlsResultsReportView(views.APIView):
             ext_pos_result_ids = OrderedDict({
                 "analysis_batch": ext_pos_result.pop('analysis_batch'),
                 "analysis_batch_string": ext_pos_result.pop('analysis_batch_string'),
-                "extraction_number": ext_pos_result.pop('extraction_number')
+                "extraction_number": ext_pos_result.pop('extraction_number'),
+                "pcrreplicate_batch": ext_pos_result.pop('pcrreplicate_batch')
             })
             ext_pos_result_targets = OrderedDict(sorted(ext_pos_result.items()))
             ext_pos_results_list_ordered.append(OrderedDict(**ext_pos_result_ids, **ext_pos_result_targets))
