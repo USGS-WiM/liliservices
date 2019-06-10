@@ -455,6 +455,104 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
     serializer_class = FinalSampleMeanConcentrationSerializer
 
     @action(detail=False)
+    def summary_statistics(self, request):
+
+        STATISTICS = ['sample_count', 'positive_count', 'percent_positive', 'max_concentration', 'min_concentration',
+                      'median_concentration', 'average_concentration', 'min_concentration_positive',
+                      'median_concentration_positive', 'average_concentration_positive']
+
+        queryset = FinalSampleMeanConcentration.objects.all()
+        query_params = request.query_params
+        # filter by sample IDs, exact list
+        sample = query_params.get('sample', None)
+        if sample is not None:
+            if LIST_DELIMETER in sample:
+                sample_list = sample.split(LIST_DELIMETER)
+                queryset = queryset.filter(sample__in=sample_list)
+            else:
+                queryset = queryset.filter(sample__exact=sample)
+        # filter by target IDs, exact list
+        target = query_params.get('target', None)
+        if target is not None:
+            if LIST_DELIMETER in target:
+                target_list = target.split(LIST_DELIMETER)
+                queryset = queryset.filter(target__in=target_list)
+            else:
+                queryset = queryset.filter(target__exact=target)
+        # get the requested statistics, exact list
+        statistic = query_params.get('statistic', None)
+        statistic_list = statistic.split(LIST_DELIMETER) if statistic is not None else STATISTICS
+
+        # set aside a parallel query for totals
+        totals_queryset = queryset
+
+        # group by target name
+        queryset = queryset.values(target_name=F('target__name')).order_by('target_name')
+
+        # include the target id
+        queryset = queryset.annotate(target_id=F('target__id'))
+
+        # initialize the totals row and include the totals target id field to match the main queryset for later merging
+        totals = {'target_name': 'All targets', 'target_id': None}
+
+        # calculate the requested statistics per object
+        if ('sample_count' in statistic_list
+                or ('percent_positive' in statistic_list and 'sample_count' not in statistic_list)):
+            queryset = queryset.annotate(sample_count=Count('id'))
+            totals['sample_count'] = queryset.aggregate(Sum('sample_count'))['sample_count__sum']
+        if ('positive_count' in statistic_list
+                or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
+            queryset = queryset.annotate(positive_count=Count('id', filter=Q(final_sample_mean_concentration__gt=0)))
+            totals['positive_count'] = queryset.aggregate(Sum('positive_count'))['positive_count__sum']
+        if 'percent_positive' in statistic_list:
+            queryset = queryset.annotate(
+                percent_positive=(Cast('positive_count', FloatField()) / Cast('sample_count', FloatField()) * 100))
+            totals['percent_positive'] = (queryset.aggregate(
+                Sum('positive_count'))['positive_count__sum'] / queryset.aggregate(
+                Sum('sample_count'))['sample_count__sum']) * 100
+        if 'max_concentration' in statistic_list:
+            queryset = queryset.annotate(max_concentration=Max('final_sample_mean_concentration'))
+            totals['max_concentration'] = totals_queryset.aggregate(
+                Max('final_sample_mean_concentration'))['final_sample_mean_concentration__max']
+        if 'min_concentration' in statistic_list:
+            queryset = queryset.annotate(min_concentration=Min('final_sample_mean_concentration'))
+            totals['min_concentration'] = totals_queryset.aggregate(
+                Min('final_sample_mean_concentration'))['final_sample_mean_concentration__min']
+        if 'median_concentration' in statistic_list:
+            queryset = queryset.annotate(median_concentration=Median('final_sample_mean_concentration'))
+            totals['median_concentration'] = totals_queryset.aggregate(
+                Median('final_sample_mean_concentration'))['final_sample_mean_concentration__median']
+        if 'average_concentration' in statistic_list:
+            queryset = queryset.annotate(average_concentration=Avg('final_sample_mean_concentration'))
+            totals['average_concentration'] = totals_queryset.aggregate(
+                Avg('final_sample_mean_concentration'))['final_sample_mean_concentration__avg']
+        if 'min_concentration_positive' in statistic_list:
+            queryset = queryset.annotate(
+                min_concentration_positive=Min('final_sample_mean_concentration',
+                                               filter=Q(final_sample_mean_concentration__gt=0)))
+            totals['min_concentration_positive'] = totals_queryset.aggregate(
+                final_sample_mean_concentration__min=Min('final_sample_mean_concentration', filter=Q(
+                    final_sample_mean_concentration__gt=0)))['final_sample_mean_concentration__min']
+        if 'median_concentration_positive' in statistic_list:
+            queryset = queryset.annotate(median_concentration_positive=Median(
+                'final_sample_mean_concentration', filter=Q(final_sample_mean_concentration__gt=0)))
+            totals['median_concentration_positive'] = totals_queryset.aggregate(
+                final_sample_mean_concentration__median=Median('final_sample_mean_concentration', filter=Q(
+                    final_sample_mean_concentration__gt=0)))['final_sample_mean_concentration__median']
+        if 'average_concentration_positive' in statistic_list:
+            queryset = queryset.annotate(
+                average_concentration_positive=Avg('final_sample_mean_concentration',
+                                                   filter=Q(final_sample_mean_concentration__gt=0)))
+            totals['average_concentration_positive'] = totals_queryset.aggregate(
+                final_sample_mean_concentration__avg=Avg('final_sample_mean_concentration', filter=Q(
+                    final_sample_mean_concentration__gt=0)))['final_sample_mean_concentration__avg']
+
+        resp = list(queryset)
+        resp.append(totals)
+
+        return Response(resp)
+
+    @action(detail=False)
     def results(self, request):
         query_params = self.request.query_params
         data = FinalSampleMeanConcentrationResultsSerializer(self.build_queryset(query_params), many=True).data
@@ -814,101 +912,101 @@ class SampleExtractionViewSet(HistoryViewSet):
 class PCRReplicateViewSet(HistoryViewSet):
     serializer_class = PCRReplicateSerializer
 
-    @action(detail=False)
-    def summary_statistics(self, request):
-
-        STATISTICS = ['replicate_count', 'positive_count', 'percent_positive', 'max_concentration', 'min_concentration',
-                      'median_concentration', 'average_concentration', 'min_concentration_positive',
-                      'median_concentration_positive', 'average_concentration_positive']
-
-        queryset = PCRReplicate.objects.all()
-        query_params = request.query_params
-        # filter by sample IDs, exact list
-        sample = query_params.get('sample', None)
-        if sample is not None:
-            if LIST_DELIMETER in sample:
-                sample_list = sample.split(LIST_DELIMETER)
-                queryset = queryset.filter(sample_extraction__sample__id__in=sample_list)
-            else:
-                queryset = queryset.filter(sample_extraction__sample__id__exact=sample)
-        # filter by target IDs, exact list
-        target = query_params.get('target', None)
-        if target is not None:
-            if LIST_DELIMETER in target:
-                target_list = target.split(LIST_DELIMETER)
-                queryset = queryset.filter(pcrreplicate_batch__target__id__in=target_list)
-            else:
-                queryset = queryset.filter(pcrreplicate_batch__target__id__exact=target)
-        # get the requested statistics, exact list
-        statistic = query_params.get('statistic', None)
-        statistic_list = statistic.split(LIST_DELIMETER) if statistic is not None else STATISTICS
-
-        # set aside a parallel query for totals
-        totals_queryset = queryset
-
-        # group by target name
-        queryset = queryset.values(target_name=F('pcrreplicate_batch__target__name')).order_by('target_name')
-
-        # include the target id
-        queryset = queryset.annotate(target_id=F('pcrreplicate_batch__target__id'))
-
-        # initialize the totals row and include the totals target id field to match the main queryset for later merging
-        totals = {'target_name': 'All targets', 'target_id': None}
-
-        # calculate the requested statistics per object
-        if ('replicate_count' in statistic_list
-                or ('percent_positive' in statistic_list and 'replicate_count' not in statistic_list)):
-            queryset = queryset.annotate(replicate_count=Count('id'))
-            totals['replicate_count'] = queryset.aggregate(Sum('replicate_count'))['replicate_count__sum']
-        if ('positive_count' in statistic_list
-                or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
-            queryset = queryset.annotate(positive_count=Count('id', filter=Q(replicate_concentration__gt=0)))
-            totals['positive_count'] = queryset.aggregate(Sum('positive_count'))['positive_count__sum']
-        if 'percent_positive' in statistic_list:
-            queryset = queryset.annotate(
-                percent_positive=Cast('positive_count', FloatField()) / Cast('replicate_count', FloatField()))
-            totals['percent_positive'] = queryset.aggregate(
-                Sum('positive_count'))['positive_count__sum'] / queryset.aggregate(
-                Sum('replicate_count'))['replicate_count__sum']
-        if 'max_concentration' in statistic_list:
-            queryset = queryset.annotate(max_concentration=Max('replicate_concentration'))
-            totals['max_concentration'] = totals_queryset.aggregate(
-                Max('replicate_concentration'))['replicate_concentration__max']
-        if 'min_concentration' in statistic_list:
-            queryset = queryset.annotate(min_concentration=Min('replicate_concentration'))
-            totals['min_concentration'] = totals_queryset.aggregate(
-                Min('replicate_concentration'))['replicate_concentration__min']
-        if 'median_concentration' in statistic_list:
-            queryset = queryset.annotate(median_concentration=Median('replicate_concentration'))
-            totals['median_concentration'] = totals_queryset.aggregate(
-                Median('replicate_concentration'))['replicate_concentration__median']
-        if 'average_concentration' in statistic_list:
-            queryset = queryset.annotate(average_concentration=Avg('replicate_concentration'))
-            totals['average_concentration'] = totals_queryset.aggregate(
-                Avg('replicate_concentration'))['replicate_concentration__avg']
-        if 'min_concentration_positive' in statistic_list:
-            queryset = queryset.annotate(
-                min_concentration_positive=Min('replicate_concentration', filter=Q(replicate_concentration__gt=0)))
-            totals['min_concentration_positive'] = totals_queryset.aggregate(
-                replicate_concentration__min=Min('replicate_concentration', filter=Q(
-                    replicate_concentration__gt=0)))['replicate_concentration__min']
-        if 'median_concentration_positive' in statistic_list:
-            queryset = queryset.annotate(median_concentration_positive=Median(
-                'replicate_concentration', filter=Q(replicate_concentration__gt=0)))
-            totals['median_concentration_positive'] = totals_queryset.aggregate(
-                replicate_concentration__median=Median('replicate_concentration', filter=Q(
-                    replicate_concentration__gt=0)))['replicate_concentration__median']
-        if 'average_concentration_positive' in statistic_list:
-            queryset = queryset.annotate(
-                average_concentration_positive=Avg('replicate_concentration', filter=Q(replicate_concentration__gt=0)))
-            totals['average_concentration_positive'] = totals_queryset.aggregate(
-                replicate_concentration__avg=Avg('replicate_concentration', filter=Q(
-                    replicate_concentration__gt=0)))['replicate_concentration__avg']
-
-        resp = list(queryset)
-        resp.append(totals)
-
-        return Response(resp)
+    # @action(detail=False)
+    # def summary_statistics(self, request):
+    #
+    #     STATISTICS = ['replicate_count', 'positive_count', 'percent_positive', 'max_concentration', 'min_concentration',
+    #                   'median_concentration', 'average_concentration', 'min_concentration_positive',
+    #                   'median_concentration_positive', 'average_concentration_positive']
+    #
+    #     queryset = PCRReplicate.objects.all()
+    #     query_params = request.query_params
+    #     # filter by sample IDs, exact list
+    #     sample = query_params.get('sample', None)
+    #     if sample is not None:
+    #         if LIST_DELIMETER in sample:
+    #             sample_list = sample.split(LIST_DELIMETER)
+    #             queryset = queryset.filter(sample_extraction__sample__id__in=sample_list)
+    #         else:
+    #             queryset = queryset.filter(sample_extraction__sample__id__exact=sample)
+    #     # filter by target IDs, exact list
+    #     target = query_params.get('target', None)
+    #     if target is not None:
+    #         if LIST_DELIMETER in target:
+    #             target_list = target.split(LIST_DELIMETER)
+    #             queryset = queryset.filter(pcrreplicate_batch__target__id__in=target_list)
+    #         else:
+    #             queryset = queryset.filter(pcrreplicate_batch__target__id__exact=target)
+    #     # get the requested statistics, exact list
+    #     statistic = query_params.get('statistic', None)
+    #     statistic_list = statistic.split(LIST_DELIMETER) if statistic is not None else STATISTICS
+    #
+    #     # set aside a parallel query for totals
+    #     totals_queryset = queryset
+    #
+    #     # group by target name
+    #     queryset = queryset.values(target_name=F('pcrreplicate_batch__target__name')).order_by('target_name')
+    #
+    #     # include the target id
+    #     queryset = queryset.annotate(target_id=F('pcrreplicate_batch__target__id'))
+    #
+    #     # initialize the totals row and include the totals target id field to match the main queryset for later merging
+    #     totals = {'target_name': 'All targets', 'target_id': None}
+    #
+    #     # calculate the requested statistics per object
+    #     if ('replicate_count' in statistic_list
+    #             or ('percent_positive' in statistic_list and 'replicate_count' not in statistic_list)):
+    #         queryset = queryset.annotate(replicate_count=Count('id'))
+    #         totals['replicate_count'] = queryset.aggregate(Sum('replicate_count'))['replicate_count__sum']
+    #     if ('positive_count' in statistic_list
+    #             or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
+    #         queryset = queryset.annotate(positive_count=Count('id', filter=Q(replicate_concentration__gt=0)))
+    #         totals['positive_count'] = queryset.aggregate(Sum('positive_count'))['positive_count__sum']
+    #     if 'percent_positive' in statistic_list:
+    #         queryset = queryset.annotate(
+    #             percent_positive=Cast('positive_count', FloatField()) / Cast('replicate_count', FloatField()))
+    #         totals['percent_positive'] = queryset.aggregate(
+    #             Sum('positive_count'))['positive_count__sum'] / queryset.aggregate(
+    #             Sum('replicate_count'))['replicate_count__sum']
+    #     if 'max_concentration' in statistic_list:
+    #         queryset = queryset.annotate(max_concentration=Max('replicate_concentration'))
+    #         totals['max_concentration'] = totals_queryset.aggregate(
+    #             Max('replicate_concentration'))['replicate_concentration__max']
+    #     if 'min_concentration' in statistic_list:
+    #         queryset = queryset.annotate(min_concentration=Min('replicate_concentration'))
+    #         totals['min_concentration'] = totals_queryset.aggregate(
+    #             Min('replicate_concentration'))['replicate_concentration__min']
+    #     if 'median_concentration' in statistic_list:
+    #         queryset = queryset.annotate(median_concentration=Median('replicate_concentration'))
+    #         totals['median_concentration'] = totals_queryset.aggregate(
+    #             Median('replicate_concentration'))['replicate_concentration__median']
+    #     if 'average_concentration' in statistic_list:
+    #         queryset = queryset.annotate(average_concentration=Avg('replicate_concentration'))
+    #         totals['average_concentration'] = totals_queryset.aggregate(
+    #             Avg('replicate_concentration'))['replicate_concentration__avg']
+    #     if 'min_concentration_positive' in statistic_list:
+    #         queryset = queryset.annotate(
+    #             min_concentration_positive=Min('replicate_concentration', filter=Q(replicate_concentration__gt=0)))
+    #         totals['min_concentration_positive'] = totals_queryset.aggregate(
+    #             replicate_concentration__min=Min('replicate_concentration', filter=Q(
+    #                 replicate_concentration__gt=0)))['replicate_concentration__min']
+    #     if 'median_concentration_positive' in statistic_list:
+    #         queryset = queryset.annotate(median_concentration_positive=Median(
+    #             'replicate_concentration', filter=Q(replicate_concentration__gt=0)))
+    #         totals['median_concentration_positive'] = totals_queryset.aggregate(
+    #             replicate_concentration__median=Median('replicate_concentration', filter=Q(
+    #                 replicate_concentration__gt=0)))['replicate_concentration__median']
+    #     if 'average_concentration_positive' in statistic_list:
+    #         queryset = queryset.annotate(
+    #             average_concentration_positive=Avg('replicate_concentration', filter=Q(replicate_concentration__gt=0)))
+    #         totals['average_concentration_positive'] = totals_queryset.aggregate(
+    #             replicate_concentration__avg=Avg('replicate_concentration', filter=Q(
+    #                 replicate_concentration__gt=0)))['replicate_concentration__avg']
+    #
+    #     resp = list(queryset)
+    #     resp.append(totals)
+    #
+    #     return Response(resp)
 
     def get_serializer(self, *args, **kwargs):
         if 'data' in kwargs:
@@ -1845,7 +1943,6 @@ class ControlsResultsReportView(views.APIView):
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
             'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
         ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
-        print(ext_poss.query)
         if sample_ids:
             ext_poss = ext_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
