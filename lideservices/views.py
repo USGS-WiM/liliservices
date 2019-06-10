@@ -1427,20 +1427,14 @@ class InhibitionCalculateDilutionFactorView(views.APIView):
                         # If INH CONT Cq minus Sample Cq<2 cycles, then dilution factor = 1 (no dilution)
                         # If INH CONT Cq minus Sample Cq>=2 cycles AND Sample Cq<36, then dilution factor = 5
                         # If INH CONT Cq minus Sample Cq>2 cycles AND Sample Cq>36 or no Cq, then dilution factor = 10
-                        if 0.0 <= diff < 2.0:
+                        if not cq:
+                            suggested_dilution_factor = 10
+                        elif 0.0 <= diff < 2.0:
                             suggested_dilution_factor = 1
                         elif diff >= 2.0 and cq < 36.0:
                             suggested_dilution_factor = 5
                         elif diff > 2.0 and cq > 36.0:
                             suggested_dilution_factor = 10
-                        # if 0.0 <= diff <= 1.0:
-                        #     suggested_dilution_factor = 1
-                        # if cq > pos and diff < 2.0:
-                        #     suggested_dilution_factor = 1
-                        # if diff >= 2.0 and cq <= 36.0:
-                        #     suggested_dilution_factor = 5
-                        # if cq > 36.0 or cq is None:
-                        #     suggested_dilution_factor = 10
                         new_data = {"id": inhib.id, "sample": sample, "cq_value": cq,
                                     "suggested_dilution_factor": suggested_dilution_factor,
                                     "extraction_batch": eb.id}
