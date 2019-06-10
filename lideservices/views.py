@@ -1602,36 +1602,37 @@ class QualityControlReportView(views.APIView):
         else:
             eb_raw_data = ExtractionBatch.objects.all()
 
-        eb_raw_data = eb_raw_data.annotate(rt_template_volume=Max(
-            'reversetranscriptions__template_volume', filter=Q(reversetranscriptions__re_rt__isnull=True)))
-        eb_raw_data = eb_raw_data.annotate(rt_reaction_volume=Max(
-            'reversetranscriptions__reaction_volume', filter=Q(reversetranscriptions__re_rt__isnull=True)))
+        eb_raw_data = eb_raw_data.filter(reversetranscriptions__re_rt__isnull=True).annotate(
+            rt_template_volume=F('reversetranscriptions__template_volume'))
+        eb_raw_data = eb_raw_data.filter(reversetranscriptions__re_rt__isnull=True).annotate(
+            rt_reaction_volume=F('reversetranscriptions__reaction_volume'))
 
         eb_raw_data = eb_raw_data.values('analysis_batch', 'extraction_number', 'extraction_volume', 'elution_volume',
                                          'rt_template_volume', 'rt_reaction_volume', 'qpcr_template_volume',
-                                         'qpcr_reaction_volume').order_by('analysis_batch', 'extraction_number')
+                                         'qpcr_reaction_volume'
+                                         ).order_by('analysis_batch', 'extraction_number').distinct()
         resp['extraction_raw_data'] = list(eb_raw_data)
 
         # ExtractionBatch-level QC summary stats
-        extraction_volumes = eb_raw_data.values('extraction_volume').annotate(count=Count('extraction_volume'))
-        elution_volumes = eb_raw_data.values('elution_volume').annotate(count=Count('elution_volume'))
+        extraction_volumes = Counter(list(eb_raw_data.values_list('extraction_volume', flat=True)))
+        elution_volumes = Counter(list(eb_raw_data.values_list('elution_volume', flat=True)))
         rt_template_volumes = Counter(list(eb_raw_data.values_list('rt_template_volume', flat=True)))
         rt_reaction_volumes = Counter(list(eb_raw_data.values_list('rt_reaction_volume', flat=True)))
-        qpcr_template_volumes = eb_raw_data.values('qpcr_template_volume').annotate(count=Count('qpcr_template_volume'))
-        qpcr_reaction_volumes = eb_raw_data.values('qpcr_reaction_volume').annotate(count=Count('qpcr_reaction_volume'))
+        qpcr_template_volumes = Counter(list(eb_raw_data.values_list('qpcr_template_volume', flat=True)))
+        qpcr_reaction_volumes = Counter(list(eb_raw_data.values_list('qpcr_reaction_volume', flat=True)))
 
         extraction_stats = []
-        for extraction_volume in extraction_volumes:
+        for key, value in extraction_volumes.items():
             extraction_stats.append({
                 "metric": "extraction_volume",
-                "value": extraction_volume['extraction_volume'],
-                "count": extraction_volume['count']
+                "value": key,
+                "count": value
             })
-        for elution_volume in elution_volumes:
+        for key, value in elution_volumes.items():
             extraction_stats.append({
                 "metric": "elution_volume",
-                "value": elution_volume['elution_volume'],
-                "count": elution_volume['count']
+                "value": key,
+                "count": value
             })
         for key, value in rt_template_volumes.items():
             extraction_stats.append({
@@ -1645,17 +1646,17 @@ class QualityControlReportView(views.APIView):
                 "value": key,
                 "count": value
             })
-        for qpcr_template_volume in qpcr_template_volumes:
+        for key, value in qpcr_template_volumes.items():
             extraction_stats.append({
                 "metric": "qpcr_template_volume",
-                "value": qpcr_template_volume['qpcr_template_volume'],
-                "count": qpcr_template_volume['count']
+                "value": key,
+                "count": value
             })
-        for qpcr_reaction_volume in qpcr_reaction_volumes:
+        for key, value in qpcr_reaction_volumes.items():
             extraction_stats.append({
                 "metric": "qpcr_reaction_volume",
-                "value": qpcr_reaction_volume['qpcr_reaction_volume'],
-                "count": qpcr_reaction_volume['count']
+                "value": key,
+                "count": value
             })
         resp['extraction_quality_control'] = extraction_stats
 
