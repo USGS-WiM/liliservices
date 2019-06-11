@@ -1117,9 +1117,15 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             message += " and extraction number of " + str(request.data['extraction_number'])
             return Response({"extraction_batch": message})
 
+        target = Target.objects.filter(id=request.data['target']).first()
+
+        if not target:
+            message = "No target was found with ID of " + str(request.data['target'])
+            return Response({"target": message})
+
         pcrreplicate_batch = PCRReplicateBatch.objects.filter(
             extraction_batch=extraction_batch.id,
-            target=request.data['target'],
+            target=target.id,
             replicate_number=request.data['replicate_number']
         ).first()
 
@@ -1129,7 +1135,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             message += " and replicate number of " + str(request.data['replicate_number'])
             return Response({"pcrreplicate_batch": message}, status=400)
 
-        rt = ReverseTranscription.objects.filter(extraction_batch=extraction_batch.id, re_rt=None).first()
+        rna = True if target.nucleic_acid_type.name == 'RNA' else False
 
         # start building up the response object
         field_validations = {"id": pcrreplicate_batch.id}
@@ -1139,12 +1145,12 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                           'pcr_neg_cq_value', 'pcr_neg_gc_reaction', 'pcr_pos_cq_value', 'pcr_pos_gc_reaction']
         control_validations = []
         for field in control_fields:
-                field_validations[field] = request.data[field] if field in request.data else None
-                # exclude RT fields if there are no RTs related to this extraction batch
-                if 'rt' not in field or rt:
-                    validation_error = self.validate_controls(field)
-                    if validation_error:
-                        control_validations.append(validation_error)
+            field_validations[field] = request.data[field] if field in request.data else None
+            # exclude RT fields if this is a DNA target
+            if 'rt' not in field or rna:
+                validation_error = self.validate_controls(field)
+                if validation_error:
+                    control_validations.append(validation_error)
         field_validations["validation_errors"] = control_validations
 
         # check that pcrreplicates have been submitted
