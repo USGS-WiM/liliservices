@@ -988,14 +988,18 @@ class PCRReplicateBatch(HistoryModel):
         # and can only be set to False if the cq_values of this rep batch are equal to zero
         self.ext_neg_invalid = False if self.ext_neg_cq_value == Decimal('0') else True
         self.pcr_neg_invalid = False if self.pcr_neg_cq_value == Decimal('0') else True
-        # reverse transcriptions are a special case... not every extraction batch will have a RT,
+        # rt_neg is a special case that only applies if the target is RNA,
+        # and even then not every extraction batch will have a RT,
         # so if there is no RT, set rt_neg_invalid to False regardless of the value of rt_neg_cq_value,
         # but if there is a RT, apply the same logic as the other invalid flags
-        rt = ReverseTranscription.objects.filter(extraction_batch=self.extraction_batch.id, re_rt=None).first()
-        if not rt:
-            self.rt_neg_invalid = False
+        if self.target.nucleic_acid_type.name == 'RNA':
+            rt = ReverseTranscription.objects.filter(extraction_batch=self.extraction_batch.id, re_rt=None).first()
+            if not rt:
+                self.rt_neg_invalid = False
+            else:
+                self.rt_neg_invalid = False if self.rt_neg_cq_value == Decimal('0') else True
         else:
-            self.rt_neg_invalid = False if self.rt_neg_cq_value == Decimal('0') else True
+            self.rt_neg_invalid = False
         # validating the pcr_pos will come in a later release of the software
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
@@ -1085,9 +1089,7 @@ class PCRReplicate(HistoryModel):
                 reasons["ext_neg_positive"] = True
             else:
                 reasons["ext_neg_positive"] = False
-            # reverse transcriptions are a special case... not every extraction batch will have a RT,
-            # so if there is no RT, rt_neg_invalid is False regardless of the value of rt_neg_cq_value,
-            # but if there is a RT, apply the same logic as the other invalid flags
+            # rt_neg is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.rt_neg_invalid:
                 if pcrreplicate_batch.rt_neg_cq_value is None:
                     reasons["rt_neg_missing"] = True
@@ -1358,9 +1360,12 @@ class PCRReplicate(HistoryModel):
                     any_peg_neg_invalid = True if len(reps) > 0 else False
 
                 # then check all other controls applicable to this rep
-                rt = ReverseTranscription.objects.filter(
-                    extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
-                rt_pos_invalid = rt.ext_pos_rna_rt_invalid if rt else False
+                if pcrreplicate_batch.target.nucleic_acid_type.name == 'RNA':
+                    rt = ReverseTranscription.objects.filter(
+                        extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
+                    rt_pos_invalid = rt.ext_pos_rna_rt_invalid if rt else False
+                else:
+                    rt_pos_invalid = False
                 if (
                         not any_peg_neg_invalid and
                         not pcrreplicate_batch.extraction_batch.ext_pos_dna_invalid and
