@@ -1081,6 +1081,30 @@ class PCRReplicate(HistoryModel):
             else:
                 reasons["peg_neg_missing"] = False
                 reasons["peg_neg_missing_replicates"] = ""
+            if pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is None:
+                reasons["ext_pos_dna_missing"] = True
+            else:
+                reasons["ext_pos_dna_missing"] = False
+            if (pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is not None
+                    and pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value > Decimal('0')):
+                reasons["ext_pos_dna_positive"] = True
+            else:
+                reasons["ext_pos_dna_positive"] = False
+            # ext_pos_rt_rna_positive is a special case that only applies if the target of the pcrreplicate_batch is RNA
+            if pcrreplicate_batch.target.nucleic_acid_type.name == 'RNA':
+                rt = ReverseTranscription.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
+                if rt.ext_pos_rna_rt_cq_value is None:
+                    reasons["ext_pos_rna_rt_missing"] = True
+                else:
+                    reasons["ext_pos_rna_rt_missing"] = False
+                if rt.ext_pos_rna_rt_cq_value is not None and rt.ext_pos_rna_rt_cq_value > Decimal('0'):
+                    reasons["ext_pos_rna_rt_positive"] = True
+                else:
+                    reasons["ext_pos_rna_rta_positive"] = False
+            else:
+                reasons["ext_pos_rna_rt_missing"] = False
+                reasons["ext_pos_rna_rta_positive"] = False
             if pcrreplicate_batch.ext_neg_cq_value is None:
                 reasons["ext_neg_missing"] = True
             else:
@@ -1121,6 +1145,8 @@ class PCRReplicate(HistoryModel):
         else:
             reasons = {
                 "peg_neg_invalid": False, "peg_neg_missing_replicates": False,
+                "ext_pos_dna_missing": False, "ext_pos_dna_positive": False,
+                "ext_pos_rna_rt_missing": False, "ext_pos_rna_rt_positive": False,
                 "ext_neg_missing": False, "ext_neg_positive": False,
                 "rt_neg_missing": False, "rt_neg_positive": False,
                 "pcr_neg_missing": False, "pcr_neg_positive": False,
