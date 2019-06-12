@@ -2,6 +2,7 @@ from collections import Counter, OrderedDict
 from django.http import JsonResponse
 from django.db.models import F, Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
+from django.contrib.postgres.aggregates import StringAgg
 from rest_framework import views, viewsets, permissions, authentication, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -1792,13 +1793,13 @@ class ControlsResultsReportView(views.APIView):
         # PCR Pos
         pcr_poss = PCRReplicateBatch.objects.all().annotate(
             result=Case(
-                When(pcr_pos_cq_value__gt=0, then=Value(pos)),
+                When(pcr_pos_cq_value__gt=0, then=Value('pcr_pos_cq_value')),
                 When(pcr_pos_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
-            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
-        ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result',
+            'pcr_pos_cq_value').order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
         if sample_ids:
             pcr_poss = pcr_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
@@ -1808,9 +1809,13 @@ class ControlsResultsReportView(views.APIView):
             # if the EB is already included in our local dict, just append the current target to it
             if pcr_pos_results.get(pcr_pos['extraction_batch__id'], None) is not None:
                 data = pcr_pos_results[pcr_pos['extraction_batch__id']]
+                if pcr_pos['result'] == 'pcr_pos_cq_value':
+                    pcr_pos['result'] = pcr_pos['pcr_pos_cq_value']
                 data[pcr_pos['target__name']] = pcr_pos['result']
             # otherwise, add the EB to our local dict and append the current target to it
             else:
+                if pcr_pos['result'] == 'pcr_pos_cq_value':
+                    pcr_pos['result'] = pcr_pos['pcr_pos_cq_value']
                 data = {
                     "analysis_batch_string": pcr_pos['extraction_batch__analysis_batch__name'],
                     "analysis_batch": pcr_pos['extraction_batch__analysis_batch'],
@@ -1845,13 +1850,14 @@ class ControlsResultsReportView(views.APIView):
             ext_pos_rna_rt_cq_value=F('extraction_batch__reversetranscriptions__ext_pos_rna_rt_cq_value')
         ).annotate(
             result=Case(
-                When(ext_pos_rna_rt_cq_value__gt=0, then=Value(pos)),
-                When(extraction_batch__ext_pos_dna_cq_value__gt=0, then=Value(pos)),
+                When(ext_pos_rna_rt_cq_value__gt=0, then=Value('ext_pos_rna_rt_cq_value')),
+                When(extraction_batch__ext_pos_dna_cq_value__gt=0, then=Value('ext_pos_dna_cq_value')),
                 When(extraction_batch__ext_pos_dna_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(
             'extraction_batch__id', 'extraction_batch__analysis_batch', 'extraction_batch__analysis_batch__name',
-            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result'
+            'extraction_batch__extraction_number', 'replicate_number', 'target__name', 'pcrreplicate_batch', 'result',
+            'ext_pos_rna_rt_cq_value', 'extraction_batch__ext_pos_dna_cq_value'
         ).order_by('extraction_batch__analysis_batch', 'extraction_batch__id')
         if sample_ids:
             ext_poss = ext_poss.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
@@ -1862,9 +1868,17 @@ class ControlsResultsReportView(views.APIView):
             # if the EB is already included in our local dict, just append the current target to it
             if ext_pos_results.get(ext_pos['extraction_batch__id'], None) is not None:
                 data = ext_pos_results[ext_pos['extraction_batch__id']]
+                if ext_pos['result'] == 'ext_pos_rna_rt_cq_value':
+                    ext_pos['result'] = ext_pos['ext_pos_rna_rt_cq_value']
+                elif ext_pos['result'] == 'ext_pos_dna_cq_value':
+                    ext_pos['result'] = ext_pos['extraction_batch__ext_pos_dna_cq_value']
                 data[ext_pos['target__name']] = ext_pos['result']
             # otherwise, add the EB to our local dict and append the current target to it
             else:
+                if ext_pos['result'] == 'ext_pos_rna_rt_cq_value':
+                    ext_pos['result'] = ext_pos['ext_pos_rna_rt_cq_value']
+                elif ext_pos['result'] == 'ext_pos_dna_cq_value':
+                    ext_pos['result'] = ext_pos['extraction_batch__ext_pos_dna_cq_value']
                 data = {
                     "analysis_batch_string": ext_pos['extraction_batch__analysis_batch__name'],
                     "analysis_batch": ext_pos['extraction_batch__analysis_batch'],
