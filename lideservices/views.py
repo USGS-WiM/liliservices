@@ -499,51 +499,71 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         # calculate the requested statistics per object
         if ('sample_count' in statistic_list
                 or ('percent_positive' in statistic_list and 'sample_count' not in statistic_list)):
+            # include the sample_count by target
             queryset = queryset.annotate(sample_count=Count('id'))
+            # include the sample_count for all targets
             totals['sample_count'] = totals_queryset.aggregate(Count('sample_id', distinct=True))['sample_id__count']
         if ('positive_count' in statistic_list
                 or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
+            # include the positive_count by target
             queryset = queryset.annotate(positive_count=Count('id', filter=Q(final_sample_mean_concentration__gt=0)))
+            # include the positive_count for all targets
             totals['positive_count'] = queryset.aggregate(Count('positive_count'))['positive_count__count']
         if 'percent_positive' in statistic_list:
+            # include the percent_positive by target
             queryset = queryset.annotate(
                 percent_positive=(Cast('positive_count', FloatField()) / Cast('sample_count', FloatField()) * 100))
-            totals['percent_positive'] = (queryset.aggregate(
-                Count('positive_count'))['positive_count__count'] / totals_queryset.aggregate(
-                Count('sample_id', distinct=True))['sample_id__count']) * 100
+            # include the percent_positive for all targets
+            pos_count = queryset.aggregate(Count('positive_count'))['positive_count__count']
+            samp_count = totals_queryset.aggregate(Count('sample_id', distinct=True))['sample_id__count']
+            totals['percent_positive'] = (pos_count / samp_count) * 100 if pos_count else 0
         if 'max_concentration' in statistic_list:
+            # include the max_concentration by target
             queryset = queryset.annotate(max_concentration=Max('final_sample_mean_concentration'))
+            # include the max_concentration for all targets
             totals['max_concentration'] = totals_queryset.aggregate(
                 Max('final_sample_mean_concentration'))['final_sample_mean_concentration__max']
         if 'min_concentration' in statistic_list:
+            # include the min_concentration by target
             queryset = queryset.annotate(min_concentration=Min('final_sample_mean_concentration'))
+            # include the min_concentration for all targets
             totals['min_concentration'] = totals_queryset.aggregate(
                 Min('final_sample_mean_concentration'))['final_sample_mean_concentration__min']
         if 'median_concentration' in statistic_list:
+            # include the median_concentration by target
             queryset = queryset.annotate(median_concentration=Median('final_sample_mean_concentration'))
+            # include the median_concentration for all targets
             totals['median_concentration'] = totals_queryset.aggregate(
                 Median('final_sample_mean_concentration'))['final_sample_mean_concentration__median']
         if 'average_concentration' in statistic_list:
+            # include the average_concentration by target
             queryset = queryset.annotate(average_concentration=Avg('final_sample_mean_concentration'))
+            # include the average_concentration for all targets
             totals['average_concentration'] = totals_queryset.aggregate(
                 Avg('final_sample_mean_concentration'))['final_sample_mean_concentration__avg']
         if 'min_concentration_positive' in statistic_list:
+            # include the min_concentration_positive by target
             queryset = queryset.annotate(
                 min_concentration_positive=Min('final_sample_mean_concentration',
                                                filter=Q(final_sample_mean_concentration__gt=0)))
+            # include the min_concentration_positive for all targets
             totals['min_concentration_positive'] = totals_queryset.aggregate(
                 final_sample_mean_concentration__min=Min('final_sample_mean_concentration', filter=Q(
                     final_sample_mean_concentration__gt=0)))['final_sample_mean_concentration__min']
         if 'median_concentration_positive' in statistic_list:
+            # include the median_concentration_positive by target
             queryset = queryset.annotate(median_concentration_positive=Median(
                 'final_sample_mean_concentration', filter=Q(final_sample_mean_concentration__gt=0)))
+            # include the median_concentration_positive for all targets
             totals['median_concentration_positive'] = totals_queryset.aggregate(
                 final_sample_mean_concentration__median=Median('final_sample_mean_concentration', filter=Q(
                     final_sample_mean_concentration__gt=0)))['final_sample_mean_concentration__median']
         if 'average_concentration_positive' in statistic_list:
+            # include the average_concentration_positive by target
             queryset = queryset.annotate(
                 average_concentration_positive=Avg('final_sample_mean_concentration',
                                                    filter=Q(final_sample_mean_concentration__gt=0)))
+            # include the average_concentration_positive for all targets
             totals['average_concentration_positive'] = totals_queryset.aggregate(
                 final_sample_mean_concentration__avg=Avg('final_sample_mean_concentration', filter=Q(
                     final_sample_mean_concentration__gt=0)))['final_sample_mean_concentration__avg']
