@@ -630,6 +630,12 @@ class FinalSampleMeanConcentration(HistoryModel):
                     if rep.cq_value is None:
                         qpcr_results_missing_count += 1
                         qpcr_results_missing.append(make_rep_identifier_object(rep))
+                        invalid_reasons = rep.invalid_reasons
+                        invalid_reasons.pop('cq_value_missing')
+                        invalid_reasons.pop('gc_reaction_missing')
+                        if any(val for val in invalid_reasons.values() if val is True):
+                            invalid_count += 1
+                            invalids.append(make_rep_identifier_object(rep))
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
                         invalid_count += 1
