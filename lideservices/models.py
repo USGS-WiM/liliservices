@@ -1108,7 +1108,7 @@ class PCRReplicate(HistoryModel):
                     reasons["ext_pos_rna_rt_negative"] = False
             else:
                 reasons["ext_pos_rna_rt_missing"] = False
-                reasons["ext_pos_rna_rt_positive"] = False
+                reasons["ext_pos_rna_rt_negative"] = False
             if pcrreplicate_batch.ext_neg_cq_value is None:
                 reasons["ext_neg_missing"] = True
             else:
