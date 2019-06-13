@@ -839,8 +839,10 @@ class ExtractionBatch(HistoryModel):
     def save(self, *args, **kwargs):
         # assess the invalid flag
         # invalid flag defaults to True (i.e., the extraction batch is invalid)
-        # and can only be set to False if the cq_value of this extraction batch is not null
-        self.ext_pos_dna_invalid = False if self.ext_pos_dna_cq_value is not None else True
+        # and can only be set to False if the cq_value of this extraction batch is greater than zero
+        self.ext_pos_dna_invalid = True
+        if self.ext_pos_dna_cq_value is not None and self.ext_pos_dna_cq_value > 0:
+            self.ext_pos_dna_invalid = False
 
         do_recalc_reps = False
         is_new = False if self.pk else True
@@ -898,8 +900,10 @@ class ReverseTranscription(HistoryModel):
     def save(self, *args, **kwargs):
         # assess the invalid flag
         # invalid flag defaults to True (i.e., the RT is invalid)
-        # and can only be set to False if the cq_value of this RT is not null
-        self.ext_pos_rna_rt_invalid = False if self.ext_pos_rna_rt_cq_value is not None else True
+        # and can only be set to False if the cq_value of this RT batch is greater than zero
+        self.ext_pos_rna_rt_invalid = True
+        if self.ext_pos_rna_rt_cq_value is not None and self.ext_pos_rna_rt_cq_value > 0:
+            self.ext_pos_rna_rt_invalid = False
 
         do_recalc_reps = False
         is_new = False if self.pk else True
