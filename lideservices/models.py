@@ -599,13 +599,13 @@ class FinalSampleMeanConcentration(HistoryModel):
         concentration_calc_values_missing = []
         positive_concentrations = []
         negative_concentrations = []
-        invalids = []
+        controls_invalids = []
         redones = []
         qpcr_results_missing_count = 0
         concentration_calc_values_missing_count = 0
         positive_concentration_count = 0
         negative_concentration_count = 0
-        invalid_count = 0
+        controls_invalid_count = 0
         redone_count = 0
 
         reps = PCRReplicate.objects.filter(sample_extraction__sample=self.sample.id,
@@ -634,12 +634,12 @@ class FinalSampleMeanConcentration(HistoryModel):
                         invalid_reasons.pop('cq_value_missing')
                         invalid_reasons.pop('gc_reaction_missing')
                         if any(val for val in invalid_reasons.values() if val is True):
-                            invalid_count += 1
-                            invalids.append(make_rep_identifier_object(rep))
+                            controls_invalid_count += 1
+                            controls_invalids.append(make_rep_identifier_object(rep))
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
-                        invalid_count += 1
-                        invalids.append(make_rep_identifier_object(rep))
+                        controls_invalid_count += 1
+                        controls_invalids.append(make_rep_identifier_object(rep))
             else:
                 redone_count += 1
                 redones.append(make_rep_identifier_object(rep))
@@ -653,8 +653,8 @@ class FinalSampleMeanConcentration(HistoryModel):
             "positive_concentrations": positive_concentrations,
             "negative_concentration_count": negative_concentration_count,
             "negative_concentrations": negative_concentrations,
-            "invalid_count": invalid_count,
-            "invalids": invalids,
+            "controls_invalid_count": controls_invalid_count,
+            "controls_invalids": controls_invalids,
             "redone_count": redone_count,
             "redones": redones
         }
