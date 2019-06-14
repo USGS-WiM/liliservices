@@ -1061,7 +1061,11 @@ class PCRReplicate(HistoryModel):
             any_peg_neg_invalid = False
             sample = self.sample_extraction.sample
 
-            peg_neg_id = sample.id if sample.record_type.id == 2 else sample.peg_neg.id
+            # record_type 1 means regular data (not a control), record_type 2 means control data (not regular data)
+            if sample.record_type.id == 2:
+                peg_neg_id = sample.id
+            else:
+                peg_neg_id = sample.peg_neg.id if sample.peg_neg is not None else None
             if peg_neg_id is not None:
                 target_id = pcrreplicate_batch.target.id
                 # only check reps with the same target as this data rep
@@ -1101,14 +1105,14 @@ class PCRReplicate(HistoryModel):
             else:
                 reasons["ext_pos_dna_negative"] = False
             # ext_pos_rt_rna_positive is a special case that only applies if the target of the pcrreplicate_batch is RNA
-            if pcrreplicate_batch.target.nucleic_acid_type.name == 'RNA':
+            if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                 rt = ReverseTranscription.objects.filter(
                     extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
-                if rt.ext_pos_rna_rt_cq_value is None:
+                if rt and rt.ext_pos_rna_rt_cq_value is None:
                     reasons["ext_pos_rna_rt_missing"] = True
                 else:
                     reasons["ext_pos_rna_rt_missing"] = False
-                if rt.ext_pos_rna_rt_cq_value is not None and rt.ext_pos_rna_rt_cq_value > Decimal('0'):
+                if rt and rt.ext_pos_rna_rt_cq_value is not None and rt.ext_pos_rna_rt_cq_value > Decimal('0'):
                     reasons["ext_pos_rna_rt_negative"] = True
                 else:
                     reasons["ext_pos_rna_rt_negative"] = False
@@ -1396,7 +1400,7 @@ class PCRReplicate(HistoryModel):
                     any_peg_neg_invalid = True if len(reps) > 0 else False
 
                 # then check all other controls applicable to this rep
-                if pcrreplicate_batch.target.nucleic_acid_type.name == 'RNA':
+                if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                     rt = ReverseTranscription.objects.filter(
                         extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
                     rt_pos_invalid = rt.ext_pos_rna_rt_invalid if rt else False
