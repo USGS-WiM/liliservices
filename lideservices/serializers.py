@@ -1702,33 +1702,6 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
 
-    # def get_inhibitions(self, obj):
-    #     inhibitions = {}
-    #     sample_extractions = obj.sampleextractions.values()
-    #
-    #     if sample_extractions is not None:
-    #         for sample_extraction in sample_extractions:
-    #             sample_id = sample_extraction.get('sample_id')
-    #             if sample_id is not None:
-    #                 sample = Sample.objects.get(id=sample_id)
-    #                 sample_inhibitions = sample.inhibitions.values()
-    #                 if sample_inhibitions is not None:
-    #                     for inhibition in sample_inhibitions:
-    #                         creator = User.objects.get(id=inhibition['created_by_id'])
-    #                         modifier = User.objects.get(id=inhibition['modified_by_id'])
-    #                         data = {"id": inhibition['id'], "sample": inhibition['sample_id'],
-    #                                 "extraction_batch": inhibition['extraction_batch_id'],
-    #                                 "inhibition_date": inhibition['inhibition_date'],
-    #                                 "nucleic_acid_type_id": inhibition['nucleic_acid_type_id'],
-    #                                 "dilution_factor": inhibition['dilution_factor'],
-    #                                 "created_date": inhibition['created_date'],
-    #                                 "created_by": creator.username if creator is not None else None,
-    #                                 "modified_date": inhibition['modified_date'],
-    #                                 "modified_by": modifier.username if modifier is not None else None}
-    #                         inhibitions[inhibition['id']] = data
-    #
-    #     return inhibitions.values()
-
     def get_reverse_transcriptions(self, obj):
         reverse_transcriptions = {}
         reversetranscriptions = obj.reversetranscriptions.values()
@@ -1740,6 +1713,8 @@ class ExtractionBatchSummarySerializer(serializers.ModelSerializer):
                 data = {"id": reverse_transcription_id, "extraction_batch": rt.extraction_batch.id,
                         "template_volume": rt.template_volume, "reaction_volume": rt.reaction_volume,
                         "rt_date": rt.rt_date, "re_rt": rt.re_rt, "re_rt_notes": rt.re_rt_notes,
+                        "ext_pos_rna_rt_cq_value": rt.ext_pos_rna_rt_cq_value,
+                        "ext_pos_rna_rt_invalid": rt.ext_pos_rna_rt_invalid,
                         "created_date": rt.created_date,
                         "created_by": rt.created_by.username if rt.created_by is not None else None,
                         "modified_date": rt.modified_date,
