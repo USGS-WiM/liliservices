@@ -1870,8 +1870,10 @@ class ControlsResultsReportView(views.APIView):
             ext_pos_rna_rt_cq_value=F('extraction_batch__reversetranscriptions__ext_pos_rna_rt_cq_value')
         ).annotate(
             result=Case(
-                When(ext_pos_rna_rt_cq_value__gt=0, then=Value('ext_pos_rna_rt_cq_value')),
-                When(extraction_batch__ext_pos_dna_cq_value__gt=0, then=Value('ext_pos_dna_cq_value')),
+                When(Q(ext_pos_rna_rt_cq_value__gt=0) & Q(target__nucleic_acid_type__name__exact='RNA'),
+                     then=Value('ext_pos_rna_rt_cq_value')),
+                When(Q(extraction_batch__ext_pos_dna_cq_value__gt=0) & Q(target__nucleic_acid_type__name__exact='DNA'),
+                     then=Value('ext_pos_dna_cq_value')),
                 When(extraction_batch__ext_pos_dna_cq_value__exact=0, then=Value(neg)),
                 default=Value(nr), output_field=CharField()
             )).annotate(pcrreplicate_batch=F('id')).values(

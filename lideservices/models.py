@@ -1002,14 +1002,10 @@ class PCRReplicateBatch(HistoryModel):
         # and even then not every extraction batch will have a RT,
         # so if there is no RT, set rt_neg_invalid to False regardless of the value of rt_neg_cq_value,
         # but if there is a RT, apply the same logic as the other invalid flags
-        if self.target.nucleic_acid_type.name == 'RNA':
+        self.rt_neg_invalid = False
+        if self.target.nucleic_acid_type.name.upper() == 'RNA':
             rt = ReverseTranscription.objects.filter(extraction_batch=self.extraction_batch.id, re_rt=None).first()
-            if not rt:
-                self.rt_neg_invalid = False
-            else:
-                self.rt_neg_invalid = False if self.rt_neg_cq_value == Decimal('0') else True
-        else:
-            self.rt_neg_invalid = False
+            self.rt_neg_invalid = False if rt and self.rt_neg_cq_value == Decimal('0') else True
         # validating the pcr_pos will come in a later release of the software
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
@@ -1059,6 +1055,7 @@ class PCRReplicate(HistoryModel):
             # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
             peg_neg_cq_values_missing = []
             any_peg_neg_invalid = False
+            peg_neg_not_extracted = False
             sample = self.sample_extraction.sample
 
             # record_type 1 means regular data (not a control), record_type 2 means control data (not regular data)
@@ -1071,6 +1068,10 @@ class PCRReplicate(HistoryModel):
                 # only check reps with the same target as this data rep
                 reps = PCRReplicate.objects.filter(
                     sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id)
+                # if there are no peg_neg reps, the the data rep must be set to invalid
+                if len(reps) == 0:
+                    any_peg_neg_invalid = True
+                    peg_neg_not_extracted = True
                 # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
                 for rep in reps:
                     if rep.invalid:
@@ -1086,85 +1087,95 @@ class PCRReplicate(HistoryModel):
 
             # then check all controls applicable to this rep
             if any_peg_neg_invalid:
-                reasons["peg_neg_invalid"] = True
+                reasons["Peg Neg invalid"] = True
             else:
-                reasons["peg_neg_invalid"] = False
+                reasons["Peg Neg invalid"] = False
+            if peg_neg_not_extracted:
+                reasons["Peg Neg not extracted"] = True
+            else:
+                reasons["Peg Neg not extracted"] = False
             if len(peg_neg_cq_values_missing) > 0:
-                reasons["peg_neg_missing"] = True
-                reasons["peg_neg_missing_replicates"] = peg_neg_cq_values_missing
+                reasons["Peg Neg replicates missing"] = True
+                reasons["Peg Neg replicates missing list"] = peg_neg_cq_values_missing
             else:
-                reasons["peg_neg_missing"] = False
-                reasons["peg_neg_missing_replicates"] = ""
-            if pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is None:
-                reasons["ext_pos_dna_missing"] = True
+                reasons["Peg Neg replicate missing"] = False
+                reasons["Peg Neg replicates missing list"] = ""
+            # ext_pos_dna is a special case that only applies if the target of the pcrreplicate_batch is RNA
+            if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'DNA':
+                if pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is None:
+                    reasons["Ext Pos DNA missing"] = True
+                else:
+                    reasons["Ext Pos DNA missing"] = False
+                if (pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is not None
+                        and not pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value > Decimal('0')):
+                    reasons["Ext Pos DNA invalid"] = True
+                else:
+                    reasons["Ext Pos DNA invalid"] = False
             else:
-                reasons["ext_pos_dna_missing"] = False
-            if (pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is not None
-                    and pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value > Decimal('0')):
-                reasons["ext_pos_dna_negative"] = True
-            else:
-                reasons["ext_pos_dna_negative"] = False
-            # ext_pos_rt_rna_positive is a special case that only applies if the target of the pcrreplicate_batch is RNA
+                reasons["Ext Pos DNA missing"] = False
+                reasons["Ext Pos DNA invalid"] = False
+            # ext_pos_rt_rna is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                 rt = ReverseTranscription.objects.filter(
                     extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
                 if rt and rt.ext_pos_rna_rt_cq_value is None:
-                    reasons["ext_pos_rna_rt_missing"] = True
+                    reasons["Ext/RT Pos RNA missing"] = True
                 else:
-                    reasons["ext_pos_rna_rt_missing"] = False
-                if rt and rt.ext_pos_rna_rt_cq_value is not None and rt.ext_pos_rna_rt_cq_value > Decimal('0'):
-                    reasons["ext_pos_rna_rt_negative"] = True
+                    reasons["Ext/RT Pos RNA missing"] = False
+                if rt and rt.ext_pos_rna_rt_cq_value is not None and not rt.ext_pos_rna_rt_cq_value > Decimal('0'):
+                    reasons["Ext/RT Pos RNA invalid"] = True
                 else:
-                    reasons["ext_pos_rna_rt_negative"] = False
+                    reasons["Ext/RT Pos RNA invalid"] = False
             else:
-                reasons["ext_pos_rna_rt_missing"] = False
-                reasons["ext_pos_rna_rt_negative"] = False
+                reasons["Ext/RT Pos RNA missing"] = False
+                reasons["Ext/RT Pos RNA invalid"] = False
             if pcrreplicate_batch.ext_neg_cq_value is None:
-                reasons["ext_neg_missing"] = True
+                reasons["Ext Neg missing"] = True
             else:
-                reasons["ext_neg_missing"] = False
+                reasons["Ext Neg missing"] = False
             if pcrreplicate_batch.ext_neg_cq_value is not None and pcrreplicate_batch.ext_neg_cq_value > Decimal('0'):
-                reasons["ext_neg_positive"] = True
+                reasons["Ext Neg invalid"] = True
             else:
-                reasons["ext_neg_positive"] = False
+                reasons["Ext Neg invalid"] = False
             # rt_neg is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.rt_neg_invalid:
                 if pcrreplicate_batch.rt_neg_cq_value is None:
-                    reasons["rt_neg_missing"] = True
+                    reasons["RT Neg missing"] = True
                 else:
-                    reasons["rt_neg_missing"] = False
+                    reasons["RT Neg missing"] = False
                 if pcrreplicate_batch.rt_neg_cq_value is not None and pcrreplicate_batch.rt_neg_cq_value > Decimal('0'):
-                    reasons["rt_neg_positive"] = True
+                    reasons["RT Neg invalid"] = True
                 else:
-                    reasons["rt_neg_positive"] = False
+                    reasons["RT Neg invalid"] = False
             else:
-                reasons["rt_neg_missing"] = False
-                reasons["rt_neg_positive"] = False
+                reasons["RT Neg missing"] = False
+                reasons["RT Neg invalid"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is None:
-                reasons["pcr_neg_missing"] = True
+                reasons["PCR Neg missing"] = True
             else:
-                reasons["pcr_neg_missing"] = False
+                reasons["PCR Neg missing"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is not None and pcrreplicate_batch.pcr_neg_cq_value > Decimal('0'):
-                reasons["pcr_neg_positive"] = True
+                reasons["PCR Neg invalid"] = True
             else:
-                reasons["pcr_neg_positive"] = False
+                reasons["PCR Neg invalid"] = False
             if self.cq_value is None:
-                reasons["cq_value_missing"] = True
+                reasons["Cq value missing"] = True
             else:
-                reasons["cq_value_missing"] = False
+                reasons["Cq value missing"] = False
             if self.gc_reaction is None:
-                reasons["gc_reaction_missing"] = True
+                reasons["GC/reaction missing"] = True
             else:
-                reasons["gc_reaction_missing"] = False
+                reasons["GC/reaction missing"] = False
         else:
             reasons = {
-                "peg_neg_invalid": False, "peg_neg_missing_replicates": False,
-                "ext_pos_dna_missing": False, "ext_pos_dna_negative": False,
-                "ext_pos_rna_rt_missing": False, "ext_pos_rna_rt_negative": False,
-                "ext_neg_missing": False, "ext_neg_positive": False,
-                "rt_neg_missing": False, "rt_neg_positive": False,
-                "pcr_neg_missing": False, "pcr_neg_positive": False,
-                "cq_value_missing": False, "gc_reaction_missing": False
+                "Peg Neg invalid": False,  "Peg Neg not extracted": False,
+                "Peg Neg replicates missing": False, "Peg Neg replicates missing list": False,
+                "Ext Pos DNA missing": False, "Ext Pos DNA invalid": False,
+                "Ext/RT Pos RNA missing": False, "Ext/RT Pos RNA invalid": False,
+                "Ext Neg missing": False, "Ext Neg invalid": False,
+                "RT Neg missing": False, "RT Neg invalid": False,
+                "PCR Neg missing": False, "PCR Neg invalid": False,
+                "Cq value missing": False, "GC/reaction missing": False
             }
 
         return reasons
@@ -1198,7 +1209,7 @@ class PCRReplicate(HistoryModel):
     @property
     def inhibition(self):
         sample_extraction = self.sample_extraction
-        nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
+        nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name.upper()
         if nucleic_acid_type_name == 'DNA':
             inhibition_id = sample_extraction.inhibition_dna.id
         elif nucleic_acid_type_name == 'RNA':
@@ -1217,7 +1228,7 @@ class PCRReplicate(HistoryModel):
     @property
     def inhibition_dilution_factor(self):
         sample_extraction = self.sample_extraction
-        nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
+        nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name.upper()
         if nucleic_acid_type_name == 'DNA':
             data = sample_extraction.inhibition_dna.dilution_factor
         elif nucleic_acid_type_name == 'RNA':
@@ -1323,7 +1334,7 @@ class PCRReplicate(HistoryModel):
                 elif matrix == 'SM' and sample.post_dilution_volume is None:
                     return None
 
-                nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name
+                nucleic_acid_type_name = self.pcrreplicate_batch.target.nucleic_acid_type.name.upper()
                 extr = self.sample_extraction
                 eb = self.sample_extraction.extraction_batch
 
@@ -1400,16 +1411,18 @@ class PCRReplicate(HistoryModel):
                     any_peg_neg_invalid = True if len(reps) > 0 else False
 
                 # then check all other controls applicable to this rep
+                rna_pos_invalid = False
+                dna_pos_invalid = False
                 if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                     rt = ReverseTranscription.objects.filter(
                         extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
-                    rt_pos_invalid = rt.ext_pos_rna_rt_invalid if rt else False
-                else:
-                    rt_pos_invalid = False
+                    rna_pos_invalid = rt.ext_pos_rna_rt_invalid if rt else False
+                if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'DNA':
+                    dna_pos_invalid = pcrreplicate_batch.extraction_batch.ext_pos_dna_invalid
                 if (
                         not any_peg_neg_invalid and
-                        not pcrreplicate_batch.extraction_batch.ext_pos_dna_invalid and
-                        not rt_pos_invalid and
+                        not dna_pos_invalid and
+                        not rna_pos_invalid and
                         not pcrreplicate_batch.ext_neg_invalid and
                         not pcrreplicate_batch.rt_neg_invalid and
                         not pcrreplicate_batch.pcr_neg_invalid and
