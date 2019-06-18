@@ -309,48 +309,9 @@ class FreezerLocationViewSet(HistoryViewSet):
             if next_spot is not None:
                 # start building the full response object
                 resp = next_spot
-                # if the next spot is not simply the next empty box
-                if next_spot != next_empty_box:
-                    # then add the next empty box to the response object
-                    resp.update({"next_empty_box": next_empty_box})
-                # otherwise the next spot is in fact just the next empty box,
-                # so attempt to find the next empty box after this one
-                else:
-                    # start building the next empty box object
-                    next_empty_box = {"freezer": last_spot.freezer.id}
-                    # check if adding another box will exceed the number of boxes allowed per rack in this freezer
-                    if next_spot['box'] + 1 > last_spot.freezer.boxes:
-                        # check if there is still room for another rack in this freezer,
-                        # and if so just increment the rack number
-                        if next_spot['rack'] + 1 <= last_spot.freezer.racks:
-                            next_empty_box['rack'] = next_spot['rack'] + 1
-                            next_empty_box['box'] = 1
-                            next_empty_box['row'] = 1
-                            next_empty_box['spot'] = 1
-                            next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
-                        # otherwise adding another rack will exceed the number of racks allowed in this freezer,
-                        # so check if there is another freezer,
-                        else:
-                            next_freezer = Freezer.objects.filter(id=(last_spot.freezer.id + 1)).first()
-                            # if there is another freezer, return the first location in that entire freezer
-                            if next_freezer is not None:
-                                next_empty_box['freezer'] = next_freezer.id
-                                next_empty_box['rack'] = 1
-                                next_empty_box['box'] = 1
-                                next_empty_box['row'] = 1
-                                next_empty_box['spot'] = 1
-                                next_empty_box['available_spots_in_box'] = next_freezer.rows * next_freezer.spots
-                            # otherwise adding another rack will exceed the number of racks allowed in any freezer
-                            else:
-                                next_empty_box = "There are no more empty boxes after this box in any freezer!"
-                    # there is still room for another box in this rack, so just increment the box number
-                    else:
-                        next_empty_box['rack'] = next_spot['rack']
-                        next_empty_box['box'] = next_spot['box'] + 1
-                        next_empty_box['row'] = 1
-                        next_empty_box['spot'] = 1
-                        next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
-                    resp.update({"next_empty_box": next_empty_box})
+                next_empty_box = FreezerLocation.objects.get_next_empty_box(study_id)
+                # then add the next empty box to the response object
+                resp.update({"next_empty_box": next_empty_box})
             # no next spot was found
             else:
                 resp = {"not_found": "There are no more empty boxes in this freezer!"}

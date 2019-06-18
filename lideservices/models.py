@@ -348,9 +348,9 @@ class FreezerLocationManager(models.Manager):
                 rack__exact=max_rack['rack__max'], box__exact=max_box['box__max'],
                 row__exact=max_row['row__max'], spot__exact=max_spot['spot__max']).first()
         else:
+            # This finds the first empty box after the last occupied box, which is not what the cooperator really wants
             # ignore all freezers that do not yet have locations used by aliquots
-            freezer_ids = list(Freezer.objects.all().values_list('id', flat=True))
-            freezer_ids.sort()
+            freezer_ids = list(Freezer.objects.all().order_by('id').values_list('id', flat=True))
             freezer_id = 0
             count_locations = 0
             while count_locations == 0:
@@ -426,42 +426,103 @@ class FreezerLocationManager(models.Manager):
         return available_spots
 
     # get the next box with no occupied spots
-    def get_next_empty_box(self):
+    def get_next_empty_box(self, study_id=None):
         # if no last spot was found or adding another rack will exceed the number of racks allowed in any freezer,
         # next_empty_box should return None
         next_empty_box = None
-        last_spot = self.get_last_occupied_spot()
-        if last_spot is not None:
-            # start building the next empty box object
-            next_empty_box = {'freezer': last_spot.freezer.id}
-            # check if adding another box will exceed the number of boxes allowed per rack in this freezer
-            if last_spot.box + 1 > last_spot.freezer.boxes:
-                # check if there is still room for another rack in this freezer,
-                # and if so just increment the rack number
-                if last_spot.rack + 1 <= last_spot.freezer.racks:
-                    next_empty_box['rack'] = last_spot.rack + 1
-                    next_empty_box['box'] = 1
-                    next_empty_box['row'] = 1
-                    next_empty_box['spot'] = 1
-                    next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
-                # otherwise check if there is another freezer,
-                # and if so return the first location in that entire freezer
-                else:
-                    next_freezer = Freezer.objects.filter(id=(last_spot.freezer.id + 1)).first()
-                    if next_freezer is not None:
-                        next_empty_box['freezer'] = next_freezer.id
-                        next_empty_box['rack'] = 1
-                        next_empty_box['box'] = 1
-                        next_empty_box['row'] = 1
-                        next_empty_box['spot'] = 1
-                        next_empty_box['available_spots_in_box'] = next_freezer.rows * next_freezer.spots
-            # there is still room for another box in this rack, so just increment the box number
-            else:
-                next_empty_box['rack'] = last_spot.rack
-                next_empty_box['box'] = last_spot.box + 1
-                next_empty_box['row'] = 1
-                next_empty_box['spot'] = 1
-                next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
+        if study_id:
+            last_spot = self.get_last_occupied_spot(study_id)
+            if last_spot is not None:
+                # start building the next empty box object
+                next_empty_box = {'freezer': last_spot.freezer.id}
+
+                # get dimensions of a box being used in the freezer that contains the current model instance (record)
+                rows_in_box = last_spot.freezer.rows
+                spots_in_row = last_spot.freezer.spots
+                spots_in_box = rows_in_box * spots_in_row
+
+                # start with the first box in the first rack of this freezer then increment until an empty box is found
+                cur_rack = last_spot.rack
+                cur_box = last_spot.box
+                while cur_rack <= last_spot.freezer.racks:
+                    while cur_box <= last_spot.freezer.boxes:
+                        # get the initial spot in the box
+                        first_spot = self.filter(
+                            freezer=last_spot.freezer.id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
+                        # if this box is empty (does not exit), return it, otherwise continue to the next box
+                        if not first_spot:
+                            next_empty_box['rack'] = cur_rack
+                            next_empty_box['box'] = cur_box
+                            next_empty_box['row'] = 1
+                            next_empty_box['spot'] = 1
+                            next_empty_box['available_spots_in_box'] = spots_in_box
+                            return next_empty_box
+                        else:
+                            cur_box += 1
+                    cur_rack += 1
+
+                # the below assumes we're starting at the first empty box after the last occupied box
+
+                # # check if adding another box will exceed the number of boxes allowed per rack in this freezer
+                # if last_spot.box + 1 > last_spot.freezer.boxes:
+                #     # check if there is still room for another rack in this freezer,
+                #     # and if so just increment the rack number
+                #     if last_spot.rack + 1 <= last_spot.freezer.racks:
+                #         next_empty_box['rack'] = last_spot.rack + 1
+                #         next_empty_box['box'] = 1
+                #         next_empty_box['row'] = 1
+                #         next_empty_box['spot'] = 1
+                #         next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
+                #     # otherwise check if there is another freezer,
+                #     # and if so return the first location in that entire freezer
+                #     else:
+                #         next_freezer = Freezer.objects.filter(id=(last_spot.freezer.id + 1)).first()
+                #         if next_freezer is not None:
+                #             next_empty_box['freezer'] = next_freezer.id
+                #             next_empty_box['rack'] = 1
+                #             next_empty_box['box'] = 1
+                #             next_empty_box['row'] = 1
+                #             next_empty_box['spot'] = 1
+                #             next_empty_box['available_spots_in_box'] = next_freezer.rows * next_freezer.spots
+                # # there is still room for another box in this rack, so just increment the box number
+                # else:
+                #     next_empty_box['rack'] = last_spot.rack
+                #     next_empty_box['box'] = last_spot.box + 1
+                #     next_empty_box['row'] = 1
+                #     next_empty_box['spot'] = 1
+                #     next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
+        else:
+            # Starting with the first freezer, traverse all boxes to find the first empty box
+            last_spot = None
+            freezer_ids = list(Freezer.objects.all().order_by('id').values_list('id', flat=True))
+            while not last_spot and len(freezer_ids) > 0:
+                freezer_id = freezer_ids.pop(0)
+                freezer = Freezer.objects.filter(id=freezer_id).first()
+                # start building the next empty box object
+                next_empty_box = {'freezer': freezer.id}
+                # get dimensions of a box being used in the freezer that contains the current model instance (record)
+                rows_in_box = freezer.rows
+                spots_in_row = freezer.spots
+                spots_in_box = rows_in_box * spots_in_row
+
+                # start with the first box in the first rack of this freezer then increment until an empty box is found
+                cur_rack = 1
+                cur_box = 1
+                while cur_rack <= freezer.racks:
+                    while cur_box <= freezer.boxes:
+                        # get the initial spot in the box
+                        first_spot = self.filter(freezer=freezer_id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
+                        # if this box is empty (does not exit), return it, otherwise continue to the next box
+                        if not first_spot:
+                            next_empty_box['rack'] = cur_rack
+                            next_empty_box['box'] = cur_box
+                            next_empty_box['row'] = 1
+                            next_empty_box['spot'] = 1
+                            next_empty_box['available_spots_in_box'] = spots_in_box
+                            return next_empty_box
+                        else:
+                            cur_box += 1
+                    cur_rack += 1
         return next_empty_box
 
 
