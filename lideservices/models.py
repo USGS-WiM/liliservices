@@ -325,7 +325,7 @@ class Unit(NameModel):
 
 class FreezerLocationManager(models.Manager):
 
-    # get the last occupied location, either in the all freezers regardless of study or for just a particular study
+    # get the last occupied location, either in all freezers regardless of study or for just a particular study
     def get_last_occupied_spot(self, study_id=None):
         if study_id is not None:
             sample_ids = Sample.objects.filter(study__exact=study_id).values_list('id')
@@ -348,30 +348,42 @@ class FreezerLocationManager(models.Manager):
                 rack__exact=max_rack['rack__max'], box__exact=max_box['box__max'],
                 row__exact=max_row['row__max'], spot__exact=max_spot['spot__max']).first()
         else:
-            # This finds the first empty box after the last occupied box, which is not what the cooperator really wants
-            # ignore all freezers that do not yet have locations used by aliquots
-            freezer_ids = list(Freezer.objects.all().order_by('id').values_list('id', flat=True))
-            freezer_id = 0
-            count_locations = 0
-            while count_locations == 0:
-                freezer_id = freezer_ids.pop()
-                count_locations = self.filter(freezer__exact=freezer_id).count()
-            max_freezer = Freezer.objects.filter(id=freezer_id).first()
-
-            max_rack = self.filter(
-                freezer__exact=max_freezer).aggregate(models.Max('rack'))
-            max_box = self.filter(
-                freezer__exact=max_freezer, rack__exact=max_rack['rack__max']).aggregate(models.Max('box'))
+            first_empty_box = self.get_first_empty_box()
             max_row = self.filter(
-                freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
-                box__exact=max_box['box__max']).aggregate(models.Max('row'))
+                freezer__exact=first_empty_box['freezer'], rack__exact=first_empty_box['rack'],
+                box__exact=(first_empty_box['box'] - 1)).aggregate(models.Max('row'))
             max_spot = self.filter(
-                freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
-                box__exact=max_box['box__max'], row__exact=max_row['row__max']).aggregate(models.Max('spot'))
+                freezer__exact=first_empty_box['freezer'], rack__exact=first_empty_box['rack'],
+                box__exact=(first_empty_box['box'] - 1), row__exact=max_row['row__max']).aggregate(models.Max('spot'))
             last_spot = self.filter(
-                freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
-                box__exact=max_box['box__max'], row__exact=max_row['row__max'],
+                freezer__exact=first_empty_box['freezer'], rack__exact=first_empty_box['rack'],
+                box__exact=(first_empty_box['box'] - 1), row__exact=max_row['row__max'],
                 spot__exact=max_spot['spot__max']).first()
+
+            # # # This finds the first empty box after the last occupied box, which is not what the we really want
+            # # ignore all freezers that do not yet have locations used by aliquots
+            # freezer_ids = list(Freezer.objects.all().order_by('id').values_list('id', flat=True))
+            # freezer_id = 0
+            # count_locations = 0
+            # while count_locations == 0:
+            #     freezer_id = freezer_ids.pop()
+            #     count_locations = self.filter(freezer__exact=freezer_id).count()
+            # max_freezer = Freezer.objects.filter(id=freezer_id).first()
+            #
+            # max_rack = self.filter(
+            #     freezer__exact=max_freezer).aggregate(models.Max('rack'))
+            # max_box = self.filter(
+            #     freezer__exact=max_freezer, rack__exact=max_rack['rack__max']).aggregate(models.Max('box'))
+            # max_row = self.filter(
+            #     freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
+            #     box__exact=max_box['box__max']).aggregate(models.Max('row'))
+            # max_spot = self.filter(
+            #     freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
+            #     box__exact=max_box['box__max'], row__exact=max_row['row__max']).aggregate(models.Max('spot'))
+            # last_spot = self.filter(
+            #     freezer__exact=max_freezer, rack__exact=max_rack['rack__max'],
+            #     box__exact=max_box['box__max'], row__exact=max_row['row__max'],
+            #     spot__exact=max_spot['spot__max']).first()
         return last_spot
 
     # get the next available location, given a particular last spot
@@ -386,7 +398,7 @@ class FreezerLocationManager(models.Manager):
             next_spot['spot'] = last_spot.spot + 1 if last_spot.spot < spots_in_row else 1
             next_spot['available_spots_in_box'] = avail_spots
         else:
-            next_spot = self.get_next_empty_box()
+            next_spot = self.get_next_empty_box(last_spot)
         return next_spot
 
     # get the count of contiguous available spots left in a box after the spot occupied by this model instance (record)
@@ -425,105 +437,69 @@ class FreezerLocationManager(models.Manager):
                 available_spots = spots_in_box - occupied_spots
         return available_spots
 
-    # get the next box with no occupied spots
-    def get_next_empty_box(self, study_id=None):
-        # if no last spot was found or adding another rack will exceed the number of racks allowed in any freezer,
-        # next_empty_box should return None
-        next_empty_box = None
-        if study_id:
-            last_spot = self.get_last_occupied_spot(study_id)
-            if last_spot is not None:
-                # start building the next empty box object
-                next_empty_box = {'freezer': last_spot.freezer.id}
+    # Starting with the first freezer, traverse all boxes to find the first empty box
+    def get_first_empty_box(self):
+        freezer_ids = list(Freezer.objects.all().order_by('id').values_list('id', flat=True))
+        while len(freezer_ids) > 0:
+            freezer_id = freezer_ids.pop(0)
+            freezer = Freezer.objects.filter(id=freezer_id).first()
+            # start building the next empty box object
+            next_empty_box = {'freezer': freezer.id}
+            # get dimensions of a box being used in the freezer that contains the current model instance (record)
+            rows_in_box = freezer.rows
+            spots_in_row = freezer.spots
+            spots_in_box = rows_in_box * spots_in_row
 
-                # get dimensions of a box being used in the freezer that contains the current model instance (record)
-                rows_in_box = last_spot.freezer.rows
-                spots_in_row = last_spot.freezer.spots
-                spots_in_box = rows_in_box * spots_in_row
+            # start with the first box in the first rack of this freezer then increment until an empty box is found
+            cur_rack = 1
+            cur_box = 1
+            while cur_rack <= freezer.racks:
+                while cur_box <= freezer.boxes:
+                    # get the initial spot in the box
+                    first_spot = self.filter(freezer=freezer_id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
+                    # if this box is empty (does not exit), return it, otherwise continue to the next box
+                    if not first_spot:
+                        next_empty_box['rack'] = cur_rack
+                        next_empty_box['box'] = cur_box
+                        next_empty_box['row'] = 1
+                        next_empty_box['spot'] = 1
+                        next_empty_box['available_spots_in_box'] = spots_in_box
+                        return next_empty_box
+                    else:
+                        cur_box += 1
+                cur_rack += 1
 
-                # start with the first box in the first rack of this freezer then increment until an empty box is found
-                cur_rack = last_spot.rack
-                cur_box = last_spot.box
-                while cur_rack <= last_spot.freezer.racks:
-                    while cur_box <= last_spot.freezer.boxes:
-                        # get the initial spot in the box
-                        first_spot = self.filter(
-                            freezer=last_spot.freezer.id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
-                        # if this box is empty (does not exit), return it, otherwise continue to the next box
-                        if not first_spot:
-                            next_empty_box['rack'] = cur_rack
-                            next_empty_box['box'] = cur_box
-                            next_empty_box['row'] = 1
-                            next_empty_box['spot'] = 1
-                            next_empty_box['available_spots_in_box'] = spots_in_box
-                            return next_empty_box
-                        else:
-                            cur_box += 1
-                    cur_rack += 1
+    # get the next box with no occupied spots after a specified spot
+    def get_next_empty_box(self, last_spot):
+        # start building the next empty box object
+        next_empty_box = {'freezer': last_spot.freezer.id}
 
-                # the below assumes we're starting at the first empty box after the last occupied box
+        # get dimensions of a box being used in the freezer that contains the current model instance (record)
+        rows_in_box = last_spot.freezer.rows
+        spots_in_row = last_spot.freezer.spots
+        spots_in_box = rows_in_box * spots_in_row
 
-                # # check if adding another box will exceed the number of boxes allowed per rack in this freezer
-                # if last_spot.box + 1 > last_spot.freezer.boxes:
-                #     # check if there is still room for another rack in this freezer,
-                #     # and if so just increment the rack number
-                #     if last_spot.rack + 1 <= last_spot.freezer.racks:
-                #         next_empty_box['rack'] = last_spot.rack + 1
-                #         next_empty_box['box'] = 1
-                #         next_empty_box['row'] = 1
-                #         next_empty_box['spot'] = 1
-                #         next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
-                #     # otherwise check if there is another freezer,
-                #     # and if so return the first location in that entire freezer
-                #     else:
-                #         next_freezer = Freezer.objects.filter(id=(last_spot.freezer.id + 1)).first()
-                #         if next_freezer is not None:
-                #             next_empty_box['freezer'] = next_freezer.id
-                #             next_empty_box['rack'] = 1
-                #             next_empty_box['box'] = 1
-                #             next_empty_box['row'] = 1
-                #             next_empty_box['spot'] = 1
-                #             next_empty_box['available_spots_in_box'] = next_freezer.rows * next_freezer.spots
-                # # there is still room for another box in this rack, so just increment the box number
-                # else:
-                #     next_empty_box['rack'] = last_spot.rack
-                #     next_empty_box['box'] = last_spot.box + 1
-                #     next_empty_box['row'] = 1
-                #     next_empty_box['spot'] = 1
-                #     next_empty_box['available_spots_in_box'] = last_spot.freezer.rows * last_spot.freezer.spots
-        else:
-            # Starting with the first freezer, traverse all boxes to find the first empty box
-            last_spot = None
-            freezer_ids = list(Freezer.objects.all().order_by('id').values_list('id', flat=True))
-            while not last_spot and len(freezer_ids) > 0:
-                freezer_id = freezer_ids.pop(0)
-                freezer = Freezer.objects.filter(id=freezer_id).first()
-                # start building the next empty box object
-                next_empty_box = {'freezer': freezer.id}
-                # get dimensions of a box being used in the freezer that contains the current model instance (record)
-                rows_in_box = freezer.rows
-                spots_in_row = freezer.spots
-                spots_in_box = rows_in_box * spots_in_row
-
-                # start with the first box in the first rack of this freezer then increment until an empty box is found
-                cur_rack = 1
-                cur_box = 1
-                while cur_rack <= freezer.racks:
-                    while cur_box <= freezer.boxes:
-                        # get the initial spot in the box
-                        first_spot = self.filter(freezer=freezer_id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
-                        # if this box is empty (does not exit), return it, otherwise continue to the next box
-                        if not first_spot:
-                            next_empty_box['rack'] = cur_rack
-                            next_empty_box['box'] = cur_box
-                            next_empty_box['row'] = 1
-                            next_empty_box['spot'] = 1
-                            next_empty_box['available_spots_in_box'] = spots_in_box
-                            return next_empty_box
-                        else:
-                            cur_box += 1
-                    cur_rack += 1
-        return next_empty_box
+        # start with the first box in the first rack of this freezer then increment until an empty box is found
+        cur_rack = last_spot.rack
+        cur_box = last_spot.box
+        while cur_rack <= last_spot.freezer.racks:
+            while cur_box <= last_spot.freezer.boxes:
+                # get the initial spot in the box
+                first_spot = self.filter(
+                    freezer=last_spot.freezer.id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
+                # if this box is empty (does not exit), return it, otherwise continue to the next box
+                if not first_spot:
+                    next_empty_box['rack'] = cur_rack
+                    next_empty_box['box'] = cur_box
+                    next_empty_box['row'] = 1
+                    next_empty_box['spot'] = 1
+                    next_empty_box['available_spots_in_box'] = spots_in_box
+                    return next_empty_box
+                else:
+                    cur_box += 1
+            cur_rack += 1
+        # return None if no last spot was found or adding a rack will exceed the number of racks allowed in any freezer
+        return None
 
 
 class FreezerLocation(HistoryModel):
@@ -1148,95 +1124,95 @@ class PCRReplicate(HistoryModel):
 
             # then check all controls applicable to this rep
             if any_peg_neg_invalid:
-                reasons["Peg Neg invalid"] = True
+                reasons["peg_neg_invalid"] = True
             else:
-                reasons["Peg Neg invalid"] = False
+                reasons["peg_neg_invalid"] = False
             if peg_neg_not_extracted:
-                reasons["Peg Neg not extracted"] = True
+                reasons["peg_neg_not_extracted"] = True
             else:
-                reasons["Peg Neg not extracted"] = False
+                reasons["peg_neg_not_extracted"] = False
             if len(peg_neg_cq_values_missing) > 0:
-                reasons["Peg Neg replicates missing"] = True
-                reasons["Peg Neg replicates missing list"] = peg_neg_cq_values_missing
+                reasons["peg_neg_replicates_missing"] = True
+                reasons["peg_neg_replicates_missing_list"] = peg_neg_cq_values_missing
             else:
-                reasons["Peg Neg replicate missing"] = False
-                reasons["Peg Neg replicates missing list"] = ""
+                reasons["peg_neg_replicates_missing"] = False
+                reasons["peg_neg_replicates_missing_list"] = ""
             # ext_pos_dna is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'DNA':
                 if pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is None:
-                    reasons["Ext Pos DNA missing"] = True
+                    reasons["ext_pos_dna_missing"] = True
                 else:
-                    reasons["Ext Pos DNA missing"] = False
+                    reasons["ext_pos_dna_missing"] = False
                 if (pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is not None
                         and not pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value > Decimal('0')):
-                    reasons["Ext Pos DNA invalid"] = True
+                    reasons["ext_pos_dna_invalid"] = True
                 else:
-                    reasons["Ext Pos DNA invalid"] = False
+                    reasons["ext_pos_dna_invalid"] = False
             else:
-                reasons["Ext Pos DNA missing"] = False
-                reasons["Ext Pos DNA invalid"] = False
+                reasons["ext_pos_dna_missing"] = False
+                reasons["ext_pos_dna_invalid"] = False
             # ext_pos_rt_rna is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                 rt = ReverseTranscription.objects.filter(
                     extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
                 if rt and rt.ext_pos_rna_rt_cq_value is None:
-                    reasons["Ext/RT Pos RNA missing"] = True
+                    reasons["ext_rt_pos_rna_missing"] = True
                 else:
-                    reasons["Ext/RT Pos RNA missing"] = False
+                    reasons["ext_rt_pos_rna_missing"] = False
                 if rt and rt.ext_pos_rna_rt_cq_value is not None and not rt.ext_pos_rna_rt_cq_value > Decimal('0'):
-                    reasons["Ext/RT Pos RNA invalid"] = True
+                    reasons["ext_rt_pos_rna_invalid"] = True
                 else:
-                    reasons["Ext/RT Pos RNA invalid"] = False
+                    reasons["ext_rt_pos_rna_invalid"] = False
             else:
-                reasons["Ext/RT Pos RNA missing"] = False
-                reasons["Ext/RT Pos RNA invalid"] = False
+                reasons["ext_rt_pos_rna_missing"] = False
+                reasons["ext_rt_pos_rna_invalid"] = False
             if pcrreplicate_batch.ext_neg_cq_value is None:
-                reasons["Ext Neg missing"] = True
+                reasons["ext_neg_missing"] = True
             else:
-                reasons["Ext Neg missing"] = False
+                reasons["ext_neg_missing"] = False
             if pcrreplicate_batch.ext_neg_cq_value is not None and pcrreplicate_batch.ext_neg_cq_value > Decimal('0'):
-                reasons["Ext Neg invalid"] = True
+                reasons["ext_neg_invalid"] = True
             else:
-                reasons["Ext Neg invalid"] = False
+                reasons["ext_neg_invalid"] = False
             # rt_neg is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.rt_neg_invalid:
                 if pcrreplicate_batch.rt_neg_cq_value is None:
-                    reasons["RT Neg missing"] = True
+                    reasons["rt_neg_missing"] = True
                 else:
-                    reasons["RT Neg missing"] = False
+                    reasons["rt_neg_missing"] = False
                 if pcrreplicate_batch.rt_neg_cq_value is not None and pcrreplicate_batch.rt_neg_cq_value > Decimal('0'):
-                    reasons["RT Neg invalid"] = True
+                    reasons["rt_neg_invalid"] = True
                 else:
-                    reasons["RT Neg invalid"] = False
+                    reasons["rt_neg_invalid"] = False
             else:
-                reasons["RT Neg missing"] = False
-                reasons["RT Neg invalid"] = False
+                reasons["rt_neg_missing"] = False
+                reasons["rt_neg_invalid"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is None:
-                reasons["PCR Neg missing"] = True
+                reasons["pcr_neg_missing"] = True
             else:
-                reasons["PCR Neg missing"] = False
+                reasons["pcr_neg_missing"] = False
             if pcrreplicate_batch.pcr_neg_cq_value is not None and pcrreplicate_batch.pcr_neg_cq_value > Decimal('0'):
-                reasons["PCR Neg invalid"] = True
+                reasons["pcr_neg_invalid"] = True
             else:
-                reasons["PCR Neg invalid"] = False
+                reasons["pcr_neg_invalid"] = False
             if self.cq_value is None:
-                reasons["Cq value missing"] = True
+                reasons["cq_value_missing"] = True
             else:
-                reasons["Cq value missing"] = False
+                reasons["cq_value_missing"] = False
             if self.gc_reaction is None:
-                reasons["GC/reaction missing"] = True
+                reasons["gc_reaction_missing"] = True
             else:
-                reasons["GC/reaction missing"] = False
+                reasons["gc_reaction_missing"] = False
         else:
             reasons = {
-                "Peg Neg invalid": False,  "Peg Neg not extracted": False,
-                "Peg Neg replicates missing": False, "Peg Neg replicates missing list": False,
-                "Ext Pos DNA missing": False, "Ext Pos DNA invalid": False,
-                "Ext/RT Pos RNA missing": False, "Ext/RT Pos RNA invalid": False,
-                "Ext Neg missing": False, "Ext Neg invalid": False,
-                "RT Neg missing": False, "RT Neg invalid": False,
-                "PCR Neg missing": False, "PCR Neg invalid": False,
-                "Cq value missing": False, "GC/reaction missing": False
+                "peg_neg_invalid": False,  "peg_neg_not_extracted": False,
+                "peg_neg_replicates_missing": False, "peg_neg_replicates_missing_list": False,
+                "ext_pos_dna_missing": False, "ext_pos_dna_invalid": False,
+                "ext_rt_pos_rna_missing": False, "ext_rt_pos_rna_invalid": False,
+                "ext_neg_missing": False, "ext_neg_invalid": False,
+                "rt_neg_missing": False, "rt_neg_invalid": False,
+                "pcr_neg_missing": False, "pcr_neg_invalid": False,
+                "cq_value_missing": False, "gc_reaction_missing": False
             }
 
         return reasons

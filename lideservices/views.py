@@ -295,10 +295,10 @@ class FreezerLocationViewSet(HistoryViewSet):
 
     @action(methods=['get'], detail=False)
     def get_next_available(self, request):
-        # get the next empty box in the any freezer
-        next_empty_box = FreezerLocation.objects.get_next_empty_box()
-        if next_empty_box is None:
-            next_empty_box = "There are no more empty boxes in this freezer!"
+        # get the first empty box in the any freezer
+        first_empty_box = FreezerLocation.objects.get_first_empty_box()
+        if first_empty_box is None:
+            first_empty_box = "There are no more empty boxes in this freezer!"
         # get the study_id from the request query
         study_id = request.query_params.get('study', None)
         last_spot = FreezerLocation.objects.get_last_occupied_spot(study_id)
@@ -309,7 +309,7 @@ class FreezerLocationViewSet(HistoryViewSet):
             if next_spot is not None:
                 # start building the full response object
                 resp = next_spot
-                next_empty_box = FreezerLocation.objects.get_next_empty_box(study_id)
+                next_empty_box = FreezerLocation.objects.get_next_empty_box(last_spot)
                 # then add the next empty box to the response object
                 resp.update({"next_empty_box": next_empty_box})
             # no next spot was found
@@ -328,48 +328,8 @@ class FreezerLocationViewSet(HistoryViewSet):
             else:
                 message = "No aliquots are stored in any freezer."
             resp = {"not_found": message}
-            resp.update({"next_empty_box": next_empty_box})
+            resp.update({"next_empty_box": first_empty_box})
         return Response(resp)
-
-        # study_id = request.query_params.get('study', None)
-        # last_spot = FreezerLocation.objects.get_last_occupied_spot(study_id)
-        # # a last spot has been found
-        # if last_spot is not None:
-        #     avail_spots = FreezerLocation.objects.get_available_spots_in_box(last_spot)
-        #     spots_in_row = last_spot.freezer.spots
-        #     if avail_spots > 0:
-        #         next_spot = {"freezer": last_spot.freezer.id}
-        #         next_spot['rack'] = last_spot.rack
-        #         next_spot['box'] = last_spot.box
-        #         next_spot['row'] = last_spot.row if last_spot.spot < spots_in_row else last_spot.row + 1
-        #         next_spot['spot'] = last_spot.spot + 1 if last_spot.spot < spots_in_row else 1
-        #         resp = next_spot
-        #         resp.update({"available_spots_in_box": avail_spots})
-        #         next_empty_box = FreezerLocation.objects.get_next_empty_box()
-        #         if next_empty_box is None:
-        #             next_empty_box = "There are no more empty boxes in this freezer!"
-        #         resp.update({"next_empty_box": next_empty_box})
-        #     else:
-        #         next_spot = FreezerLocation.objects.get_next_empty_box()
-        #         if next_spot is None:
-        #             next_spot = {"not_found": "There are no more empty boxes in this freezer!"}
-        #         resp = next_spot
-        #         resp.update({"available_spots_in_box": last_spot.freezer.rows * spots_in_row})
-        # # no spot has been found
-        # else:
-        #     if study_id is not None:
-        #         study = Study.objects.filter(id=study_id).first()
-        #         message = "No aliquots for "
-        #         if study is not None:
-        #             message += study.name + " "
-        #         message += "(Study ID #" + str(study_id) + ") are stored in any freezer."
-        #         resp = {"not_found": message}
-        #         resp.update({"next_empty_box": FreezerLocation.objects.get_next_empty_box()})
-        #     else:
-        #         message = "No aliquots are stored in any freezer."
-        #         resp = {"not_found": message}
-        #         resp.update({"next_empty_box": FreezerLocation.objects.get_next_empty_box()})
-        # return Response(resp)
 
 
 class FreezerViewSet(HistoryViewSet):
@@ -1541,7 +1501,7 @@ class QualityControlReportView(views.APIView):
         sample_stats = []
         for matrix in matrix_counts:
             sample_stats.append({
-                "metric": "sample_matrix",
+                "metric": "Sample Matrix",
                 "value": matrix['matrix__name'],
                 "count": matrix['count'],
                 "min": None,
@@ -1549,7 +1509,7 @@ class QualityControlReportView(views.APIView):
             })
         for sample_type in sample_type_counts:
             sample_stats.append({
-                "metric": "sample_type",
+                "metric": "Sample Type",
                 "value": sample_type['sample_type__name'],
                 "count": sample_type['count'],
                 "min": None,
@@ -1557,28 +1517,28 @@ class QualityControlReportView(views.APIView):
             })
         for unit in total_volume_sampled_unit_initial_counts:
             sample_stats.append({
-                "metric": "total_volume_sampled_unit_initial",
+                "metric": "Total Volume Sampled Unit Initial",
                 "value": unit['total_volume_sampled_unit_initial__name'],
                 "count": unit['count'],
                 "min": None,
                 "max": None
             })
         sample_stats.append({
-            "metric": "post_dilution_volume",
+            "metric": "Post Dilution Volume",
             "value": None,
             "count": None,
             "min": post_dilution_volume_min['min'],
             "max": post_dilution_volume_max['max']
         })
         sample_stats.append({
-            "metric": "total_volume_or_mass_sampled",
+            "metric": "Total Volume or Mass Sampled",
             "value": None,
             "count": None,
             "min": total_volume_or_mass_sampled_min['min'],
             "max": total_volume_or_mass_sampled_max['max']
         })
         sample_stats.append({
-            "metric": "final_concentrated_sample_volume",
+            "metric": "Final Concentrated Sample Volume",
             "value": None,
             "count": None,
             "min": final_concentrated_sample_volume_min['min'],
@@ -1614,37 +1574,37 @@ class QualityControlReportView(views.APIView):
         extraction_stats = []
         for key, value in extraction_volumes.items():
             extraction_stats.append({
-                "metric": "extraction_volume",
+                "metric": "Extraction Volume",
                 "value": key,
                 "count": value
             })
         for key, value in elution_volumes.items():
             extraction_stats.append({
-                "metric": "elution_volume",
+                "metric": "Elution Volume",
                 "value": key,
                 "count": value
             })
         for key, value in rt_template_volumes.items():
             extraction_stats.append({
-                "metric": "rt_template_volume",
+                "metric": "RT Template Volume",
                 "value": key,
                 "count": value
             })
         for key, value in rt_reaction_volumes.items():
             extraction_stats.append({
-                "metric": "rt_reaction_volume",
+                "metric": "RT Reaction Volume",
                 "value": key,
                 "count": value
             })
         for key, value in qpcr_template_volumes.items():
             extraction_stats.append({
-                "metric": "qpcr_template_volume",
+                "metric": "qPCR Template Volume",
                 "value": key,
                 "count": value
             })
         for key, value in qpcr_reaction_volumes.items():
             extraction_stats.append({
-                "metric": "qpcr_reaction_volume",
+                "metric": "qPCR Reaction Volume",
                 "value": key,
                 "count": value
             })
