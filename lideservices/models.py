@@ -1473,8 +1473,8 @@ class PCRReplicate(HistoryModel):
                     # then invalidate all related reps with the same target from samples using that peg_neg
                     if sample.record_type.id == 2:
                         PCRReplicate.objects.filter(
-                            sample_extraction__sample=self.sample_extraction.sample.id,
-                            pcrreplicate_batch__target=self.pcrreplicate_batch.target.id).update(invalid=True)
+                            sample_extraction__sample__peg_neg__id=self.sample_extraction.sample.id,
+                            pcrreplicate_batch__target__id=self.pcrreplicate_batch.target.id).update(invalid=True)
                     return True
             else:
                 return True
