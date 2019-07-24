@@ -1100,7 +1100,8 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
             field_validations["updated_pcrreplicates"] = [("updated_pcrreplicates is missing", 2)]
         else:
             # validate pcrreplicates
-            existing_pcrreplicates = PCRReplicate.objects.filter(pcrreplicate_batch=pcrreplicate_batch.id)
+            existing_pcrreplicates = PCRReplicate.objects.filter(
+                pcrreplicate_batch=pcrreplicate_batch.id).order_by('sample_extraction__sample__id')
             all_pcrreplicates_validations = []
             updated_pcrreplicates = request.data.get('updated_pcrreplicates')
             updated_pcrreplicates_sample_ids = [rep['sample'] for rep in updated_pcrreplicates]
@@ -1216,7 +1217,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
-        queryset = PCRReplicateBatch.objects.all()
+        queryset = PCRReplicateBatch.objects.all().order_by('sampleex')
         # if ID is in query, only search by ID and ignore other params
         batch = self.request.query_params.get('id', None)
         if batch is not None:

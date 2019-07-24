@@ -193,24 +193,27 @@ class Sample(HistoryModel):
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
 
-        do_recalc_reps = False
-
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_sample = Sample.objects.get(id=self.pk)
-            if self.matrix.id != old_sample.matrix.id:
-                do_recalc_reps = True
-            if self.total_volume_or_mass_sampled != old_sample.total_volume_or_mass_sampled:
-                do_recalc_reps = True
-            if self.matrix.code == 'A' and self.dissolution_volume != old_sample.dissolution_volume:
-                do_recalc_reps = True
-            elif self.matrix.code == 'SM' and self.post_dilution_volume != old_sample.post_dilution_volume:
-                do_recalc_reps = True
+        # do_recalc_reps = False
+        #
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_sample = Sample.objects.get(id=self.pk)
+        #     if self.matrix.id != old_sample.matrix.id:
+        #         do_recalc_reps = True
+        #     if self.total_volume_or_mass_sampled != old_sample.total_volume_or_mass_sampled:
+        #         do_recalc_reps = True
+        #     if self.matrix.code == 'A' and self.dissolution_volume != old_sample.dissolution_volume:
+        #         do_recalc_reps = True
+        #     elif self.matrix.code == 'SM' and self.post_dilution_volume != old_sample.post_dilution_volume:
+        #         do_recalc_reps = True
 
         super(Sample, self).save(*args, **kwargs)
 
-        if do_recalc_reps:
-            recalc_reps('Sample', self.id)
+        # if do_recalc_reps:
+        #     recalc_reps('Sample', self.id)
+
+        # ALWAYS recalc child PCR Replicates
+        recalc_reps('Sample', self.id)
 
     def __str__(self):
         return str(self.id)
@@ -566,18 +569,21 @@ class FinalConcentratedSampleVolume(HistoryModel):
     # and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
 
-        do_recalc_reps = False
-
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_fcsv = FinalConcentratedSampleVolume.objects.get(id=self.pk)
-            if self.final_concentrated_sample_volume != old_fcsv.final_concentrated_sample_volume:
-                do_recalc_reps = True
+        # do_recalc_reps = False
+        #
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_fcsv = FinalConcentratedSampleVolume.objects.get(id=self.pk)
+        #     if self.final_concentrated_sample_volume != old_fcsv.final_concentrated_sample_volume:
+        #         do_recalc_reps = True
 
         super(FinalConcentratedSampleVolume, self).save(*args, **kwargs)
 
-        if do_recalc_reps:
-            recalc_reps('Sample', self.sample.id)
+        # if do_recalc_reps:
+        #     recalc_reps('Sample', self.sample.id)
+
+        # ALWAYS recalc child PCR Replicates
+        recalc_reps('Sample', self.sample.id)
 
     def __str__(self):
         return str(self.id)
@@ -887,32 +893,35 @@ class ExtractionBatch(HistoryModel):
         if self.ext_pos_dna_cq_value is not None and self.ext_pos_dna_cq_value > 0:
             self.ext_pos_dna_invalid = False
 
-        do_recalc_reps = False
-        is_new = False if self.pk else True
+        # do_recalc_reps = False
+        # is_new = False if self.pk else True
 
-        # a value can only be changed if the instance already exists
-        if not is_new:
-            old_extraction_batch = ExtractionBatch.objects.get(id=self.pk)
-            if self.qpcr_reaction_volume != old_extraction_batch.qpcr_reaction_volume:
-                do_recalc_reps = True
-            if self.qpcr_template_volume != old_extraction_batch.qpcr_template_volume:
-                do_recalc_reps = True
-            if self.elution_volume != old_extraction_batch.elution_volume:
-                do_recalc_reps = True
-            if self.extraction_volume != old_extraction_batch.extraction_volume:
-                do_recalc_reps = True
-            if self.sample_dilution_factor != old_extraction_batch.sample_dilution_factor:
-                do_recalc_reps = True
+        # # a value can only be changed if the instance already exists
+        # if not is_new:
+        #     old_extraction_batch = ExtractionBatch.objects.get(id=self.pk)
+        #     if self.qpcr_reaction_volume != old_extraction_batch.qpcr_reaction_volume:
+        #         do_recalc_reps = True
+        #     if self.qpcr_template_volume != old_extraction_batch.qpcr_template_volume:
+        #         do_recalc_reps = True
+        #     if self.elution_volume != old_extraction_batch.elution_volume:
+        #         do_recalc_reps = True
+        #     if self.extraction_volume != old_extraction_batch.extraction_volume:
+        #         do_recalc_reps = True
+        #     if self.sample_dilution_factor != old_extraction_batch.sample_dilution_factor:
+        #         do_recalc_reps = True
 
         super(ExtractionBatch, self).save(*args, **kwargs)
 
-        # Invalidate all child PCR Replicates if this (their parent Extraction Batch) is invalid
-        if self.ext_pos_dna_invalid and not is_new:
-            PCRReplicate.objects.filter(sample_extraction__extraction_batch=self.id).update(invalid=True)
-            do_recalc_reps = True
+        # # Invalidate all child PCR Replicates if this (their parent Extraction Batch) is invalid
+        # if self.ext_pos_dna_invalid and not is_new:
+        #     PCRReplicate.objects.filter(sample_extraction__extraction_batch=self.id).update(invalid=True)
+        #     do_recalc_reps = True
 
-        if do_recalc_reps:
-            recalc_reps('ExtractionBatch', self.id)
+        # if not is_new:
+        #     recalc_reps('ExtractionBatch', self.id)
+
+        # ALWAYS recalc child PCR Replicates
+        recalc_reps('ExtractionBatch', self.id)
 
     def __str__(self):
         return self.extraction_string
@@ -948,18 +957,21 @@ class ReverseTranscription(HistoryModel):
         if self.ext_pos_rna_rt_cq_value is not None and self.ext_pos_rna_rt_cq_value > 0:
             self.ext_pos_rna_rt_invalid = False
 
-        do_recalc_reps = False
-        is_new = False if self.pk else True
+        # do_recalc_reps = False
+        # is_new = False if self.pk else True
         super(ReverseTranscription, self).save(*args, **kwargs)
 
-        # Invalidate all child PCR Replicates if this (their parent RT) is invalid
-        if self.ext_pos_rna_rt_invalid and not is_new:
-            PCRReplicate.objects.filter(
-                sample_extraction__extraction_batch=self.extraction_batch.id).update(invalid=True)
-            do_recalc_reps = True
+        # # Invalidate all child PCR Replicates if this (their parent RT) is invalid
+        # if self.ext_pos_rna_rt_invalid and not is_new:
+        #     PCRReplicate.objects.filter(
+        #         sample_extraction__extraction_batch=self.extraction_batch.id).update(invalid=True)
+        #     do_recalc_reps = True
 
-        if do_recalc_reps:
-            recalc_reps('ExtractionBatch', self.extraction_batch.id)
+        # if do_recalc_reps:
+        #     recalc_reps('ExtractionBatch', self.extraction_batch.id)
+
+        # ALWAYS recalc child PCR Replicates
+        recalc_reps('ExtractionBatch', self.extraction_batch.id)
 
     def __str__(self):
         return str(self.id)
@@ -1047,18 +1059,21 @@ class PCRReplicateBatch(HistoryModel):
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
 
-        do_recalc_reps = False
-
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_pcrreplicate_batch = PCRReplicateBatch.objects.get(id=self.pk)
-            if self.target.id != old_pcrreplicate_batch.target.id:
-                do_recalc_reps = True
+        # do_recalc_reps = False
+        #
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_pcrreplicate_batch = PCRReplicateBatch.objects.get(id=self.pk)
+        #     if self.target.id != old_pcrreplicate_batch.target.id:
+        #         do_recalc_reps = True
 
         super(PCRReplicateBatch, self).save(*args, **kwargs)
 
-        if do_recalc_reps:
-            recalc_reps('PCRReplicateBatch', self.id)
+        # if do_recalc_reps:
+        #     recalc_reps('PCRReplicateBatch', self.id)
+
+        # ALWAYS recalc child PCR Replicates
+        recalc_reps('PCRReplicateBatch', self.id)
 
     def __str__(self):
         return str(self.id)
@@ -1523,18 +1538,21 @@ class Inhibition(HistoryModel):
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
 
-        do_recalc_reps = False
-
-        # a value can only be changed if the instance already exists
-        if self.pk:
-            old_inhibition = Inhibition.objects.get(id=self.pk)
-            if self.dilution_factor != old_inhibition.dilution_factor:
-                do_recalc_reps = True
+        # do_recalc_reps = False
+        #
+        # # a value can only be changed if the instance already exists
+        # if self.pk:
+        #     old_inhibition = Inhibition.objects.get(id=self.pk)
+        #     if self.dilution_factor != old_inhibition.dilution_factor:
+        #         do_recalc_reps = True
 
         super(Inhibition, self).save(*args, **kwargs)
 
-        if do_recalc_reps:
-            recalc_reps('Inhibition', self.id)
+        # if do_recalc_reps:
+        #     recalc_reps('Inhibition', self.id)
+
+        # ALWAYS recalc child PCR Replicates
+        recalc_reps('Inhibition', self.id)
 
     def __str__(self):
         return str(self.id)
