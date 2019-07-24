@@ -36,14 +36,19 @@ def get_sci_val(decimal_val):
     return sci_val
 
 
-def recalc_reps(level, level_id):
+def recalc_reps(level, level_id, target=None):
     reps = None
     if level == 'Sample':
         reps = PCRReplicate.objects.filter(sample_extraction__sample=level_id)
+    elif level == 'FinalSampleMeanConcentration':
+        reps = PCRReplicate.objects.filter(sample_extraction__sample=level_id,
+                                           pcrreplicate_batch__target__exact=target)
     elif level == 'ExtractionBatch':
         reps = PCRReplicate.objects.filter(sample_extraction__extraction_batch=level_id)
     elif level == 'PCRReplicateBatch':
         reps = PCRReplicate.objects.filter(pcrreplicate_batch=level_id)
+    # elif level == 'SampleExtraction':
+    #     reps = PCRReplicate.objects.filter(sample_extraction=level_id)
     elif level == 'Inhibition':
         reps_dna = PCRReplicate.objects.filter(sample_extraction__inhibition_dna=level_id)
         reps_rna = PCRReplicate.objects.filter(sample_extraction__inhibition_rna=level_id)

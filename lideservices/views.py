@@ -88,6 +88,12 @@ class SampleViewSet(HistoryViewSet):
                 target_list = [target]
                 queryset = queryset.filter(finalsamplemeanconcentrations__target__exact=target)
 
+        # recalc reps
+        for sample in queryset:
+            fsmcs = FinalSampleMeanConcentration.objects.filter(sample=sample.id, target__in=target_list)
+            for fsmc in fsmcs:
+                recalc_reps('FinalSampleMeanConcentration', sample.id, fsmc.target.id)
+
         # start building up the response object
         resp = []
         for sample in queryset:
@@ -408,6 +414,10 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         # set aside a parallel query for totals
         totals_queryset = queryset
 
+        # recalc reps
+        for fsmc in queryset:
+            recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, fsmc.target.id)
+
         # group by target name
         queryset = queryset.values(target_name=F('target__name')).order_by('target_name')
 
@@ -534,7 +544,17 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         if collaborator_sample_id is not None:
             collaborator_sample_id_list = sample.split(',')
             queryset = queryset.filter(sample__collaborator_sample_id__in=collaborator_sample_id_list)
+
+        # recalc reps
+        for fsmc in queryset:
+            recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, fsmc.target.id)
+
         return queryset
+
+    # override the default GET method to recalc all child PCR Replicates first before the FSMC Select query
+    def retrieve(self, request, *args, **kwargs):
+        recalc_reps('FinalSampleMeanConcentration', self.get_object().sample.id, self.get_object().target.id)
+        return super(FinalSampleMeanConcentrationViewSet, self).retrieve(request, *args, **kwargs)
 
 
 ######
@@ -838,6 +858,9 @@ class SampleExtractionViewSet(HistoryViewSet):
                 queryset = queryset.filter(sample__in=sample_list)
             else:
                 queryset = queryset.filter(sample__exact=sample)
+        # # recalc reps
+        # for sampleext in queryset:
+        #     recalc_reps('SampleExtraction', sampleext.id)
         data = SampleExtractionReportSerializer(queryset, many=True).data
         return Response(data)
 
@@ -1217,7 +1240,7 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
 
     # override the default queryset to allow filtering by URL arguments
     def get_queryset(self):
-        queryset = PCRReplicateBatch.objects.all().order_by('sampleex')
+        queryset = PCRReplicateBatch.objects.all()
         # if ID is in query, only search by ID and ignore other params
         batch = self.request.query_params.get('id', None)
         if batch is not None:
