@@ -1103,7 +1103,13 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
         rna = True if target.nucleic_acid_type.name == 'RNA' else False
 
         # start building up the response object
-        field_validations = {"id": pcrreplicate_batch.id}
+        field_validations = {
+            "id": pcrreplicate_batch.id,
+            "ext_neg_invalid": False,
+            "rt_neg_invalid": False,
+            "pcr_neg_invalid": False,
+            "pcr_pos_invalid": False
+        }
 
         # populate the response object with the submitted control values and the control validations
         control_fields = ['ext_neg_cq_value', 'ext_neg_gc_reaction', 'rt_neg_cq_value', 'rt_neg_gc_reaction',
@@ -1116,6 +1122,14 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 validation_error = self.validate_controls(field)
                 if validation_error:
                     control_validations.append(validation_error)
+                    if "ext_neg" in field:
+                        field_validations["ext_neg_invalid"] = True
+                    elif "rt_neg" in field:
+                        field_validations["rt_neg_invalid"] = True
+                    elif "pcr_neg" in field:
+                        field_validations["pcr_neg_invalid"] = True
+                    elif "pcr_pos" in field:
+                        field_validations["pcr_pos_invalid"] = True
         field_validations["validation_errors"] = control_validations
 
         # check that pcrreplicates have been submitted

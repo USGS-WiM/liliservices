@@ -1044,14 +1044,24 @@ class PCRReplicateBatch(HistoryModel):
     pcr_pos_invalid = models.BooleanField(default=True)
     re_pcr = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='pcrreplicatebatches')
 
-    # override the save method to calculate and invalid flags
+    # override the save method to calculate invalid flags
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
         # assess the invalid flags
         # invalid flags default to True (i.e., the rep is invalid)
         # and can only be set to False if the cq_values of this rep batch are equal to zero
+
+        # also, if any negative controls are positive (have a cq_value greater than zero),
+        # not only the child reps of this rep batch need to be invalidated,
+        # but also all the child repsof the parent extraction batch need to be invalidated.
+        invalidate_reps = False
         self.ext_neg_invalid = False if self.ext_neg_cq_value == Decimal('0') else True
         self.pcr_neg_invalid = False if self.pcr_neg_cq_value == Decimal('0') else True
+        if self.ext_neg_cq_value > Decimal('0'):
+            invalidate_reps = True
+        if self.pcr_neg_cq_value > Decimal('0'):
+            invalidate_reps = True
+
         # rt_neg is a special case that only applies if the target is RNA,
         # and even then not every extraction batch will have a RT,
         # so if there is no RT, set rt_neg_invalid to False regardless of the value of rt_neg_cq_value,
@@ -1060,6 +1070,9 @@ class PCRReplicateBatch(HistoryModel):
         if self.target.nucleic_acid_type.name.upper() == 'RNA':
             rt = ReverseTranscription.objects.filter(extraction_batch=self.extraction_batch.id, re_rt=None).first()
             self.rt_neg_invalid = False if rt and self.rt_neg_cq_value == Decimal('0') else True
+            if self.rt_neg_cq_value > Decimal('0'):
+                invalidate_reps = True
+
         # validating the pcr_pos will come in a later release of the software
         # sc = validated_data.get('standard_curve', None)
         self.pcr_pos_invalid = False
@@ -1076,6 +1089,11 @@ class PCRReplicateBatch(HistoryModel):
 
         # if do_recalc_reps:
         #     recalc_reps('PCRReplicateBatch', self.id)
+
+        # invalidate child PCR Replicates of parent Extraction Batch if any negative control is positive
+        if invalidate_reps:
+            PCRReplicate.objects.filter(
+                sample_extraction__extraction_batch=self.extraction_batch.id).update(invalid=True)
 
         # ALWAYS recalc child PCR Replicates
         recalc_reps('PCRReplicateBatch', self.id)
