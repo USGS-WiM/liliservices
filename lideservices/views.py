@@ -88,11 +88,11 @@ class SampleViewSet(HistoryViewSet):
                 target_list = [target]
                 queryset = queryset.filter(finalsamplemeanconcentrations__target__exact=target)
 
-        # recalc reps
+        # recalc reps validity
         for sample in queryset:
             fsmcs = FinalSampleMeanConcentration.objects.filter(sample=sample.id, target__in=target_list)
             for fsmc in fsmcs:
-                recalc_reps('FinalSampleMeanConcentration', sample.id, fsmc.target.id)
+                recalc_reps('FinalSampleMeanConcentration', sample.id, target=fsmc.target.id, recalc_rep_conc=False)
 
         # start building up the response object
         resp = []
@@ -414,9 +414,9 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         # set aside a parallel query for totals
         totals_queryset = queryset
 
-        # recalc reps
+        # recalc reps validity
         for fsmc in queryset:
-            recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, fsmc.target.id)
+            recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, target=fsmc.target.id, recalc_rep_conc=False)
 
         # group by target name
         queryset = queryset.values(target_name=F('target__name')).order_by('target_name')
@@ -545,15 +545,16 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
             collaborator_sample_id_list = sample.split(',')
             queryset = queryset.filter(sample__collaborator_sample_id__in=collaborator_sample_id_list)
 
-        # recalc reps
+        # recalc reps validity
         for fsmc in queryset:
-            recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, fsmc.target.id)
+            recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, target=fsmc.target.id, recalc_rep_conc=False)
 
         return queryset
 
     # override the default GET method to recalc all child PCR Replicates first before the FSMC Select query
     def retrieve(self, request, *args, **kwargs):
-        recalc_reps('FinalSampleMeanConcentration', self.get_object().sample.id, self.get_object().target.id)
+        recalc_reps('FinalSampleMeanConcentration',
+                    self.get_object().sample.id, target=self.get_object().target.id, recalc_rep_conc=False)
         return super(FinalSampleMeanConcentrationViewSet, self).retrieve(request, *args, **kwargs)
 
 
@@ -859,9 +860,9 @@ class SampleExtractionViewSet(HistoryViewSet):
             else:
                 queryset = queryset.filter(sample__exact=sample)
         # recalc not needed here because the report shows inhibition data, not PCR replicate data
-        # # recalc reps
+        # # recalc reps validity
         # for sampleext in queryset:
-        #     recalc_reps('SampleExtraction', sampleext.id)
+        #     recalc_reps('SampleExtraction', sampleext.id, recalc_rep_conc=False)
         data = SampleExtractionReportSerializer(queryset, many=True).data
         return Response(data)
 
@@ -1523,9 +1524,9 @@ class QualityControlReportView(views.APIView):
         if samples is not None:
             queryset = queryset.filter(id__in=samples)
 
-        # recalc reps
+        # recalc reps validity
         for sample in queryset:
-            recalc_reps('Sample', sample.id)
+            recalc_reps('Sample', sample.id, recalc_rep_conc=False)
 
         matrix_counts = queryset.values('matrix__name').order_by().annotate(count=Count('matrix'))
         sample_type_counts = queryset.values('sample_type__name').order_by().annotate(count=Count('sample_type'))
@@ -1596,9 +1597,9 @@ class QualityControlReportView(views.APIView):
         else:
             eb_raw_data = ExtractionBatch.objects.all()
 
-        # recalc reps
+        # recalc reps validity
         for eb in eb_raw_data:
-            recalc_reps('ExtractionBatch', eb.id)
+            recalc_reps('ExtractionBatch', eb.id, recalc_rep_conc=False)
 
         eb_raw_data = eb_raw_data.filter(reversetranscriptions__re_rt__isnull=True).annotate(
             rt_template_volume=F('reversetranscriptions__template_volume'))
@@ -1676,14 +1677,14 @@ class ControlsResultsReportView(views.APIView):
             targets = Target.objects.filter(id__in=target_ids).values('id', 'name').order_by('name')
         target_names = [target['name'] for target in targets]
 
-        # recalc reps once for use by all the control queries below
+        # recalc reps validity once for use by all the control queries below
         queryset = PCRReplicateBatch.objects.all()
         if sample_ids:
             queryset = queryset.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
         if target_ids:
             queryset = queryset.filter(target__in=target_ids)
         for pcrrep_batch in queryset:
-            recalc_reps('PCRReplicateBatch', pcrrep_batch.id)
+            recalc_reps('PCRReplicateBatch', pcrrep_batch.id, recalc_rep_conc=False)
 
         pos = "Positive"
         neg = "Negative"

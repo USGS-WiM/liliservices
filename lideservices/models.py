@@ -36,7 +36,7 @@ def get_sci_val(decimal_val):
     return sci_val
 
 
-def recalc_reps(level, level_id, target=None):
+def recalc_reps(level, level_id, target=None, recalc_rep_conc=True, recalc_invalid=True):
     reps = None
     if level == 'Sample':
         reps = PCRReplicate.objects.filter(sample_extraction__sample=level_id)
@@ -55,9 +55,12 @@ def recalc_reps(level, level_id, target=None):
         reps = reps_dna.union(reps_rna).distinct()
     if reps:
         for rep in reps:
-            rep.replicate_concentration = rep.calc_rep_conc()
-            rep.invalid = rep.calc_invalid()
-            rep.save()
+            if recalc_rep_conc:
+                rep.replicate_concentration = rep.calc_rep_conc()
+            if recalc_invalid:
+                rep.invalid = rep.calc_invalid()
+            if recalc_rep_conc or recalc_invalid:
+                rep.save()
 
 
 class NonnegativeIntegerField(models.IntegerField):
@@ -686,6 +689,7 @@ class FinalSampleMeanConcentration(HistoryModel):
                             controls_invalids.append(make_rep_identifier_object(rep))
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
+                        # so this rep could only be invalid if a parent control invalidated it
                         controls_invalid_count += 1
                         controls_invalids.append(make_rep_identifier_object(rep))
             else:
@@ -1490,12 +1494,30 @@ class PCRReplicate(HistoryModel):
                 # then check all other controls applicable to this rep
                 rna_pos_invalid = False
                 dna_pos_invalid = False
+
+                # # just for debugging
+                # ext_neg_invalids = PCRReplicateBatch.objects.filter(
+                #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                #     target=pcrreplicate_batch.target.id).values_list('id', 'ext_neg_invalid')
+                # rt_neg_invalids = PCRReplicateBatch.objects.filter(
+                #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                #     target=pcrreplicate_batch.target.id).values_list('id', 'rt_neg_invalid')
+                # pcr_neg_invalids = PCRReplicateBatch.objects.filter(
+                #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                #     target=pcrreplicate_batch.target.id).values_list('id', 'pcr_neg_invalid')
+
                 ext_neg_invalid = any(list(PCRReplicateBatch.objects.filter(
-                    extraction_batch=pcrreplicate_batch.extraction_batch.id).values_list('ext_neg_invalid', flat=True)))
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                    target=pcrreplicate_batch.target.id
+                ).values_list('ext_neg_invalid', flat=True)))
                 rt_neg_invalid = any(list(PCRReplicateBatch.objects.filter(
-                    extraction_batch=pcrreplicate_batch.extraction_batch.id).values_list('rt_neg_invalid', flat=True)))
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                    target=pcrreplicate_batch.target.id
+                ).values_list('rt_neg_invalid', flat=True)))
                 pcr_neg_invalid = any(list(PCRReplicateBatch.objects.filter(
-                    extraction_batch=pcrreplicate_batch.extraction_batch.id).values_list('pcr_neg_invalid', flat=True)))
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                    target=pcrreplicate_batch.target.id
+                ).values_list('pcr_neg_invalid', flat=True)))
                 if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                     rt = ReverseTranscription.objects.filter(
                         extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
