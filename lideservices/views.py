@@ -858,6 +858,7 @@ class SampleExtractionViewSet(HistoryViewSet):
                 queryset = queryset.filter(sample__in=sample_list)
             else:
                 queryset = queryset.filter(sample__exact=sample)
+        # recalc not needed here because the report shows inhibition data, not PCR replicate data
         # # recalc reps
         # for sampleext in queryset:
         #     recalc_reps('SampleExtraction', sampleext.id)
@@ -1521,6 +1522,11 @@ class QualityControlReportView(views.APIView):
         samples = request_data.get('samples', None)
         if samples is not None:
             queryset = queryset.filter(id__in=samples)
+
+        # recalc reps
+        for sample in queryset:
+            recalc_reps('Sample', sample.id)
+
         matrix_counts = queryset.values('matrix__name').order_by().annotate(count=Count('matrix'))
         sample_type_counts = queryset.values('sample_type__name').order_by().annotate(count=Count('sample_type'))
         total_volume_sampled_unit_initial_counts = queryset.values(
@@ -1589,6 +1595,10 @@ class QualityControlReportView(views.APIView):
             eb_raw_data = ExtractionBatch.objects.filter(analysis_batch__samples__in=samples)
         else:
             eb_raw_data = ExtractionBatch.objects.all()
+
+        # recalc reps
+        for eb in eb_raw_data:
+            recalc_reps('ExtractionBatch', eb.id)
 
         eb_raw_data = eb_raw_data.filter(reversetranscriptions__re_rt__isnull=True).annotate(
             rt_template_volume=F('reversetranscriptions__template_volume'))
@@ -1665,6 +1675,15 @@ class ControlsResultsReportView(views.APIView):
         if target_ids:
             targets = Target.objects.filter(id__in=target_ids).values('id', 'name').order_by('name')
         target_names = [target['name'] for target in targets]
+
+        # recalc reps once for use by all the control queries below
+        queryset = PCRReplicateBatch.objects.all()
+        if sample_ids:
+            queryset = queryset.filter(pcrreplicates__sample_extraction__sample__in=sample_ids)
+        if target_ids:
+            queryset = queryset.filter(target__in=target_ids)
+        for pcrrep_batch in queryset:
+            recalc_reps('PCRReplicateBatch', pcrrep_batch.id)
 
         pos = "Positive"
         neg = "Negative"
