@@ -1057,9 +1057,9 @@ class PCRReplicateBatch(HistoryModel):
         invalidate_reps = False
         self.ext_neg_invalid = False if self.ext_neg_cq_value == Decimal('0') else True
         self.pcr_neg_invalid = False if self.pcr_neg_cq_value == Decimal('0') else True
-        if self.ext_neg_cq_value > Decimal('0'):
+        if self.ext_neg_cq_value is not None and self.ext_neg_cq_value > Decimal('0'):
             invalidate_reps = True
-        if self.pcr_neg_cq_value > Decimal('0'):
+        if self.pcr_neg_cq_value is not None and self.pcr_neg_cq_value > Decimal('0'):
             invalidate_reps = True
 
         # rt_neg is a special case that only applies if the target is RNA,
@@ -1070,7 +1070,7 @@ class PCRReplicateBatch(HistoryModel):
         if self.target.nucleic_acid_type.name.upper() == 'RNA':
             rt = ReverseTranscription.objects.filter(extraction_batch=self.extraction_batch.id, re_rt=None).first()
             self.rt_neg_invalid = False if rt and self.rt_neg_cq_value == Decimal('0') else True
-            if self.rt_neg_cq_value > Decimal('0'):
+            if self.rt_neg_cq_value is not None and self.rt_neg_cq_value > Decimal('0'):
                 invalidate_reps = True
 
         # validating the pcr_pos will come in a later release of the software
@@ -1459,6 +1459,8 @@ class PCRReplicate(HistoryModel):
         # invalid flags default to True (i.e., the rep is invalid) and can only be set to False if:
         #     1. all parent controls exist
         #     2. all parent control flags are False (i.e., the controls are valid)
+        #        (NOTE: **ALL** PCR Replicate Batch controls from the same parent Extraction Batch
+        #        are considered parent controls for this rep, per cooperator statement July 24, 2019)
         #     3. the cq_value and gc_reaction of this rep are greater than or equal to zero
         if self.invalid_override is None:
             if self.cq_value is not None and self.gc_reaction is not None:
@@ -1488,6 +1490,12 @@ class PCRReplicate(HistoryModel):
                 # then check all other controls applicable to this rep
                 rna_pos_invalid = False
                 dna_pos_invalid = False
+                ext_neg_invalid = any(list(PCRReplicateBatch.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id).values_list('ext_neg_invalid', flat=True)))
+                rt_neg_invalid = any(list(PCRReplicateBatch.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id).values_list('rt_neg_invalid', flat=True)))
+                pcr_neg_invalid = any(list(PCRReplicateBatch.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id).values_list('pcr_neg_invalid', flat=True)))
                 if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'RNA':
                     rt = ReverseTranscription.objects.filter(
                         extraction_batch=pcrreplicate_batch.extraction_batch.id, re_rt=None).first()
@@ -1498,9 +1506,9 @@ class PCRReplicate(HistoryModel):
                         not any_peg_neg_invalid and
                         not dna_pos_invalid and
                         not rna_pos_invalid and
-                        not pcrreplicate_batch.ext_neg_invalid and
-                        not pcrreplicate_batch.rt_neg_invalid and
-                        not pcrreplicate_batch.pcr_neg_invalid and
+                        not ext_neg_invalid and
+                        not rt_neg_invalid and
+                        not pcr_neg_invalid and
                         self.cq_value is not None and self.cq_value >= Decimal('0') and
                         self.gc_reaction is not None and self.gc_reaction >= Decimal('0')
                 ):
