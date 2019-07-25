@@ -731,6 +731,13 @@ class ExtractionBatchViewSet(HistoryViewSet):
                     eb_id = item.pop('id')
                     eb = ExtractionBatch.objects.filter(id=eb_id).first()
                     item['modified_by'] = request.user
+
+                    # remove nulls coming from client (user not actually sending nulls, so no need to trigger recalcs)
+                    if 'ext_pos_rna_rt_cq_value' in item and item['ext_pos_rna_rt_cq_value'] is None:
+                        item.pop('ext_pos_rna_rt_cq_value')
+                    if 'ext_pos_dna_cq_value' in item and item['ext_pos_dna_cq_value'] is None:
+                        item.pop('ext_pos_dna_cq_value')
+
                     if eb:
                         serializer = self.get_serializer(eb, data=item, partial=True)
                         # if this item is valid, temporarily hold it until all items are proven valid, then save all

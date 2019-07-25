@@ -1164,6 +1164,32 @@ class PCRReplicate(HistoryModel):
                             "target": rep.pcrreplicate_batch.target.id
                         }})
 
+            # TODO: implement reasons for sibling neg controls
+            # ext_neg_invalids = list(PCRReplicateBatch.objects.filter(
+            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+            #     target=pcrreplicate_batch.target.id,
+            #     ext_neg_invalid=True).values_list('id', flat=True))
+            # ext_neg_missings = list(PCRReplicateBatch.objects.filter(
+            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+            #     target=pcrreplicate_batch.target.id,
+            #     ext_neg_cq_value__isnull=True).values_list('id', flat=True))
+            # rt_neg_invalids = list(PCRReplicateBatch.objects.filter(
+            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+            #     target=pcrreplicate_batch.target.id,
+            #     rt_neg_invalid=True).values_list('id', flat=True))
+            # rt_neg_missings = list(PCRReplicateBatch.objects.filter(
+            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+            #     target=pcrreplicate_batch.target.id,
+            #     rt_neg_cq_value__isnull=True).values_list('id', flat=True))
+            # pcr_neg_invalids = list(PCRReplicateBatch.objects.filter(
+            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+            #     target=pcrreplicate_batch.target.id,
+            #     pcr_neg_invalid=True).values_list('id', flat=True))
+            # pcr_neg_missings = list(PCRReplicateBatch.objects.filter(
+            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
+            #     target=pcrreplicate_batch.target.id,
+            #     pcr_neg_cq_value__isnull=True).values_list('id', flat=True))
+
             # then check all controls applicable to this rep
             if any_peg_neg_invalid:
                 reasons["peg_neg_invalid"] = True

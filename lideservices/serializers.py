@@ -800,7 +800,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     new_rt = serializers.JSONField(write_only=True, required=False)
     new_replicates = serializers.ListField(write_only=True, required=False)
     new_sample_extractions = serializers.ListField(write_only=True, required=False)
-    ext_pos_rna_rt_cq_value = serializers.DecimalField(write_only=True, required=False, max_digits=20, decimal_places=10)
+    ext_pos_rna_rt_cq_value = serializers.DecimalField(
+        write_only=True, required=False, allow_null=True, max_digits=20, decimal_places=10)
 
     def validate(self, data):
         if 'request' in self.context and self.context['request'].method == 'POST':
