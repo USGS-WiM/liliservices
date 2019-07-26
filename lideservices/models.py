@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import date
 from django.db import models
+from django.db.models import F
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.conf import settings
@@ -663,8 +664,8 @@ class FinalSampleMeanConcentration(HistoryModel):
                                            pcrreplicate_batch__target__exact=self.target)
         for rep in reps:
             total_count += 1
-            # ignore invalid reps and 'redones' (batches that have been redone)
-            # in other words, only allow valid reps for batches that have not been redone
+            # ignore 'redones' (batches that have been redone)
+            # in other words, only allow reps for batches that have not been redone
             if rep.pcrreplicate_batch.re_pcr is None:
                 if rep.invalid is False:
                     if rep.replicate_concentration is None:
@@ -690,8 +691,12 @@ class FinalSampleMeanConcentration(HistoryModel):
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
                         # so this rep could only be invalid if a parent control invalidated it
-                        controls_invalid_count += 1
-                        controls_invalids.append(make_rep_identifier_object(rep))
+                        invalid_reasons = rep.invalid_reasons
+                        invalid_reasons.pop('cq_value_missing')
+                        invalid_reasons.pop('gc_reaction_missing')
+                        if any(val for val in invalid_reasons.values() if val is True):
+                            controls_invalid_count += 1
+                            controls_invalids.append(make_rep_identifier_object(rep))
             else:
                 redone_count += 1
                 redones.append(make_rep_identifier_object(rep))
@@ -1132,79 +1137,65 @@ class PCRReplicate(HistoryModel):
             # first check related peg_neg validity
             # assume no related peg_neg, in which case this control does not apply
             # but if there is a related peg_neg, check the validity of its reps with same target as this data rep
-            peg_neg_cq_values_missing = []
-            any_peg_neg_invalid = False
+            peg_neg_missings = []
+            peg_neg_invalids = []
             peg_neg_not_extracted = False
             sample = self.sample_extraction.sample
 
             # record_type 1 means regular data (not a control), record_type 2 means control data (not regular data)
-            if sample.record_type.id == 2:
-                peg_neg_id = sample.id
-            else:
-                peg_neg_id = sample.peg_neg.id if sample.peg_neg is not None else None
+            # only a regular data sample can potentially have a peg_neg control
+            # the inverse (a control data sample having a peg_neg control) is impossible
+            peg_neg_id = sample.peg_neg.id if sample.peg_neg is not None and sample.record_type.id == 1 else None
             if peg_neg_id is not None:
                 target_id = pcrreplicate_batch.target.id
-                # only check reps with the same target as this data rep
-                reps = PCRReplicate.objects.filter(
-                    sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id)
+                # only get reps with the same target as this data rep
+                peg_neg_rep_count = PCRReplicate.objects.filter(
+                    sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id).count()
                 # if there are no peg_neg reps, the the data rep must be set to invalid
-                if len(reps) == 0:
-                    any_peg_neg_invalid = True
+                if peg_neg_rep_count == 0:
                     peg_neg_not_extracted = True
-                # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                for rep in reps:
-                    if rep.invalid:
-                        any_peg_neg_invalid = True
-                    if not rep.gc_reaction:
-                        peg_neg_cq_values_missing.append({str(rep.id): {
-                            "sample": rep.sample_extraction.sample.id,
-                            "analysis_batch": rep.pcrreplicate_batch.extraction_batch.analysis_batch.id,
-                            "extraction_number": rep.pcrreplicate_batch.extraction_batch.extraction_number,
-                            "replicate_number": rep.pcrreplicate_batch.replicate_number,
-                            "target": rep.pcrreplicate_batch.target.id
-                        }})
+                peg_neg_invalids = PCRReplicate.objects.filter(sample_extraction__sample=peg_neg_id,
+                                                               pcrreplicate_batch__target__exact=target_id,
+                                                               invalid=True, cq_value__isnull=False).annotate(
+                    sample=F('sample_extraction__sample')).annotate(
+                    analysis_batch=F('pcrreplicate_batch__extraction_batch__analysis_batch')).annotate(
+                    extraction_number=F('pcrreplicate_batch__extraction_batch__extraction_number')).annotate(
+                    replicate_number=F('pcrreplicate_batch__replicate_number')).annotate(
+                    target=F('pcrreplicate_batch__target')
+                ).values('sample', 'analysis_batch', 'extraction_number', 'replicate_number', 'target')
+                peg_neg_missings = PCRReplicate.objects.filter(sample_extraction__sample=peg_neg_id,
+                                                               pcrreplicate_batch__target__exact=target_id,
+                                                               cq_value__isnull=True).annotate(
+                    sample=F('sample_extraction__sample')).annotate(
+                    analysis_batch=F('pcrreplicate_batch__extraction_batch__analysis_batch')).annotate(
+                    extraction_number=F('pcrreplicate_batch__extraction_batch__extraction_number')).annotate(
+                    replicate_number=F('pcrreplicate_batch__replicate_number')).annotate(
+                    target=F('pcrreplicate_batch__target')
+                ).values('sample', 'analysis_batch', 'extraction_number', 'replicate_number', 'target')
 
-            # TODO: implement reasons for sibling neg controls
-            # ext_neg_invalids = list(PCRReplicateBatch.objects.filter(
-            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
-            #     target=pcrreplicate_batch.target.id,
-            #     ext_neg_invalid=True).values_list('id', flat=True))
-            # ext_neg_missings = list(PCRReplicateBatch.objects.filter(
-            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
-            #     target=pcrreplicate_batch.target.id,
-            #     ext_neg_cq_value__isnull=True).values_list('id', flat=True))
-            # rt_neg_invalids = list(PCRReplicateBatch.objects.filter(
-            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
-            #     target=pcrreplicate_batch.target.id,
-            #     rt_neg_invalid=True).values_list('id', flat=True))
-            # rt_neg_missings = list(PCRReplicateBatch.objects.filter(
-            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
-            #     target=pcrreplicate_batch.target.id,
-            #     rt_neg_cq_value__isnull=True).values_list('id', flat=True))
-            # pcr_neg_invalids = list(PCRReplicateBatch.objects.filter(
-            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
-            #     target=pcrreplicate_batch.target.id,
-            #     pcr_neg_invalid=True).values_list('id', flat=True))
-            # pcr_neg_missings = list(PCRReplicateBatch.objects.filter(
-            #     extraction_batch=pcrreplicate_batch.extraction_batch.id,
-            #     target=pcrreplicate_batch.target.id,
-            #     pcr_neg_cq_value__isnull=True).values_list('id', flat=True))
+            # Parent PegNeg Controls
 
-            # then check all controls applicable to this rep
-            if any_peg_neg_invalid:
-                reasons["peg_neg_invalid"] = True
-            else:
-                reasons["peg_neg_invalid"] = False
             if peg_neg_not_extracted:
                 reasons["peg_neg_not_extracted"] = True
             else:
                 reasons["peg_neg_not_extracted"] = False
-            if len(peg_neg_cq_values_missing) > 0:
-                reasons["peg_neg_replicates_missing"] = True
-                reasons["peg_neg_replicates_missing_list"] = peg_neg_cq_values_missing
+            if len(peg_neg_invalids) > 0:
+                reasons["peg_neg_reps_invalid"] = True
+                reasons["peg_neg_reps_invalid_list"] = list(peg_neg_invalids)
             else:
-                reasons["peg_neg_replicates_missing"] = False
-                reasons["peg_neg_replicates_missing_list"] = ""
+                reasons["peg_neg_reps_invalid"] = False
+                reasons["peg_neg_reps_invalid_list"] = ""
+            if len(peg_neg_missings) > 0:
+                reasons["peg_neg_reps_missing"] = True
+                reasons["peg_neg_reps_missing_list"] = list(peg_neg_missings)
+            else:
+                reasons["peg_neg_reps_missing"] = False
+                reasons["peg_neg_reps_missing_list"] = ""
+
+            # then check all other controls applicable to this rep
+
+            # Parent ExtractionBatch Controls
+
             # ext_pos_dna is a special case that only applies if the target of the pcrreplicate_batch is RNA
             if pcrreplicate_batch.target.nucleic_acid_type.name.upper() == 'DNA':
                 if pcrreplicate_batch.extraction_batch.ext_pos_dna_cq_value is None:
@@ -1234,6 +1225,88 @@ class PCRReplicate(HistoryModel):
             else:
                 reasons["ext_rt_pos_rna_missing"] = False
                 reasons["ext_rt_pos_rna_invalid"] = False
+
+            # Parent Sibling PCRReplicateBatch Controls
+
+            ext_neg_invalids = PCRReplicateBatch.objects.filter(
+                extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                target=pcrreplicate_batch.target.id,
+                ext_neg_invalid=True,
+                ext_neg_cq_value__isnull=False
+            ).exclude(id=pcrreplicate_batch.id
+                      ).annotate(analysis_batch=F('extraction_batch__analysis_batch')
+                                 ).annotate(extraction_number=F('extraction_batch__extraction_number')
+                                            ).values('analysis_batch', 'extraction_number', 'replicate_number',
+                                                     'target')
+            ext_neg_missings = PCRReplicateBatch.objects.filter(
+                extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                target=pcrreplicate_batch.target.id,
+                ext_neg_cq_value__isnull=True
+            ).exclude(id=pcrreplicate_batch.id).annotate(analysis_batch=F('extraction_batch__analysis_batch')
+                                                         ).annotate(
+                extraction_number=F('extraction_batch__extraction_number')
+            ).values('analysis_batch', 'extraction_number', 'replicate_number', 'target')
+
+            # rt_neg is a special case that only applies if the target of the pcrreplicate_batch is RNA
+            if self.pcrreplicate_batch.target.nucleic_acid_type.id == 2:
+                rt_neg_invalids = PCRReplicateBatch.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                    target=pcrreplicate_batch.target.id,
+                    rt_neg_invalid=True,
+                    rt_neg_cq_value__isnull=False,
+                    target__nucleic_acid_type=2
+                ).exclude(id=pcrreplicate_batch.id).annotate(analysis_batch=F('extraction_batch__analysis_batch')
+                                                             ).annotate(
+                    extraction_number=F('extraction_batch__extraction_number')
+                    ).values('analysis_batch', 'extraction_number', 'replicate_number', 'target')
+                rt_neg_missings = PCRReplicateBatch.objects.filter(
+                    extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                    target=pcrreplicate_batch.target.id,
+                    rt_neg_cq_value__isnull=True,
+                    target__nucleic_acid_type=2
+                ).exclude(id=pcrreplicate_batch.id).annotate(analysis_batch=F('extraction_batch__analysis_batch')
+                                                             ).annotate(
+                    extraction_number=F('extraction_batch__extraction_number')
+                ).values('analysis_batch', 'extraction_number', 'replicate_number', 'target')
+            else:
+                rt_neg_invalids = PCRReplicateBatch.objects.none()
+                rt_neg_missings = PCRReplicateBatch.objects.none()
+
+            pcr_neg_invalids = PCRReplicateBatch.objects.filter(
+                extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                target=pcrreplicate_batch.target.id,
+                pcr_neg_invalid=True,
+                pcr_neg_cq_value__isnull=False
+            ).exclude(id=pcrreplicate_batch.id).annotate(analysis_batch=F('extraction_batch__analysis_batch')
+                                                         ).annotate(
+                extraction_number=F('extraction_batch__extraction_number')
+            ).values('analysis_batch', 'extraction_number', 'replicate_number', 'target')
+            pcr_neg_missings = PCRReplicateBatch.objects.filter(
+                extraction_batch=pcrreplicate_batch.extraction_batch.id,
+                target=pcrreplicate_batch.target.id,
+                pcr_neg_cq_value__isnull=True
+            ).exclude(id=pcrreplicate_batch.id).annotate(analysis_batch=F('extraction_batch__analysis_batch')
+                                                         ).annotate(
+                extraction_number=F('extraction_batch__extraction_number')
+            ).values('analysis_batch', 'extraction_number', 'replicate_number', 'target')
+
+            if len(ext_neg_invalids) > 0 or len(rt_neg_invalids) > 0 or len(pcr_neg_invalids) > 0:
+                reasons["sibling_pcr_rep_controls_invalid"] = True
+                reasons["sibling_pcr_rep_controls_invalid_list"] = list(
+                    ext_neg_invalids.union(rt_neg_invalids).union(pcr_neg_invalids))
+            else:
+                reasons["sibling_pcr_rep_controls_invalid"] = False
+                reasons["sibling_pcr_rep_controls_invalid_list"] = ""
+            if len(ext_neg_missings) > 0 or len(rt_neg_missings) > 0 or len(pcr_neg_missings) > 0:
+                reasons["sibling_pcr_rep_controls_missing"] = True
+                reasons["sibling_pcr_rep_controls_missing_list"] = list(
+                    ext_neg_missings.union(rt_neg_missings).union(pcr_neg_missings))
+            else:
+                reasons["sibling_pcr_rep_controls_missing"] = False
+                reasons["sibling_pcr_rep_controls_missing_list"] = ""
+
+            # Parent PCRReplicateBatch Controls
+
             if pcrreplicate_batch.ext_neg_cq_value is None:
                 reasons["ext_neg_missing"] = True
             else:
@@ -1263,6 +1336,9 @@ class PCRReplicate(HistoryModel):
                 reasons["pcr_neg_invalid"] = True
             else:
                 reasons["pcr_neg_invalid"] = False
+
+            # Self Values
+
             if self.cq_value is None:
                 reasons["cq_value_missing"] = True
             else:
@@ -1273,10 +1349,13 @@ class PCRReplicate(HistoryModel):
                 reasons["gc_reaction_missing"] = False
         else:
             reasons = {
-                "peg_neg_invalid": False,  "peg_neg_not_extracted": False,
-                "peg_neg_replicates_missing": False, "peg_neg_replicates_missing_list": False,
+                "peg_neg_not_extracted": False,
+                "peg_neg_reps_invalid": False, "peg_neg_reps_invalid_list": False,
+                "peg_neg_reps_missing": False, "peg_neg_reps_missing_list": False,
                 "ext_pos_dna_missing": False, "ext_pos_dna_invalid": False,
                 "ext_rt_pos_rna_missing": False, "ext_rt_pos_rna_invalid": False,
+                "sibling_pcr_rep_controls_invalid": False, "sibling_pcr_rep_controls_invalid_list": False,
+                "sibling_pcr_rep_controls_missing": False, "sibling_pcr_rep_controls_missing_list": False,
                 "ext_neg_missing": False, "ext_neg_invalid": False,
                 "rt_neg_missing": False, "rt_neg_invalid": False,
                 "pcr_neg_missing": False, "pcr_neg_invalid": False,
@@ -1503,10 +1582,9 @@ class PCRReplicate(HistoryModel):
                 # check the validity of all the parent sample's peg_neg reps with the same target as this data rep
                 any_peg_neg_invalid = False
                 # record_type 1 means regular data (not a control), record_type 2 means control data (not regular data)
-                if sample.record_type.id == 2:
-                    peg_neg_id = sample.id
-                else:
-                    peg_neg_id = sample.peg_neg.id if sample.peg_neg is not None else None
+                # only a regular data sample can potentially have a peg_neg control
+                # the inverse (a control data sample having a peg_neg control) is impossible
+                peg_neg_id = sample.peg_neg.id if sample.peg_neg is not None and sample.record_type.id == 1 else None
                 if peg_neg_id is not None:
                     target_id = pcrreplicate_batch.target.id
                     # only check sample extractions with the same peg_neg_id as the sample of this data rep
