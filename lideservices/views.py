@@ -1,6 +1,6 @@
 from collections import Counter, OrderedDict
 from django.http import JsonResponse
-from django.db.models import F, Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
+from django.db.models import F, Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField, IntegerField
 from django.db.models.functions import Cast
 from django.contrib.postgres.aggregates import StringAgg
 from rest_framework import views, viewsets, permissions, authentication, status
@@ -413,14 +413,21 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
 
         # set aside a parallel query for totals
         totals_queryset = queryset
+        total_sample_count = totals_queryset.aggregate(Count('sample_id', distinct=True))['sample_id__count']
 
         # recalc reps validity
         for fsmc in queryset:
             recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, target=fsmc.target.id, recalc_rep_conc=False)
 
-        # TODO: fix positive counts
-        # pqueryset = queryset.annotate(positive_count=Count('id', filter=Q(final_sample_mean_concentration__gt=0)))
-        # total_pos_ct = pqueryset.aggregate(Count('positive_count'))['positive_count__count']
+        # set aside a parallel query for positive counts if necessary
+        total_pos_count = None
+        if ('positive_count' in statistic_list
+                or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
+            pqueryset = queryset.values('sample').annotate(max_val=Case(
+                    When(final_sample_mean_concentration__gt=0, then=Value(1)),
+                    default=Value(0), output_field=IntegerField()
+                )).order_by('sample', 'target__id')
+            total_pos_count = pqueryset.aggregate(Sum('max_val'))['max_val__sum']
 
         # group by target name
         queryset = queryset.values(target_name=F('target__name')).order_by('target_name')
@@ -437,21 +444,19 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
             # include the sample_count by target
             queryset = queryset.annotate(sample_count=Count('id'))
             # include the sample_count for all targets
-            totals['sample_count'] = totals_queryset.aggregate(Count('sample_id', distinct=True))['sample_id__count']
+            totals['sample_count'] = total_sample_count
         if ('positive_count' in statistic_list
                 or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
             # include the positive_count by target
             queryset = queryset.annotate(positive_count=Count('id', filter=Q(final_sample_mean_concentration__gt=0)))
             # include the positive_count for all targets
-            totals['positive_count'] = queryset.aggregate(Count('positive_count'))['positive_count__count']
+            totals['positive_count'] = total_pos_count
         if 'percent_positive' in statistic_list:
             # include the percent_positive by target
             queryset = queryset.annotate(
                 percent_positive=(Cast('positive_count', FloatField()) / Cast('sample_count', FloatField()) * 100))
             # include the percent_positive for all targets
-            pos_count = queryset.aggregate(Count('positive_count'))['positive_count__count']
-            samp_count = totals_queryset.aggregate(Count('sample_id', distinct=True))['sample_id__count']
-            totals['percent_positive'] = (pos_count / samp_count) * 100 if pos_count else 0
+            totals['percent_positive'] = (total_pos_count / total_sample_count) * 100 if total_pos_count else 0
         if 'max_concentration' in statistic_list:
             # include the max_concentration by target
             queryset = queryset.annotate(max_concentration=Max('final_sample_mean_concentration'))
