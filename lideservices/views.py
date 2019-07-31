@@ -1069,8 +1069,9 @@ class PCRReplicateBatchViewSet(HistoryViewSet):
                 # recalc the child rep validity
                 reps = PCRReplicate.objects.filter(pcrreplicate_batch=item.data['id'])
                 for rep in reps:
-                    rep.invalid = rep.calc_invalid()
-                    rep.save()
+                    if rep.invalid_override is None:
+                        rep.invalid = rep.calc_invalid()
+                        rep.save()
                 response_data.append(item.data)
             return JsonResponse(response_data, safe=False, status=200)
         else:

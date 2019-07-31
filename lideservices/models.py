@@ -58,7 +58,7 @@ def recalc_reps(level, level_id, target=None, recalc_rep_conc=True, recalc_inval
         for rep in reps:
             if recalc_rep_conc:
                 rep.replicate_concentration = rep.calc_rep_conc()
-            if recalc_invalid:
+            if recalc_invalid and rep.invalid_override is None:
                 rep.invalid = rep.calc_invalid()
             if recalc_rep_conc or recalc_invalid:
                 rep.save()

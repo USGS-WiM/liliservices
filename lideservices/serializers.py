@@ -1187,8 +1187,9 @@ class PCRReplicateListSerializer(serializers.ListSerializer):
                                                        self.child.pcrreplicate_batch.target.id)
                     # calculate the invalidity
                     for rep in reps:
-                        rep.invalid = rep.calc_invalid()
-                        rep.save()
+                        if rep.invalid_override is None:
+                            rep.invalid = rep.calc_invalid()
+                            rep.save()
 
         return ret
 
@@ -1244,8 +1245,9 @@ class PCRReplicateSerializer(serializers.ModelSerializer):
                                                pcrreplicate_batch__target__exact=instance.pcrreplicate_batch.target.id)
             # calculate the invalidity
             for rep in reps:
-                rep.invalid = rep.calc_invalid()
-                rep.save()
+                if rep.invalid_override is None:
+                    rep.invalid = rep.calc_invalid()
+                    rep.save()
 
         instance.save()
 
