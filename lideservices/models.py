@@ -721,7 +721,7 @@ class FinalSampleMeanConcentration(HistoryModel):
     sample = models.ForeignKey('Sample', models.CASCADE, related_name='finalsamplemeanconcentrations')
     target = models.ForeignKey('Target', models.PROTECT, related_name='finalsamplemeanconcentrations')
 
-    # Calculate sample mean concentration for all samples whose target replicates are now in the database
+    # Calculate sample mean concentration for all samples whose target replicates are now in the database and all valid
     # Concentrations from replicates are used to determine the Mean Sample Concentration
     # by taking the average of positive replicates (negative replicates (value of "0") are ignored).
     # If all replicates are negative ("0"), then the Mean Sample Concentration is "0".
@@ -729,7 +729,8 @@ class FinalSampleMeanConcentration(HistoryModel):
         sample_target_replicates = self.sample_target_replicates
 
         if (sample_target_replicates['qpcr_results_missing_count'] == 0
-                and sample_target_replicates['concentration_calc_values_missing_count'] == 0):
+                and sample_target_replicates['concentration_calc_values_missing_count'] == 0
+                and sample_target_replicates['controls_invalid_count'] == 0):
 
             pos_reps_count = sample_target_replicates['positive_concentration_count']
             if pos_reps_count > 0:
@@ -1589,11 +1590,17 @@ class PCRReplicate(HistoryModel):
                     target_id = pcrreplicate_batch.target.id
                     # only check sample extractions with the same peg_neg_id as the sample of this data rep
                     # only check reps with the same target as this data rep
-                    reps = list(PCRReplicate.objects.filter(
-                        sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id,
-                        invalid=True).values_list('id', flat=True))
-                    # if even a single one of the peg_neg reps is invalid, the data rep must be set to invalid
-                    any_peg_neg_invalid = True if len(reps) > 0 else False
+                    reps = PCRReplicate.objects.filter(
+                        sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id)
+                    # if even a single one of the peg_neg reps is invalid, or there are no peg_neg reps
+                    # (because the peg_neg sample has not yet been extracted), the data rep must be set to invalid
+                    if len(reps) > 0:
+                        invalid_reps = list(PCRReplicate.objects.filter(
+                            sample_extraction__sample=peg_neg_id, pcrreplicate_batch__target__exact=target_id,
+                            invalid=True).values_list('id'))
+                        any_peg_neg_invalid = True if len(invalid_reps) > 0 else False
+                    else:
+                        any_peg_neg_invalid = True
 
                 # then check all other controls applicable to this rep
                 rna_pos_invalid = False
