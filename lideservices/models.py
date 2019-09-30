@@ -647,12 +647,14 @@ class FinalSampleMeanConcentration(HistoryModel):
             return identifier_obj
 
         total_count = 0
+        invalid_override_invalids = []
         qpcr_results_missing = []
         concentration_calc_values_missing = []
         positive_concentrations = []
         negative_concentrations = []
         controls_invalids = []
         redones = []
+        invalid_override_invalid_count = 0
         qpcr_results_missing_count = 0
         concentration_calc_values_missing_count = 0
         positive_concentration_count = 0
@@ -668,7 +670,10 @@ class FinalSampleMeanConcentration(HistoryModel):
             # in other words, only allow reps for batches that have not been redone
             if rep.pcrreplicate_batch.re_pcr is None:
                 if rep.invalid is False:
-                    if rep.replicate_concentration is None:
+                    if rep.invalid_override:
+                        invalid_override_invalid_count += 1
+                        invalid_override_invalids.append(make_rep_identifier_object(rep))
+                    elif rep.replicate_concentration is None:
                         concentration_calc_values_missing_count += 1
                         concentration_calc_values_missing.append(make_rep_identifier_object(rep))
                     elif rep.replicate_concentration > Decimal('0'):
@@ -691,6 +696,7 @@ class FinalSampleMeanConcentration(HistoryModel):
                     else:
                         # a cq_value less than zero is impossible due to the model field definition
                         # so this rep could only be invalid if a parent control invalidated it
+                        # or if the user overrode the validation
                         invalid_reasons = rep.invalid_reasons
                         invalid_reasons.pop('cq_value_missing')
                         invalid_reasons.pop('gc_reaction_missing')
@@ -702,6 +708,8 @@ class FinalSampleMeanConcentration(HistoryModel):
                 redones.append(make_rep_identifier_object(rep))
 
         data = {
+            "invalid_override_invalid_count": invalid_override_invalid_count,
+            "invalid_override_invalids": invalid_override_invalids,
             "qpcr_results_missing_count": qpcr_results_missing_count,
             "qpcr_results_missing": qpcr_results_missing,
             "concentration_calc_values_missing_count": concentration_calc_values_missing_count,
@@ -728,7 +736,8 @@ class FinalSampleMeanConcentration(HistoryModel):
     def calc_sample_mean_conc(self):
         sample_target_replicates = self.sample_target_replicates
 
-        if (sample_target_replicates['qpcr_results_missing_count'] == 0
+        if (sample_target_replicates['invalid_override_invalid_count'] == 0
+                and sample_target_replicates['qpcr_results_missing_count'] == 0
                 and sample_target_replicates['concentration_calc_values_missing_count'] == 0
                 and sample_target_replicates['controls_invalid_count'] == 0):
 
@@ -1348,6 +1357,11 @@ class PCRReplicate(HistoryModel):
                 reasons["gc_reaction_missing"] = True
             else:
                 reasons["gc_reaction_missing"] = False
+            if self.invalid_override is not None:
+                reasons["invalid_override"] = True
+            else:
+                reasons["invalid_override"] = False
+
         else:
             reasons = {
                 "peg_neg_not_extracted": False,
@@ -1360,7 +1374,8 @@ class PCRReplicate(HistoryModel):
                 "ext_neg_missing": False, "ext_neg_invalid": False,
                 "rt_neg_missing": False, "rt_neg_invalid": False,
                 "pcr_neg_missing": False, "pcr_neg_invalid": False,
-                "cq_value_missing": False, "gc_reaction_missing": False
+                "cq_value_missing": False, "gc_reaction_missing": False,
+                "invalid_override": False
             }
 
         return reasons

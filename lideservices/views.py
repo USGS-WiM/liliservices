@@ -1553,6 +1553,9 @@ class QualityControlReportView(views.APIView):
 
         matrix_counts = queryset.values('matrix__name').order_by().annotate(count=Count('matrix'))
         sample_type_counts = queryset.values('sample_type__name').order_by().annotate(count=Count('sample_type'))
+        meter_reading_unit_counts = queryset.values(
+            'meter_reading_unit__name').order_by().annotate(
+            count=Count('meter_reading_unit'))
         total_volume_sampled_unit_initial_counts = queryset.values(
             'total_volume_sampled_unit_initial__name').order_by().annotate(
             count=Count('total_volume_sampled_unit_initial'))
@@ -1580,6 +1583,14 @@ class QualityControlReportView(views.APIView):
                 "metric": "Sample Type",
                 "value": sample_type['sample_type__name'],
                 "count": sample_type['count'],
+                "min": None,
+                "max": None
+            })
+        for unit in meter_reading_unit_counts:
+            sample_stats.append({
+                "metric": "Meter Reading Unit",
+                "value": unit['meter_reading_unit__name'],
+                "count": unit['count'],
                 "min": None,
                 "max": None
             })
