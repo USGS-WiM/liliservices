@@ -65,6 +65,12 @@ class HistoryViewSet(viewsets.ModelViewSet):
 class SampleViewSet(HistoryViewSet):
     serializer_class = SampleSerializer
 
+    def get_serializer_class(self):
+        if self.request and 'slim' in self.request.query_params:
+            return SampleSlimSerializer
+        else:
+            return SampleSerializer
+
     @action(detail=False)
     def finalsamplemeanconcentrations(self, request):
         queryset = Sample.objects.prefetch_related('finalsamplemeanconcentrations').distinct()

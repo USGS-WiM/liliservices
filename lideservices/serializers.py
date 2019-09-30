@@ -459,25 +459,25 @@ class SampleSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("meter_reading_final must be larger than meter_reading_initial")
         return data
 
-    # peg_neg_targets_extracted
-    def get_peg_neg_targets_extracted(self, obj):
-        targets_extracted = []
-        peg_neg = obj.peg_neg
-        if peg_neg is not None:
-            sample_extractions = peg_neg.sampleextractions.values()
-
-            if sample_extractions is not None:
-                for sample_extraction in sample_extractions:
-                    replicates = sample_extraction.get('pcrreplicates')
-                    if replicates is not None:
-                        for replicate in replicates:
-                            target_id = replicate.get('target_id')
-
-                            # get the unique target IDs for this peg_neg
-                            if target_id not in targets_extracted:
-                                targets_extracted.append(target_id)
-
-        return targets_extracted
+    # # peg_neg_targets_extracted
+    # def get_peg_neg_targets_extracted(self, obj):
+    #     targets_extracted = []
+    #     peg_neg = obj.peg_neg
+    #     if peg_neg is not None:
+    #         sample_extractions = peg_neg.sampleextractions.values()
+    #
+    #         if sample_extractions is not None:
+    #             for sample_extraction in sample_extractions:
+    #                 replicates = sample_extraction.get('pcrreplicates')
+    #                 if replicates is not None:
+    #                     for replicate in replicates:
+    #                         target_id = replicate.get('target_id')
+    #
+    #                         # get the unique target IDs for this peg_neg
+    #                         if target_id not in targets_extracted:
+    #                             targets_extracted.append(target_id)
+    #
+    #     return targets_extracted
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -494,9 +494,9 @@ class SampleSerializer(serializers.ModelSerializer):
     dissolution_volume = NullableRStrip10DecimalField()
     post_dilution_volume = NullableRStrip10DecimalField()
     aliquots = AliquotSerializer(many=True, read_only=True)
-    peg_neg_targets_extracted = serializers.SerializerMethodField()
+    # peg_neg_targets_extracted = serializers.SerializerMethodField()
     finalconcentratedsamplevolume = FinalConcentratedSampleVolumeSerializer(read_only=True)
-    finalsamplemeanconcentrations = FinalSampleMeanConcentrationSerializer(many=True, read_only=True)
+    # finalsamplemeanconcentrations = FinalSampleMeanConcentrationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sample
@@ -508,8 +508,19 @@ class SampleSerializer(serializers.ModelSerializer):
                   'total_volume_sampled_unit_initial', 'total_volume_or_mass_sampled', 'sample_volume_initial',
                   'filter_born_on_date', 'filter_flag', 'secondary_concentration_flag', 'elution_notes', 'record_type',
                   'record_type_string', 'technician_initials', 'dissolution_volume', 'post_dilution_volume', 'peg_neg',
-                  'samplegroups', 'analysisbatches', 'peg_neg_targets_extracted', 'finalconcentratedsamplevolume',
-                  'finalsamplemeanconcentrations', 'aliquots',
+                  'samplegroups', 'analysisbatches', 'finalconcentratedsamplevolume', 'aliquots',
+                  # 'finalsamplemeanconcentrations',  'peg_neg_targets_extracted',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class SampleSlimSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    study_string = serializers.StringRelatedField(source='study')
+
+    class Meta:
+        model = Sample
+        fields = ('id', 'study', 'study_string', 'collaborator_sample_id', 'collection_start_date',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
