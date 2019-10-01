@@ -425,15 +425,12 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         for fsmc in queryset:
             recalc_reps('FinalSampleMeanConcentration', fsmc.sample.id, target=fsmc.target.id, recalc_rep_conc=False)
 
-        # set aside a parallel query for positive counts if necessary
+        # get binary count of all positive samples if necessary
         total_pos_count = None
         if ('positive_count' in statistic_list
                 or ('percent_positive' in statistic_list and 'positive_count' not in statistic_list)):
-            pqueryset = queryset.values('sample').annotate(max_val=Case(
-                    When(final_sample_mean_concentration__gt=0, then=Value(1)),
-                    default=Value(0), output_field=IntegerField()
-                )).order_by('sample', 'target__id')
-            total_pos_count = pqueryset.aggregate(Sum('max_val'))['max_val__sum']
+            total_pos_count = queryset.values(
+                'sample').annotate(conc=Sum('final_sample_mean_concentration')).filter(conc__gt=0).count()
 
         # group by target name
         queryset = queryset.values(target_name=F('target__name')).order_by('target_name')
