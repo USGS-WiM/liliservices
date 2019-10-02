@@ -1878,3 +1878,13 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
         model = AnalysisBatch
         fields = ('id', 'name', 'analysis_batch_description', 'analysis_batch_notes', 'studies', 'summary',
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class ReportFileSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = ReportFile
+        fields = ('id', 'name', 'file', 'report_type', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        read_only_fields = ('name',)

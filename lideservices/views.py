@@ -883,6 +883,9 @@ class SampleExtractionViewSet(HistoryViewSet):
         # for sampleext in queryset:
         #     recalc_reps('SampleExtraction', sampleext.id, recalc_rep_conc=False)
         data = SampleExtractionReportSerializer(queryset, many=True).data
+
+        # TODO: create a file from the data, save the file to the server, and only return a message as a response
+
         return Response(data)
 
     # override the default DELETE method to prevent deletion of a SampleExtraction with any results data entered
@@ -1976,3 +1979,9 @@ class ControlsResultsReportView(views.APIView):
         }
 
         return Response(resp)
+
+
+class ReportFileViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = ReportFile.objects.all()
+    serializer_class = ReportFileSerializer
