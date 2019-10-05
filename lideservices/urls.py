@@ -40,6 +40,7 @@ router.register(r'nucleicacidtypes', views.NucleicAcidTypeViewSet, 'nucleicacidt
 router.register(r'recordtypes', views.RecordTypeViewSet, 'recordtypes')
 router.register(r'otheranalyses', views.OtherAnalysisViewSet, 'otheranalyses')
 router.register(r'users', views.UserViewSet, 'users')
+router.register(r'reportfiles', views.ReportFileViewSet, 'reportfiles')
 
 urlpatterns = [
     url(r'^', include(router.urls)),
@@ -51,4 +52,5 @@ urlpatterns = [
         name='qualitycontrolreport'),
     url(r'^controlresultsreport/$', views.ControlsResultsReportView.as_view(),
         name='controlresultsreport'),
+    # url(r'^reportfiles/$', views.ReportFileViewSet.as_view(), name='reportfiles'),
 ]

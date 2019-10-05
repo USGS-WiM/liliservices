@@ -1,9 +1,10 @@
+import json
 from collections import Counter, OrderedDict
 from django.http import JsonResponse
-from django.db.models import F, Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField, IntegerField
+from django.db.models import  Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
-from django.contrib.postgres.aggregates import StringAgg
-from rest_framework import views, viewsets, permissions, authentication, status
+from django.core.files.base import ContentFile
+from rest_framework import views, viewsets, authentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
@@ -32,6 +33,13 @@ from lideservices.aggregates import *
 
 
 LIST_DELIMETER = ','
+
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return json.JSONEncoder.default(self, obj)
 
 
 ######
@@ -870,8 +878,15 @@ class SampleExtractionViewSet(HistoryViewSet):
 
     @action(detail=False)
     def inhibition_report(self, request):
-        queryset = SampleExtraction.objects.all()
+        self.generate_inhibition_report(request)
+        return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
+
+    def generate_inhibition_report(self, request):
         sample = request.query_params.get('sample', None)
+        user = request.user
+        report_file = ReportFile(report_type=1, report_status=1, created_by=user, modified_by=user)
+
+        queryset = SampleExtraction.objects.all()
         if sample is not None:
             if LIST_DELIMETER in sample:
                 sample_list = sample.split(',')
@@ -883,10 +898,13 @@ class SampleExtractionViewSet(HistoryViewSet):
         # for sampleext in queryset:
         #     recalc_reps('SampleExtraction', sampleext.id, recalc_rep_conc=False)
         data = SampleExtractionReportSerializer(queryset, many=True).data
+        datetimenow = datetime.today().strftime('%Y-%m-%d_%H::%M::%S')
+        new_file_name = "InhibitionReport_" + user.username + "_" + datetimenow + ".json"
+        new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
 
-        # TODO: create a file from the data, save the file to the server, and only return a message as a response
-
-        return Response(data)
+        report_file.file.save(new_file_name, new_file_content)
+        report_file.report_status = 2
+        report_file.save()
 
     # override the default DELETE method to prevent deletion of a SampleExtraction with any results data entered
     def destroy(self, request, *args, **kwargs):
@@ -1983,5 +2001,36 @@ class ControlsResultsReportView(views.APIView):
 
 class ReportFileViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
-    queryset = ReportFile.objects.all()
+    # queryset = ReportFile.objects.all()
     serializer_class = ReportFileSerializer
+
+    def get_queryset(self):
+        queryset = ReportFile.objects.all()
+        query_params = self.request.query_params
+        # filter by report_type, exact list
+        report_type = query_params.get('report_type', None)
+        if report_type is not None:
+            if LIST_DELIMETER in report_type:
+                report_type_list = report_type.split(LIST_DELIMETER)
+                queryset = queryset.filter(report_type__in=report_type_list)
+            else:
+                queryset = queryset.filter(report_type__exact=report_type)
+        return queryset
+
+
+# class ReportFileViewSet(views.APIView):
+#     permission_classes = (permissions.IsAuthenticated,)
+#
+#     def get(self, request):
+#         inhibitions = ReportFile.objects.filter(report_type=1)
+#         resultssummaries = ReportFile.objects.filter(report_type=2)
+#         individualsamples = ReportFile.objects.filter(report_type=3)
+#         qualitycontrols = ReportFile.objects.filter(report_type=4)
+#         controlsresults = ReportFile.objects.filter(report_type=5)
+#         return JsonResponse({
+#             "inhibitions": ReportFileSerializer(inhibitions, many=True).data,
+#             "resultssummaries": ReportFileSerializer(resultssummaries, many=True).data,
+#             "individualsamples": ReportFileSerializer(individualsamples, many=True).data,
+#             "qualitycontrols": ReportFileSerializer(qualitycontrols, many=True).data,
+#             "controlsresults": ReportFileSerializer(controlsresults, many=True).data
+#         }, safe=False, status=200)

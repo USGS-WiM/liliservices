@@ -1830,22 +1830,29 @@ class ReportFile(HistoryModel):
         """Returns the name of the file"""
         return '%s' % str(self.file).split('/')[-1]
 
-    def reportfile_location(self, instance, filename):
+    def reportfile_location(self, instance):
         """Returns a custom location for the report file, in a folder named for its report type"""
-        return 'reports/{0}/{1}'.format(instance.report_type, filename)
+        return 'reports/{0}/{1}'.format(self.get_report_type_display(), instance)
 
     # TODO: confirm report names
     REPORT_TYPES = (
         (1, 'Inhibition',),
         (2, 'ResultsSummary',),
         (3, 'IndividualSample',),
-        (3, 'QualityControl',),
-        (3, 'ControlsResults',),
+        (4, 'QualityControl',),
+        (5, 'ControlsResults',),
+    )
+
+    REPORT_STATUSES = (
+        (1, 'Pending',),
+        (2, 'Complete',),
+        (3, 'Failed',)
     )
 
     name = property(_get_filename)
-    file = models.FileField(upload_to=reportfile_location, help_text='The file path of the uploaded file, which is used to find the file name')
-    report_type = models.IntegerField(max_length=1, choices=REPORT_TYPES)
+    file = models.FileField(upload_to=reportfile_location, null=True)
+    report_type = models.IntegerField(choices=REPORT_TYPES)
+    report_status = models.IntegerField(choices=REPORT_STATUSES)
 
     def __str__(self):
         return str(self.name)

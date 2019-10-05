@@ -1886,5 +1886,6 @@ class ReportFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReportFile
-        fields = ('id', 'name', 'file', 'report_type', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'name', 'file', 'report_type', 'report_status',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
         read_only_fields = ('name',)
