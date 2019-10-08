@@ -1,0 +1,6 @@
+Celery must be installed and running as a service/daemon in order for Django to use it.
+
+On Windows, when in development, run Celery with the following command:
+celery -A lide worker -l info --pool=solo
+
+On Linux, run Celery without the pool option.

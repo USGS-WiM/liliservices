@@ -13,6 +13,8 @@ from lideservices.serializers import *
 from lideservices.models import *
 from lideservices.permissions import *
 from lideservices.aggregates import *
+from celery import Celery
+from celery import shared_task
 
 
 ########################################################################################################################
@@ -40,6 +42,32 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(obj, Decimal):
             return float(obj)
         return json.JSONEncoder.default(self, obj)
+
+
+@shared_task(name="generate_inhibition_report_task")
+def generate_inhibition_report(sample, report_file_id, username):
+    report_file = ReportFile.objects.filter(id=report_file_id).first()
+
+    queryset = SampleExtraction.objects.all()
+    if sample is not None:
+        if LIST_DELIMETER in sample:
+            sample_list = sample.split(',')
+            queryset = queryset.filter(sample__in=sample_list)
+        else:
+            queryset = queryset.filter(sample__exact=sample)
+    # recalc not needed here because the report shows inhibition data, not PCR replicate data
+    # # recalc reps validity
+    # for sampleext in queryset:
+    #     recalc_reps('SampleExtraction', sampleext.id, recalc_rep_conc=False)
+    data = SampleExtractionReportSerializer(queryset, many=True).data
+    datetimenow = datetime.today().strftime('%Y-%m-%d_%H:%M:%S')
+    new_file_name = "InhibitionReport_" + username + "_" + datetimenow + ".json"
+    new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
+
+    report_file.file.save(new_file_name, new_file_content)
+    report_file.report_status = 2
+    report_file.save()
+    return "generate_inhibition_report completed and created file {0}".format(new_file_name)
 
 
 ######
@@ -878,33 +906,13 @@ class SampleExtractionViewSet(HistoryViewSet):
 
     @action(detail=False)
     def inhibition_report(self, request):
-        self.generate_inhibition_report(request)
-        return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
-
-    def generate_inhibition_report(self, request):
         sample = request.query_params.get('sample', None)
-        user = request.user
-        report_file = ReportFile(report_type=1, report_status=1, created_by=user, modified_by=user)
-
-        queryset = SampleExtraction.objects.all()
-        if sample is not None:
-            if LIST_DELIMETER in sample:
-                sample_list = sample.split(',')
-                queryset = queryset.filter(sample__in=sample_list)
-            else:
-                queryset = queryset.filter(sample__exact=sample)
-        # recalc not needed here because the report shows inhibition data, not PCR replicate data
-        # # recalc reps validity
-        # for sampleext in queryset:
-        #     recalc_reps('SampleExtraction', sampleext.id, recalc_rep_conc=False)
-        data = SampleExtractionReportSerializer(queryset, many=True).data
-        datetimenow = datetime.today().strftime('%Y-%m-%d_%H::%M::%S')
-        new_file_name = "InhibitionReport_" + user.username + "_" + datetimenow + ".json"
-        new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
-
-        report_file.file.save(new_file_name, new_file_content)
-        report_file.report_status = 2
-        report_file.save()
+        report_file = ReportFile.objects.create(
+            report_type=1, report_status=1, created_by=request.user, modified_by=request.user)
+        print("start task", datetime.now())
+        generate_inhibition_report.delay(sample, report_file.id, request.user.username)
+        print("send response", datetime.now())
+        return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
 
     # override the default DELETE method to prevent deletion of a SampleExtraction with any results data entered
     def destroy(self, request, *args, **kwargs):
