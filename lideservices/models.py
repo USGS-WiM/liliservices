@@ -1853,6 +1853,7 @@ class ReportFile(HistoryModel):
     file = models.FileField(upload_to=reportfile_location, null=True)
     report_type = models.IntegerField(choices=REPORT_TYPES)
     report_status = models.IntegerField(choices=REPORT_STATUSES)
+    fail_reason = models.TextField(blank=True)
 
     def __str__(self):
         return str(self.name)
