@@ -1883,8 +1883,14 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 class ReportFileSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    report_type_string = serializers.StringRelatedField()
-    report_status_string = serializers.StringRelatedField()
+    report_type_string = serializers.SerializerMethodField()
+    report_status_string = serializers.SerializerMethodField()
+
+    def get_report_type_string(self, obj):
+        return obj.get_report_type_display()
+
+    def get_report_status_string(self, obj):
+        return obj.get_report_status_display()
 
     class Meta:
         model = ReportFile
