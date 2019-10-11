@@ -41,6 +41,8 @@ router.register(r'recordtypes', views.RecordTypeViewSet, 'recordtypes')
 router.register(r'otheranalyses', views.OtherAnalysisViewSet, 'otheranalyses')
 router.register(r'users', views.UserViewSet, 'users')
 router.register(r'reportfiles', views.ReportFileViewSet, 'reportfiles')
+router.register(r'reporttypes', views.ReportTypeViewSet, 'reporttypes')
+router.register(r'statuses', views.StatusViewSet, 'statuses')
 
 urlpatterns = [
     url(r'^', include(router.urls)),

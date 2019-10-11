@@ -389,8 +389,10 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         sample = request.query_params.get('sample', None)
         target = request.query_params.get('target', None)
         statistic = request.query_params.get('statistic', None)
+        report_type = ReportType.objects.filter(id=2).first()
+        status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
-            report_type=2, report_status=1, created_by=request.user, modified_by=request.user)
+            report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
         generate_results_summary_report.delay(sample, target, statistic, report_file.id, request.user.username)
         return JsonResponse({"message": "Request for Results Summary Report received."}, status=200)
 
@@ -398,8 +400,10 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
     def results(self, request):
         sample = request.query_params.get('sample', None)
         target = request.query_params.get('target', None)
+        report_type = ReportType.objects.filter(id=2).first()
+        status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
-            report_type=3, report_status=1, created_by=request.user, modified_by=request.user)
+            report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
         generate_individual_sample_report.delay(sample, target, report_file.id, request.user.username)
         return JsonResponse({"message": "Request for Individual Sample Report received."}, status=200)
 
@@ -753,8 +757,10 @@ class SampleExtractionViewSet(HistoryViewSet):
     @action(detail=False)
     def inhibition_report(self, request):
         sample = request.query_params.get('sample', None)
+        report_type = ReportType.objects.filter(id=1).first()
+        status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
-            report_type=1, report_status=1, created_by=request.user, modified_by=request.user)
+            report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
         generate_inhibition_report.delay(sample, report_file.id, request.user.username)
         return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
 
@@ -1411,8 +1417,10 @@ class QualityControlReportView(views.APIView):
     def post(self, request):
         request_data = JSONParser().parse(request)
         samples = request_data.get('samples', None)
+        report_type = ReportType.objects.filter(id=4).first()
+        status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
-            report_type=4, report_status=1, created_by=request.user, modified_by=request.user)
+            report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
         generate_quality_control_report.delay(samples, report_file.id, request.user.username)
         return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
 
@@ -1424,15 +1432,16 @@ class ControlsResultsReportView(views.APIView):
         request_data = JSONParser().parse(request)
         sample_ids = request_data.get('samples', None)
         target_ids = request_data.get('targets', None)
+        report_type = ReportType.objects.filter(id=5).first()
+        status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
-            report_type=5, report_status=1, created_by=request.user, modified_by=request.user)
+            report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
         generate_control_results_report.delay(sample_ids, target_ids, report_file.id, request.user.username)
         return JsonResponse({"message": "Request for Control Results Report received."}, status=200)
 
 
 class ReportFileViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
-    # queryset = ReportFile.objects.all()
     serializer_class = ReportFileSerializer
 
     def get_queryset(self):
@@ -1447,3 +1456,15 @@ class ReportFileViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 queryset = queryset.filter(report_type__exact=report_type)
         return queryset
+
+
+class ReportTypeViewSet(viewsets.ModelViewSet):
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = ReportType.objects.all()
+    serializer_class = ReportTypeSerializer
+
+
+class StatusViewSet(viewsets.ModelViewSet):
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = Status.objects.all()
+    serializer_class = StatusSerializer

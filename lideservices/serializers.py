@@ -1883,17 +1883,30 @@ class AnalysisBatchSummarySerializer(serializers.ModelSerializer):
 class ReportFileSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
-    report_type_string = serializers.SerializerMethodField()
-    report_status_string = serializers.SerializerMethodField()
+    report_type_string = serializers.StringRelatedField()
+    status_string = serializers.StringRelatedField()
 
-    def get_report_type_string(self, obj):
-        return obj.get_report_type_display()
-
-    def get_report_status_string(self, obj):
-        return obj.get_report_status_display()
 
     class Meta:
         model = ReportFile
-        fields = ('id', 'name', 'file', 'report_type', 'report_type_string', 'report_status', 'report_status_string',
-                  'fail_reason', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+        fields = ('id', 'name', 'file', 'report_type', 'report_type_string', 'status', 'status_string', 'fail_reason',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
         read_only_fields = ('name',)
+
+
+class ReportTypeSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = ReportType
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
+class StatusSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = Status
+        fields = ('id', 'name', 'created_date', 'created_by', 'modified_date', 'modified_by',)

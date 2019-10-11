@@ -1832,27 +1832,12 @@ class ReportFile(HistoryModel):
 
     def reportfile_location(self, instance):
         """Returns a custom location for the report file, in a folder named for its report type"""
-        return 'reports/{0}/{1}'.format(self.get_report_type_display(), instance)
-
-    # TODO: confirm report names
-    REPORT_TYPES = (
-        (1, 'Inhibition',),
-        (2, 'ResultsSummary',),
-        (3, 'IndividualSample',),
-        (4, 'QualityControl',),
-        (5, 'ControlsResults',),
-    )
-
-    REPORT_STATUSES = (
-        (1, 'Pending',),
-        (2, 'Complete',),
-        (3, 'Failed',)
-    )
+        return 'reports/{0}/{1}'.format(self.report_type.name, instance)
 
     name = property(_get_filename)
     file = models.FileField(upload_to=reportfile_location, null=True)
-    report_type = models.IntegerField(choices=REPORT_TYPES)
-    report_status = models.IntegerField(choices=REPORT_STATUSES)
+    report_type = models.ForeignKey('ReportType', models.PROTECT, related_name='reportfiles')
+    status = models.ForeignKey('Status', models.PROTECT, related_name='reportfiles')
     fail_reason = models.TextField(blank=True)
 
     def __str__(self):
@@ -1860,3 +1845,21 @@ class ReportFile(HistoryModel):
 
     class Meta:
         db_table = "lide_reportfile"
+
+
+class ReportType(NameModel):
+
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        db_table = "lide_reporttype"
+
+
+class Status(NameModel):
+
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        db_table = "lide_status"

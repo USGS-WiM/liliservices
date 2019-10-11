@@ -38,13 +38,13 @@ def generate_inhibition_report(sample, report_file_id, username):
         new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
 
         report_file.file.save(new_file_name, new_file_content)
-        report_file.report_status = 2
+        report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
         return "generate_inhibition_report completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
         message = "generate_inhibition_report failed and no file was created, error message: {0}".format(exc)
-        report_file.report_status = 3
+        report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
         return message
@@ -179,13 +179,13 @@ def generate_results_summary_report(sample, target, statistic, report_file_id, u
         new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
 
         report_file.file.save(new_file_name, new_file_content)
-        report_file.report_status = 2
+        report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
         return "results_summary_report completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
         message = "results_summary_report failed and no file was created, error message: {0}".format(exc)
-        report_file.report_status = 3
+        report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
         return message
@@ -216,13 +216,13 @@ def generate_individual_sample_report(sample, target, report_file_id, username):
         new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
 
         report_file.file.save(new_file_name, new_file_content)
-        report_file.report_status = 2
+        report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
         return "individual_sample_report_task completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
         message = "individual_sample_report_task failed and no file was created, error message: {0}".format(exc)
-        report_file.report_status = 3
+        report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
         return message
@@ -390,13 +390,13 @@ def generate_quality_control_report(samples, report_file_id, username):
         new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder))
 
         report_file.file.save(new_file_name, new_file_content)
-        report_file.report_status = 2
+        report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
         return "quality_control_report_task completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
         message = "quality_control_report_task failed and no file was created, error message: {0}".format(exc)
-        report_file.report_status = 3
+        report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
         return message
@@ -684,13 +684,13 @@ def generate_control_results_report(sample_ids, target_ids, report_file_id, user
         new_file_content = ContentFile(json.dumps(data, cls=DecimalEncoder, default=str))
 
         report_file.file.save(new_file_name, new_file_content)
-        report_file.report_status = 2
+        report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
         return "control_results_report_task completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
         message = "control_results_report_task failed and no file was created, error message: {0}".format(exc)
-        report_file.report_status = 3
+        report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
         return message
