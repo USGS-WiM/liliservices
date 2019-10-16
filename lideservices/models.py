@@ -1845,6 +1845,7 @@ class ReportFile(HistoryModel):
 
     class Meta:
         db_table = "lide_reportfile"
+        ordering = ['-id']
 
 
 class ReportType(NameModel):
