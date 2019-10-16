@@ -400,7 +400,7 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
     def results(self, request):
         sample = request.query_params.get('sample', None)
         target = request.query_params.get('target', None)
-        report_type = ReportType.objects.filter(id=2).first()
+        report_type = ReportType.objects.filter(id=3).first()
         status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
