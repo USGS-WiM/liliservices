@@ -761,7 +761,11 @@ class SampleExtractionViewSet(HistoryViewSet):
         status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
-        generate_inhibition_report.delay(sample, report_file.id, request.user.username)
+        task = generate_inhibition_report.delay(sample, report_file.id, request.user.username)
+        # generate_inhibition_report.apply_async((sample, report_file.id, request.user.username),
+        #                                        link=success_handler.s(report_file.id),
+        #                                        link_error=error_handler.s(report_file.id))
+        monitor_task.delay(task.id, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'), report_file.id)
         return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
 
     # override the default DELETE method to prevent deletion of a SampleExtraction with any results data entered

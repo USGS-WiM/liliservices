@@ -1,4 +1,5 @@
 import json
+from time import sleep
 from collections import Counter, OrderedDict
 from django.db.models import Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
@@ -6,7 +7,8 @@ from django.core.files.base import ContentFile
 from lideservices.aggregates import Median
 from lideservices.serializers import *
 from lideservices.models import *
-from celery import shared_task
+from celery import shared_task, current_app
+from celery.result import AsyncResult
 
 
 LIST_DELIMETER = settings.LIST_DELIMETER
@@ -17,6 +19,31 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(obj, Decimal):
             return float(obj)
         return json.JSONEncoder.default(self, obj)
+
+
+@shared_task(name='monitor_task')
+def monitor_task(task_id, datetimestart_str, report_file_id):
+    sleep(settings.TASK_SLEEP)
+    task = AsyncResult(task_id)
+    print('monitoring task ', task)
+    datetimestart = datetime.strptime(datetimestart_str, '%Y-%m-%d_%H:%M:%S')
+    if task.status in ['PENDING', 'RECEIVED', 'STARTED']:
+        datetimediff = datetime.now() - datetimestart
+        # hoursdiff = divmod(datetimediff.total_seconds(), 3600)[0]
+        # print(task, task.status, hoursdiff)
+        print(task, task.status, datetimediff.total_seconds())
+        if datetimediff.total_seconds() >= settings.TASK_TIMEOUT:
+            print('timeout reached, terminating task ', task, '...')
+            current_app.control.revoke(task_id, terminate=True)
+            report_file = ReportFile.objects.filter(id=report_file_id).first()
+            report_file.status = Status.objects.filter(id=3).first()
+            report_file.save()
+            # return "task timeout: {0} for reportfile {1}".format(task.status, report_file_id)
+        else:
+            monitor_task(task, datetimestart, report_file_id)
+    else:
+        print(task, task.status)
+        # return "success: {0} for reportfile {1}".format(task.status, report_file_id)
 
 
 @shared_task(name="generate_inhibition_report_task")
