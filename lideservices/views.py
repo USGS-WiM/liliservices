@@ -393,7 +393,8 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
-        generate_results_summary_report.delay(sample, target, statistic, report_file.id, request.user.username)
+        task = generate_results_summary_report.delay(sample, target, statistic, report_file.id, request.user.username)
+        monitor_task.delay(task.id, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'), report_file.id)
         return JsonResponse({"message": "Request for Results Summary Report received."}, status=200)
 
     @action(detail=False)
@@ -404,7 +405,8 @@ class FinalSampleMeanConcentrationViewSet(HistoryViewSet):
         status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
-        generate_individual_sample_report.delay(sample, target, report_file.id, request.user.username)
+        task = generate_individual_sample_report.delay(sample, target, report_file.id, request.user.username)
+        monitor_task.delay(task.id, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'), report_file.id)
         return JsonResponse({"message": "Request for Individual Sample Report received."}, status=200)
 
 
@@ -762,9 +764,6 @@ class SampleExtractionViewSet(HistoryViewSet):
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
         task = generate_inhibition_report.delay(sample, report_file.id, request.user.username)
-        # generate_inhibition_report.apply_async((sample, report_file.id, request.user.username),
-        #                                        link=success_handler.s(report_file.id),
-        #                                        link_error=error_handler.s(report_file.id))
         monitor_task.delay(task.id, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'), report_file.id)
         return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
 
@@ -1425,7 +1424,8 @@ class QualityControlReportView(views.APIView):
         status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
-        generate_quality_control_report.delay(samples, report_file.id, request.user.username)
+        task = generate_quality_control_report.delay(samples, report_file.id, request.user.username)
+        monitor_task.delay(task.id, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'), report_file.id)
         return JsonResponse({"message": "Request for Inhibition Report received."}, status=200)
 
 
@@ -1440,7 +1440,8 @@ class ControlsResultsReportView(views.APIView):
         status = Status.objects.filter(id=1).first()
         report_file = ReportFile.objects.create(
             report_type=report_type, status=status, created_by=request.user, modified_by=request.user)
-        generate_control_results_report.delay(sample_ids, target_ids, report_file.id, request.user.username)
+        task = generate_control_results_report.delay(sample_ids, target_ids, report_file.id, request.user.username)
+        monitor_task.delay(task.id, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'), report_file.id)
         return JsonResponse({"message": "Request for Control Results Report received."}, status=200)
 
 
