@@ -25,23 +25,28 @@ class DecimalEncoder(json.JSONEncoder):
 def monitor_task(task_id, datetimestart_str, report_file_id):
     sleep(settings.TASK_SLEEP)
     task = AsyncResult(task_id)
-    print('monitoring task ID ' + str(task))
+    print('monitoring task ID ' + str(task) + ' for report ID ' + str(report_file_id))
     datetimestart = datetime.strptime(datetimestart_str, '%Y-%m-%d_%H:%M:%S')
     if task.status in ['PENDING', 'RECEIVED', 'STARTED']:
         datetimediff = datetime.now() - datetimestart
-        message = 'task ID ' + str(task) + ' has state ' + str(task.status)
+        message = 'task ID ' + str(task) + ' for report ID ' + str(report_file_id) + ' has state ' + str(task.status)
         message += ' at ' + str(datetimediff.total_seconds()) + ' seconds after it started'
         print(message)
         if datetimediff.total_seconds() >= settings.TASK_TIMEOUT:
-            print('timeout reached, terminating task ID ' + str(task) + '...')
+            message = 'timeout reached, terminating task ID ' + str(task) + ' for report ID ' + str(report_file_id)
+            print(message)
             current_app.control.revoke(task_id, terminate=True)
             report_file = ReportFile.objects.filter(id=report_file_id).first()
             report_file.status = Status.objects.filter(id=3).first()
             report_file.save()
+            return message
         else:
             monitor_task(task, datetimestart, report_file_id)
     else:
-        print('monitoring task ID ' + str(task) + ' completed with status ' + str(task.status))
+        message = 'monitoring task ID ' + str(task) + ' for report ID ' + str(report_file_id)
+        message += ' completed with status ' + str(task.status)
+        print(message)
+        return message
 
 
 @shared_task(name="generate_inhibition_report_task")

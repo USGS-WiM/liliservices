@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'simple_history',
     'rest_framework',
+    'django_celery_results',
     'corsheaders',
     'lideservices',
 ]
