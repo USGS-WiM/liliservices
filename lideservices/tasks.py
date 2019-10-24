@@ -1,5 +1,6 @@
 import json
 from time import sleep
+from datetime import datetime
 from collections import Counter, OrderedDict
 from django.db.models import Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
@@ -26,8 +27,8 @@ def monitor_task(task_id, datetimestart_str, report_file_id):
     sleep(settings.TASK_SLEEP)
     task = AsyncResult(task_id)
     print('monitoring task ID ' + str(task) + ' for report ID ' + str(report_file_id))
-    datetimestart = datetime.strptime(datetimestart_str, '%Y-%m-%d_%H:%M:%S')
     if task.status in ['PENDING', 'RECEIVED', 'STARTED']:
+        datetimestart = datetime.strptime(datetimestart_str, '%Y-%m-%d_%H:%M:%S')
         datetimediff = datetime.now() - datetimestart
         message = 'task ID ' + str(task) + ' for report ID ' + str(report_file_id) + ' has state ' + str(task.status)
         message += ' at ' + str(datetimediff.total_seconds()) + ' seconds after it started'
@@ -41,7 +42,12 @@ def monitor_task(task_id, datetimestart_str, report_file_id):
             report_file.save()
             return message
         else:
-            monitor_task(task, datetimestart, report_file_id)
+            message = 'task ID ' + str(task) + ' for report ID ' + str(report_file_id) + ' is still running'
+            print(message)
+            try:
+                return message
+            finally:
+                monitor_task(task.id, datetimestart_str, report_file_id)
     else:
         message = 'monitoring task ID ' + str(task) + ' for report ID ' + str(report_file_id)
         message += ' completed with status ' + str(task.status)
