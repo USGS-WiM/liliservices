@@ -55,7 +55,7 @@ In a production environment (or really, any non-development environment) this Dj
 
 Additionally, Celery must be set up as a service or daemon for Django to use it. On Linux (note that Celery is no longer supported on Windows) follow the instructions [here](https://docs.celeryproject.org/en/latest/userguide/daemonizing.html#daemonizing) (also read the docs about how Celery and Django connect [here](https://docs.celeryproject.org/en/latest/django/first-steps-with-django.html#django-first-steps)). For convenience, the necessary documents are in this repository:
 * `default_celeryd` (sourced from the [official Celery documentation](https://docs.celeryproject.org/en/latest/userguide/daemonizing.html#example-configuration), note that this file should be saved on the server as `/etc/default/celeryd`))
-* `init.d_celeryd` (sourced from the [official Celery repo](https://github.com/celery/celery/blob/master/extra/generic-init.d/celeryd), note that this file should be saved on the server as `/etc/init.d/celeryd`, and its file permissions should be set to 755 (which can be done with the command `sudo chmod 755 /etc/init.d/celeryd`); also register the script to run on boot with the command `sudo update-rc.d lide defaults`)
+* `init.d_celeryd` (sourced from the [official Celery repo](https://github.com/celery/celery/blob/master/extra/generic-init.d/celeryd), note that this file should be saved on the server as `/etc/init.d/celeryd`, and its file permissions should be set to 755 (which can be done with the command `sudo chmod 755 /etc/init.d/celeryd`); also register the script to run on boot with the command `sudo update-rc.d celeryd defaults`)
 
 ## Authors
 
