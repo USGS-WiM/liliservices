@@ -2,6 +2,8 @@ from decimal import Decimal
 from datetime import date
 from django.db import models
 from django.db.models import F
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.conf import settings
@@ -1846,6 +1848,11 @@ class ReportFile(HistoryModel):
     class Meta:
         db_table = "lide_reportfile"
         ordering = ['-id']
+
+
+@receiver(post_delete, sender=ReportFile)
+def submission_delete(sender, instance, **kwargs):
+    instance.file.delete(False)
 
 
 class ReportType(NameModel):

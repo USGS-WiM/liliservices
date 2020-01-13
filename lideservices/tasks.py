@@ -1,6 +1,6 @@
 import json
 from time import sleep
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import Counter, OrderedDict
 from django.db.models import Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
@@ -20,6 +20,17 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(obj, Decimal):
             return float(obj)
         return json.JSONEncoder.default(self, obj)
+
+
+def purge_old_reports(report_type_id):
+    # remove all reports older than one week
+    one_week_ago = datetime.strftime(datetime.now() - timedelta(7), '%Y-%m-%d')
+    ReportFile.objects.filter(created_date__lt=one_week_ago).delete()
+
+    # remove all remaining reports of this report type except the most recent ten
+    if ReportFile.objects.filter(report_type=report_type_id).count() > 10:
+        reports_to_keep = ReportFile.objects.filter(report_type=report_type_id).order_by('-id')[:10]
+        ReportFile.objects.filter(report_type=report_type_id).exclude(pk__in=reports_to_keep).delete()
 
 
 @shared_task(name='monitor_task')
@@ -60,6 +71,15 @@ def generate_inhibition_report(sample, report_file_id, username):
     report_file = ReportFile.objects.filter(id=report_file_id).first()
 
     try:
+        purge_old_reports(report_file.report_type.id)
+    except Exception as exc:
+        message = "generate_inhibition_report_task failed and no file was created, error message: {0}".format(exc)
+        report_file.status = Status.objects.filter(id=3).first()
+        report_file.fail_reason = message
+        report_file.save()
+        return message
+
+    try:
         queryset = SampleExtraction.objects.all()
         if sample is not None:
             if LIST_DELIMETER in sample:
@@ -76,10 +96,10 @@ def generate_inhibition_report(sample, report_file_id, username):
         report_file.file.save(new_file_name, new_file_content)
         report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
-        return "generate_inhibition_report completed and created file {0}".format(new_file_name)
+        return "generate_inhibition_report_task completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
-        message = "generate_inhibition_report failed and no file was created, error message: {0}".format(exc)
+        message = "generate_inhibition_report_task failed and no file was created, error message: {0}".format(exc)
         report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
@@ -89,6 +109,15 @@ def generate_inhibition_report(sample, report_file_id, username):
 @shared_task(name="results_summary_report_task")
 def generate_results_summary_report(sample, target, statistic, report_file_id, username):
     report_file = ReportFile.objects.filter(id=report_file_id).first()
+
+    try:
+        purge_old_reports(report_file.report_type.id)
+    except Exception as exc:
+        message = "results_summary_report_task failed and no file was created, error message: {0}".format(exc)
+        report_file.status = Status.objects.filter(id=3).first()
+        report_file.fail_reason = message
+        report_file.save()
+        return message
 
     try:
         STATISTICS = ['sample_count', 'positive_count', 'percent_positive', 'max_concentration', 'min_concentration',
@@ -217,10 +246,10 @@ def generate_results_summary_report(sample, target, statistic, report_file_id, u
         report_file.file.save(new_file_name, new_file_content)
         report_file.status = Status.objects.filter(id=2).first()
         report_file.save()
-        return "results_summary_report completed and created file {0}".format(new_file_name)
+        return "results_summary_report_task completed and created file {0}".format(new_file_name)
 
     except Exception as exc:
-        message = "results_summary_report failed and no file was created, error message: {0}".format(exc)
+        message = "results_summary_report_task failed and no file was created, error message: {0}".format(exc)
         report_file.status = Status.objects.filter(id=3).first()
         report_file.fail_reason = message
         report_file.save()
@@ -230,6 +259,15 @@ def generate_results_summary_report(sample, target, statistic, report_file_id, u
 @shared_task(name="individual_sample_report_task")
 def generate_individual_sample_report(sample, target, report_file_id, username):
     report_file = ReportFile.objects.filter(id=report_file_id).first()
+
+    try:
+        purge_old_reports(report_file.report_type.id)
+    except Exception as exc:
+        message = "individual_sample_report_task failed and no file was created, error message: {0}".format(exc)
+        report_file.status = Status.objects.filter(id=3).first()
+        report_file.fail_reason = message
+        report_file.save()
+        return message
 
     try:
         queryset = FinalSampleMeanConcentration.objects.all()
@@ -267,6 +305,15 @@ def generate_individual_sample_report(sample, target, report_file_id, username):
 @shared_task(name="quality_control_report_task")
 def generate_quality_control_report(samples, report_file_id, username):
     report_file = ReportFile.objects.filter(id=report_file_id).first()
+
+    try:
+        purge_old_reports(report_file.report_type.id)
+    except Exception as exc:
+        message = "quality_control_report_task failed and no file was created, error message: {0}".format(exc)
+        report_file.status = Status.objects.filter(id=3).first()
+        report_file.fail_reason = message
+        report_file.save()
+        return message
 
     try:
         data = {}
@@ -441,6 +488,15 @@ def generate_quality_control_report(samples, report_file_id, username):
 @shared_task(name="control_results_report_task")
 def generate_control_results_report(sample_ids, target_ids, report_file_id, username):
     report_file = ReportFile.objects.filter(id=report_file_id).first()
+
+    try:
+        purge_old_reports(report_file.report_type.id)
+    except Exception as exc:
+        message = "control_results_report_task failed and no file was created, error message: {0}".format(exc)
+        report_file.status = Status.objects.filter(id=3).first()
+        report_file.fail_reason = message
+        report_file.save()
+        return message
 
     try:
         targets = Target.objects.all().values('id', 'name').order_by('name')
