@@ -4,10 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
 from rest_framework.exceptions import APIException
-from lideservices.serializers import *
-from lideservices.models import *
-from lideservices.permissions import *
-from lideservices.tasks import *
+from liliapi.serializers import *
+from liliapi.models import *
+from liliapi.permissions import *
+from liliapi.tasks import *
 
 
 ########################################################################################################################

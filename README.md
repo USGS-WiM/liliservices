@@ -14,8 +14,8 @@ This project was built with Django, Django REST Framework, Psycopg2, Celery, and
 *Prerequisite*: Please install Celery and RabbitMQ by following [these instructions](https://docs.celeryproject.org/en/latest/getting-started/first-steps-with-celery.html).
 
 ```bash
-git clone https://github.com/USGS-WiM/lide.git
-cd lide
+git clone https://github.com/USGS-WiM/liliservices.git
+cd liliservices
 
 # install virtualenv
 pip3 install virtualenv
@@ -33,7 +33,7 @@ pip3 install -r requirements.txt
 python3 manage.py migrate
 
 # install the custom SQL Median aggregate function in the database
-psql -U lideadmin -d lide -f create_aggregate_median.sql
+psql -U lideadmin -d lili -f create_aggregate_median.sql
 
 # install RabbitMQ, the message broker used by Celery (which is itself was installed by the prior pip command)
 sudo apt-get install rabbitmq-server
@@ -47,7 +47,7 @@ Note that on Windows, the default arrangement of a settings.py file reading a se
 
 Run `python3 manage.py runserver` for a dev server with live reload. Navigate to `http://localhost:8000/lideservices/`. The web services will automatically reload if you change any of the source files. This will use the development environment configuration.
 
-To use Celery in development, run `celery -A lide worker -l info` (note that this no longer seems to work on Windows, and so the `--pool=solo` option should be appeneded to the preceding command).
+To use Celery in development, run `celery -A liliservices worker -l info` (note that this no longer seems to work on Windows, and so the `--pool=solo` option should be appeneded to the preceding command).
 
 ## Production server
 

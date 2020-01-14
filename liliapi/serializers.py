@@ -1,7 +1,7 @@
 from datetime import datetime
 from queue import PriorityQueue
 from rest_framework import serializers
-from lideservices.models import *
+from liliapi.models import *
 
 
 class NullableRStrip100DecimalField(serializers.DecimalField):

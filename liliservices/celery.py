@@ -1,8 +1,8 @@
 import os
 from celery import Celery
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'lide.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'liliservices.settings')
 
-app = Celery('lide')
+app = Celery('liliservices')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()

@@ -1,5 +1,5 @@
 from django.conf.urls import url, include
-from lideservices import views
+from liliapi import views
 from rest_framework.routers import DefaultRouter
 
 

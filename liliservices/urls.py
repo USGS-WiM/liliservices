@@ -1,4 +1,4 @@
-"""lide URL Configuration
+"""liliservices URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/1.11/topics/http/urls/
@@ -24,5 +24,5 @@ handler400 = 'rest_framework.exceptions.bad_request'
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url('media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT, }),
-    url(r'^lideservices/', include('lideservices.urls')),
+    url(r'^api/', include('liliapi.urls')),
 ]

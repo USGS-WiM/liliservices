@@ -1,25 +1,25 @@
 [
   {
-    "name": "lide",
+    "name": "liliservices",
     "organization": "U.S. Geological Survey",
     "description": "Web services for LILI (LIDE (Laboratory for Infectious Disease and the Environment) Information Management System)",
-    "version": "v0.122.0",
-    "status": "Release Candidate",
+    "version": "v1.0.0",
+    "status": "Production",
 
     "permissions": {
       "usageType": "openSource",
       "licenses": [
         {
           "name": "Public Domain",
-          "URL": "https://github.com/USGS-WiM/lide/blob/master/LICENSE.md"
+          "URL": "https://github.com/USGS-WiM/liliservices/blob/master/LICENSE.md"
         }
       ]
     },
 
     "homepageURL": "https://wim.usgs.gov",
-    "downloadURL": "https://github.com/USGS-WiM/lide/archive/master.zip",
-    "disclaimerURL": "https://github.com/USGS-WiM/lide/blob/master/DISCLAIMER.md",
-    "repositoryUrl": "https://github.com/USGS-WiM/lide",
+    "downloadURL": "https://github.com/USGS-WiM/liliservices/archive/master.zip",
+    "disclaimerURL": "https://github.com/USGS-WiM/liliservices/blob/master/DISCLAIMER.md",
+    "repositoryUrl": "https://github.com/USGS-WiM/liliservices",
     "vcs": "git",
 
     "laborHours": null,
@@ -47,7 +47,7 @@
     },
 
     "date": {
-      "metadataLastUpdated": "2020-01-13"
+      "metadataLastUpdated": "2020-01-14"
     }
   }
 ]

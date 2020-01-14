@@ -5,9 +5,9 @@ from collections import Counter, OrderedDict
 from django.db.models import Q, Case, When, Value, Count, Sum, Min, Max, Avg, FloatField, CharField
 from django.db.models.functions import Cast
 from django.core.files.base import ContentFile
-from lideservices.aggregates import Median
-from lideservices.serializers import *
-from lideservices.models import *
+from liliapi.aggregates import Median
+from liliapi.serializers import *
+from liliapi.models import *
 from celery import shared_task, current_app
 from celery.result import AsyncResult
 

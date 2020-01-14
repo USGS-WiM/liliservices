@@ -136,7 +136,7 @@ class HistoryModel(models.Model):
     modified_date = models.DateField(auto_now=True, null=True, blank=True)
     modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT, null=True, blank=True, db_index=True,
                                     related_name='%(class)s_modifier')
-    history = HistoricalRecords(inherit=True)
+
 
     class Meta:
         abstract = True
@@ -200,6 +200,8 @@ class Sample(HistoryModel):
     samplegroups = models.ManyToManyField('SampleGroup', through='SampleSampleGroup', related_name='samples')
     peg_neg = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='samples')
     record_type = models.ForeignKey('RecordType', models.PROTECT, default=1)
+    history = HistoricalRecords(inherit=True, table_name='lili_samplehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
@@ -230,7 +232,7 @@ class Sample(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_sample"
+        db_table = "lili_sample"
         ordering = ['id']
 
 
@@ -248,12 +250,14 @@ class Aliquot(HistoryModel):
     freezer_location = models.ForeignKey('FreezerLocation', models.PROTECT, related_name='aliquots')
     aliquot_number = NonnegativeIntegerField()
     frozen = models.BooleanField(default=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_aliquothistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.aliquot_string
 
     class Meta:
-        db_table = "lide_aliquot"
+        db_table = "lili_aliquot"
         unique_together = ("sample", "aliquot_number")
 
 
@@ -268,7 +272,7 @@ class SampleType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_sampletype"
+        db_table = "lili_sampletype"
 
 
 class Matrix(NameModel):
@@ -282,7 +286,7 @@ class Matrix(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_matrix"
+        db_table = "lili_matrix"
         verbose_name_plural = "matrices"
 
 
@@ -297,7 +301,7 @@ class FilterType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_filtertype"
+        db_table = "lili_filtertype"
 
 
 class Study(NameModel):
@@ -311,7 +315,7 @@ class Study(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_study"
+        db_table = "lili_study"
         verbose_name_plural = "studies"
 
 
@@ -327,7 +331,7 @@ class Unit(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_unit"
+        db_table = "lili_unit"
 
 
 ######
@@ -527,12 +531,14 @@ class FreezerLocation(HistoryModel):
     row = NonnegativeIntegerField()
     spot = NonnegativeIntegerField()
     objects = FreezerLocationManager()
+    history = HistoricalRecords(inherit=True, table_name='lili_freezerlocationhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_freezerlocation"
+        db_table = "lili_freezerlocation"
         unique_together = ("freezer", "rack", "box", "row", "spot")
 
 
@@ -550,7 +556,7 @@ class Freezer(NameModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_freezer"
+        db_table = "lili_freezer"
 
 
 ######
@@ -575,6 +581,8 @@ class FinalConcentratedSampleVolume(HistoryModel):
     final_concentrated_sample_volume = models.DecimalField(
         max_digits=120, decimal_places=100, validators=[MINVAL_DECIMAL_100])
     notes = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_finalconcentratedsamplevolumehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # override the save method to check if a rep calc value changed,
     # and if so, recalc rep conc and rep invalid and FSMC
@@ -600,7 +608,7 @@ class FinalConcentratedSampleVolume(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_finalconcentratedsamplevolume"
+        db_table = "lili_finalconcentratedsamplevolume"
 
 
 class ConcentrationType(NameModel):
@@ -612,7 +620,7 @@ class ConcentrationType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_concentrationtype"
+        db_table = "lili_concentrationtype"
 
 
 class FinalSampleMeanConcentration(HistoryModel):
@@ -730,6 +738,8 @@ class FinalSampleMeanConcentration(HistoryModel):
     final_sample_mean_concentration = NullableNonnegativeDecimalField120100()
     sample = models.ForeignKey('Sample', models.CASCADE, related_name='finalsamplemeanconcentrations')
     target = models.ForeignKey('Target', models.PROTECT, related_name='finalsamplemeanconcentrations')
+    history = HistoricalRecords(inherit=True, table_name='lili_finalsamplemeanconcentrationhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # Calculate sample mean concentration for all samples whose target replicates are now in the database and all valid
     # Concentrations from replicates are used to determine the Mean Sample Concentration
@@ -762,7 +772,7 @@ class FinalSampleMeanConcentration(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_finalsamplemeanconcentration"
+        db_table = "lili_finalsamplemeanconcentration"
         unique_together = ("sample", "target")
         ordering = ['sample', 'id']
 
@@ -781,12 +791,14 @@ class SampleSampleGroup(HistoryModel):
 
     sample = models.ForeignKey('Sample', models.CASCADE)
     samplegroup = models.ForeignKey('SampleGroup', models.CASCADE)
+    history = HistoricalRecords(inherit=True, table_name='lili_samplesamplegrouphistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_samplesamplegroup"
+        db_table = "lili_samplesamplegroup"
         unique_together = ("sample", "samplegroup")
 
 
@@ -801,7 +813,7 @@ class SampleGroup(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_samplegroup"
+        db_table = "lili_samplegroup"
 
 
 ######
@@ -818,12 +830,14 @@ class SampleAnalysisBatch(HistoryModel):
 
     sample = models.ForeignKey('Sample', models.CASCADE)
     analysis_batch = models.ForeignKey('AnalysisBatch', models.CASCADE)
+    history = HistoricalRecords(inherit=True, table_name='lili_sampleanalysisbatchhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_sampleanalysisbatch"
+        db_table = "lili_sampleanalysisbatch"
         unique_together = ("sample", "analysis_batch")
         verbose_name_plural = "sampleanalysisbatches"
 
@@ -840,7 +854,7 @@ class AnalysisBatch(NameModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_analysisbatch"
+        db_table = "lili_analysisbatch"
         verbose_name_plural = "analysisbatches"
 
 
@@ -858,7 +872,7 @@ class AnalysisBatchTemplate(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_analysisbatchtemplate"
+        db_table = "lili_analysisbatchtemplate"
 
 
 ######
@@ -877,7 +891,7 @@ class ExtractionMethod(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_extractionmethod"
+        db_table = "lili_extractionmethod"
 
 
 class ExtractionBatch(HistoryModel):
@@ -908,6 +922,8 @@ class ExtractionBatch(HistoryModel):
     ext_pos_dna_invalid = models.BooleanField(default=True)
     inh_pos_cq_value = NullableNonnegativeDecimalField2010()
     inh_pos_nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, null=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_extractionbatchhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # override the save method to calculate invalid flag
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
@@ -953,7 +969,7 @@ class ExtractionBatch(HistoryModel):
         return self.extraction_string
 
     class Meta:
-        db_table = "lide_extractionbatch"
+        db_table = "lili_extractionbatch"
         unique_together = ("analysis_batch", "extraction_number", "re_extraction")
         verbose_name_plural = "extractionbatches"
 
@@ -973,6 +989,8 @@ class ReverseTranscription(HistoryModel):
     re_rt_notes = models.TextField(blank=True)
     ext_pos_rna_rt_cq_value = NullableNonnegativeDecimalField2010()
     ext_pos_rna_rt_invalid = models.BooleanField(default=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_reversetranscriptionhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # override the save method to calculate invalid flag
     def save(self, *args, **kwargs):
@@ -1003,7 +1021,7 @@ class ReverseTranscription(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_reversetranscription"
+        db_table = "lili_reversetranscription"
         unique_together = ("extraction_batch", "re_rt")
 
 
@@ -1016,12 +1034,14 @@ class SampleExtraction(HistoryModel):
     extraction_batch = models.ForeignKey('ExtractionBatch', models.CASCADE, related_name='sampleextractions')
     inhibition_dna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractionsdna')
     inhibition_rna = models.ForeignKey('Inhibition', models.CASCADE, null=True, related_name='sampleextractionsrna')
+    history = HistoricalRecords(inherit=True, table_name='lili_sampleextractionhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_sampleextraction"
+        db_table = "lili_sampleextraction"
         unique_together = ("sample", "extraction_batch")
         ordering = ['sample', 'id']
 
@@ -1064,6 +1084,8 @@ class PCRReplicateBatch(HistoryModel):
     pcr_pos_gc_reaction = NullableNonnegativeDecimalField120100()
     pcr_pos_invalid = models.BooleanField(default=True)
     re_pcr = models.ForeignKey('self', on_delete=models.CASCADE, null=True, related_name='pcrreplicatebatches')
+    history = HistoricalRecords(inherit=True, table_name='lili_pcrreplicatebatchhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # override the save method to calculate invalid flags
     # and to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
@@ -1123,7 +1145,7 @@ class PCRReplicateBatch(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_pcrreplicatebatch"
+        db_table = "lili_pcrreplicatebatch"
         unique_together = ("extraction_batch", "target", "replicate_number", "re_pcr")
         verbose_name_plural = "pcrreplicatebatches"
 
@@ -1472,6 +1494,8 @@ class PCRReplicate(HistoryModel):
     invalid = models.BooleanField(default=True)
     invalid_override = models.ForeignKey(
         settings.AUTH_USER_MODEL, models.PROTECT, null=True, related_name='pcrreplicates')
+    history = HistoricalRecords(inherit=True, table_name='lili_pcrreplicatehistory',
+                                custom_model_name=lambda x: f'{x}History')
     # objects = PCRReplicateManager()
 
     # override the save method to assign or calculate concentration_unit, replicate_concentration, and invalid flag
@@ -1681,7 +1705,7 @@ class PCRReplicate(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_pcrreplicate"
+        db_table = "lili_pcrreplicate"
         unique_together = ("sample_extraction", "pcrreplicate_batch")
 
 
@@ -1695,13 +1719,15 @@ class StandardCurve(HistoryModel):
     efficiency = NullableNonnegativeDecimalField2010()
     pos_ctrl_cq = NullableNonnegativeDecimalField2010()
     pos_ctrl_cq_range = NullableNonnegativeDecimalField2010()
+    history = HistoricalRecords(inherit=True, table_name='lili_standardcurvehistory',
+                                custom_model_name=lambda x: f'{x}History')
     # QUESTION: should there be an active or inactive/superseded field?
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_standardcurve"
+        db_table = "lili_standardcurve"
 
 
 class Inhibition(HistoryModel):
@@ -1715,6 +1741,8 @@ class Inhibition(HistoryModel):
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, default=1)
     cq_value = NullableNonnegativeDecimalField2010()
     dilution_factor = models.IntegerField(null=True, blank=True, validators=[MINVAL_ZERO])
+    history = HistoricalRecords(inherit=True, table_name='lili_inhibitionhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     # override the save method to check if a rep calc value changed, and if so, recalc rep conc and rep invalid and FSMC
     def save(self, *args, **kwargs):
@@ -1739,7 +1767,7 @@ class Inhibition(HistoryModel):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_inhibition"
+        db_table = "lili_inhibition"
         unique_together = ("sample", "extraction_batch", "nucleic_acid_type")
 
 
@@ -1756,7 +1784,7 @@ class Target(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_target"
+        db_table = "lili_target"
 
 
 ######
@@ -1774,12 +1802,14 @@ class FieldUnit(HistoryModel):
     table = models.CharField(max_length=64)
     field = models.CharField(max_length=64)
     unit = models.ForeignKey('Unit', models.PROTECT, related_name='fieldunits')
+    history = HistoricalRecords(inherit=True, table_name='lili_fieldunithistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_fieldunit"
+        db_table = "lili_fieldunit"
         unique_together = ("table", "field")
 
 
@@ -1792,7 +1822,7 @@ class NucleicAcidType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_nucleicacidtype"
+        db_table = "lili_nucleicacidtype"
 
 
 class RecordType(NameModel):
@@ -1804,7 +1834,7 @@ class RecordType(NameModel):
         return self.name
 
     class Meta:
-        db_table = "lide_recordtype"
+        db_table = "lili_recordtype"
 
 
 class OtherAnalysis(HistoryModel):
@@ -1814,12 +1844,14 @@ class OtherAnalysis(HistoryModel):
 
     description = models.TextField(blank=True)
     data = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_otheranalysishistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        db_table = "lide_otheranalysis"
+        db_table = "lili_otheranalysis"
         verbose_name_plural = "otheranalyses"
 
 
@@ -1841,12 +1873,14 @@ class ReportFile(HistoryModel):
     report_type = models.ForeignKey('ReportType', models.PROTECT, related_name='reportfiles')
     status = models.ForeignKey('Status', models.PROTECT, related_name='reportfiles')
     fail_reason = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_reportfilehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.name)
 
     class Meta:
-        db_table = "lide_reportfile"
+        db_table = "lili_reportfile"
         ordering = ['-id']
 
 
@@ -1861,7 +1895,7 @@ class ReportType(NameModel):
         return str(self.name)
 
     class Meta:
-        db_table = "lide_reporttype"
+        db_table = "lili_reporttype"
 
 
 class Status(NameModel):
@@ -1870,4 +1904,4 @@ class Status(NameModel):
         return str(self.name)
 
     class Meta:
-        db_table = "lide_status"
+        db_table = "lili_status"
