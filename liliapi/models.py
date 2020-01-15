@@ -137,7 +137,6 @@ class HistoryModel(models.Model):
     modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT, null=True, blank=True, db_index=True,
                                     related_name='%(class)s_modifier')
 
-
     class Meta:
         abstract = True
         default_permissions = ('add', 'change', 'delete', 'view')
@@ -267,6 +266,8 @@ class SampleType(NameModel):
     """
 
     code = models.CharField(max_length=128, unique=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_sampletypehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -281,6 +282,8 @@ class Matrix(NameModel):
     """
 
     code = models.CharField(max_length=128, unique=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_matrixhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -296,6 +299,8 @@ class FilterType(NameModel):
     """
 
     matrix = models.ForeignKey('Matrix', models.PROTECT, related_name='filtertypes')
+    history = HistoricalRecords(inherit=True, table_name='lili_filtertypehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -310,6 +315,8 @@ class Study(NameModel):
     """
 
     description = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_studyhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -326,6 +333,8 @@ class Unit(NameModel):
 
     symbol = models.CharField(max_length=128, unique=True)
     description = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_unithistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -551,6 +560,8 @@ class Freezer(NameModel):
     boxes = NonnegativeIntegerField()
     rows = NonnegativeIntegerField()
     spots = NonnegativeIntegerField()
+    history = HistoricalRecords(inherit=True, table_name='lili_freezerhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
@@ -615,6 +626,9 @@ class ConcentrationType(NameModel):
     """
     Concentration Type
     """
+
+    history = HistoricalRecords(inherit=True, table_name='lili_concentrationtypehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -808,6 +822,8 @@ class SampleGroup(NameModel):
     """
 
     description = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_samplegrouphistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -849,6 +865,8 @@ class AnalysisBatch(NameModel):
 
     analysis_batch_description = models.CharField(max_length=128, blank=True)
     analysis_batch_notes = models.CharField(max_length=128, blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_analysisbatchhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.id)
@@ -867,6 +885,8 @@ class AnalysisBatchTemplate(NameModel):
     description = models.TextField(blank=True)
     extraction_volume = NonnegativeDecimalField2010()
     elution_volume = NonzeroDecimalField2010()
+    history = HistoricalRecords(inherit=True, table_name='lili_analysisbatchtemplatehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -886,6 +906,9 @@ class ExtractionMethod(NameModel):
     """
     Extraction Method
     """
+
+    history = HistoricalRecords(inherit=True, table_name='lili_extractionmethodhistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -1779,6 +1802,8 @@ class Target(NameModel):
     code = models.CharField(max_length=128, unique=True)
     nucleic_acid_type = models.ForeignKey('NucleicAcidType', models.PROTECT, default=1)
     notes = models.TextField(blank=True)
+    history = HistoricalRecords(inherit=True, table_name='lili_targethistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -1818,6 +1843,9 @@ class NucleicAcidType(NameModel):
     Nucleic Acid Type (DNA or RNA)
     """
 
+    history = HistoricalRecords(inherit=True, table_name='lili_nucleicacidtypehistory',
+                                custom_model_name=lambda x: f'{x}History')
+
     def __str__(self):
         return self.name
 
@@ -1829,6 +1857,9 @@ class RecordType(NameModel):
     """
     Record Type (DATA or CONTROL)
     """
+
+    history = HistoricalRecords(inherit=True, table_name='lili_recordtypehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return self.name
@@ -1890,6 +1921,12 @@ def submission_delete(sender, instance, **kwargs):
 
 
 class ReportType(NameModel):
+    """
+    Report Type
+    """
+
+    history = HistoricalRecords(inherit=True, table_name='lili_reporttypehistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.name)
@@ -1899,6 +1936,12 @@ class ReportType(NameModel):
 
 
 class Status(NameModel):
+    """
+    Status
+    """
+
+    history = HistoricalRecords(inherit=True, table_name='lili_statushistory',
+                                custom_model_name=lambda x: f'{x}History')
 
     def __str__(self):
         return str(self.name)
