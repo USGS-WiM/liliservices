@@ -1659,12 +1659,121 @@ class OtherAnalysisSerializer(serializers.ModelSerializer):
 ######
 
 
+# Password must be at least 12 characters long.
+# Password cannot contain your username.
+# Password cannot have been used in previous 20 passwords.
+# Password cannot have been changed less than 24 hours ago.
+# Password must satisfy 3 out of the following requirements:
+# Contain lowercase letters (a, b, c, ..., z)
+# Contain uppercase letters (A, B, C, ..., Z)
+# Contain numbers (0, 1, 2, ..., 9)
+# Contain symbols (~, !, @, #, etc.)
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, allow_blank=True, required=False)
+
+    def validate(self, data):
+
+        if self.context['request'].method == 'POST':
+            if 'password' not in data:
+                raise serializers.ValidationError("password is required")
+        if 'password' in data:
+            password = data['password']
+            details = []
+            char_type_requirements_met = []
+            symbols = '~!@#$%^&*'
+
+            username = self.initial_data['username'] if 'username' in self.initial_data else self.instance.username
+
+            if len(password) < 12:
+                details.append("Password must be at least 12 characters long.")
+            if username.lower() in password.lower():
+                details.append("Password cannot contain username.")
+            if any(character.islower() for character in password):
+                char_type_requirements_met.append('lowercase')
+            if any(character.isupper() for character in password):
+                char_type_requirements_met.append('uppercase')
+            if any(character.isdigit() for character in password):
+                char_type_requirements_met.append('number')
+            if any(character in password for character in symbols):
+                char_type_requirements_met.append('special')
+            if len(char_type_requirements_met) < 3:
+                message = "Password must satisfy three of the following requirements: "
+                message += "Contain lowercase letters (a, b, c, ..., z); "
+                message += "Contain uppercase letters (A, B, C, ..., Z); "
+                message += "Contain numbers (0, 1, 2, ..., 9); "
+                message += "Contain symbols (~, !, @, #, $, %, ^, &, *); "
+                details.append(message)
+            if details:
+                raise serializers.ValidationError(details)
+
+        return data
+
+    def create(self, validated_data):
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
+            requesting_user = self.context['request'].user
+        else:
+            raise serializers.ValidationError("User could not be identified, please contact the administrator.")
+
+        if not requesting_user.is_staff:
+            raise serializers.ValidationError("Only staff can create users.")
+
+        if 'created_by' in validated_data:
+            validated_data.pop('created_by')
+        if 'modified_by' in validated_data:
+            validated_data.pop('modified_by')
+
+        password = validated_data.pop('password', None)
+
+        # only superusers can edit is_superuser, is_staff, and is_active fields
+        if requesting_user.is_authenticated and not requesting_user.is_superuser:
+            validated_data['is_superuser'] = False
+            validated_data['is_staff'] = False
+            validated_data['is_active'] = True
+
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+
+        return user
+
+    def update(self, instance, validated_data):
+        if 'request' in self.context and hasattr(self.context['request'], 'user'):
+            requesting_user = self.context['request'].user
+        else:
+            raise serializers.ValidationError("User could not be identified, please contact the administrator.")
+
+        if 'created_by' in validated_data:
+            validated_data.pop('created_by')
+        if 'modified_by' in validated_data:
+            validated_data.pop('modified_by')
+
+        # non-superusers can only edit their first and last names and password
+        if not requesting_user.is_authenticated:
+            raise serializers.ValidationError("You cannot edit user data.")
+        elif not requesting_user.is_superuser:
+            if instance.id == requesting_user.id:
+                instance.first_name = validated_data.get('first_name', instance.first_name)
+                instance.last_name = validated_data.get('last_name', instance.last_name)
+            else:
+                raise serializers.ValidationError("You can only edit your own user information.")
+        elif requesting_user.is_superuser:
+            instance.username = validated_data.get('username', instance.username)
+            instance.email = validated_data.get('email', instance.email)
+            instance.is_superuser = validated_data.get('is_superuser', instance.is_superuser)
+            instance.is_staff = validated_data.get('is_staff', instance.is_staff)
+            instance.is_active = validated_data.get('is_active', instance.is_active)
+
+        new_password = validated_data.get('password', None)
+        if new_password is not None:
+            instance.set_password(new_password)
+        instance.save()
+
+        return instance
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'first_name', 'last_name', 'email', 'groups', 'user_permissions',
-                  'is_superuser', 'is_staff', 'is_active',)
+        fields = ('id', 'username', 'password', 'first_name', 'last_name', 'email', 'is_superuser', 'is_staff',
+                  'is_active',)
 
 
 ######
