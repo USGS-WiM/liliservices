@@ -1747,25 +1747,32 @@ class UserSerializer(serializers.ModelSerializer):
         if 'modified_by' in validated_data:
             validated_data.pop('modified_by')
 
-        # non-superusers can only edit their first and last names and password
+        new_password = validated_data.get('password', None)
+
+        # non-superusers can only edit their username and email and first and last names and password
         if not requesting_user.is_authenticated:
             raise serializers.ValidationError("You cannot edit user data.")
         elif not requesting_user.is_superuser:
             if instance.id == requesting_user.id:
+                instance.username = validated_data.get('username', instance.username)
+                instance.email = validated_data.get('email', instance.email)
                 instance.first_name = validated_data.get('first_name', instance.first_name)
                 instance.last_name = validated_data.get('last_name', instance.last_name)
+                if new_password is not None:
+                    instance.set_password(new_password)
             else:
                 raise serializers.ValidationError("You can only edit your own user information.")
         elif requesting_user.is_superuser:
             instance.username = validated_data.get('username', instance.username)
             instance.email = validated_data.get('email', instance.email)
+            instance.first_name = validated_data.get('first_name', instance.first_name)
+            instance.last_name = validated_data.get('last_name', instance.last_name)
             instance.is_superuser = validated_data.get('is_superuser', instance.is_superuser)
             instance.is_staff = validated_data.get('is_staff', instance.is_staff)
             instance.is_active = validated_data.get('is_active', instance.is_active)
+            if new_password is not None:
+                instance.set_password(new_password)
 
-        new_password = validated_data.get('password', None)
-        if new_password is not None:
-            instance.set_password(new_password)
         instance.save()
 
         return instance

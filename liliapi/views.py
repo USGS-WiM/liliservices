@@ -259,7 +259,7 @@ class AliquotViewSet(HistoryViewSet):
             data = kwargs['data']
 
             # check if many is required
-            if isinstance(data, list) and 'aliquot_count' in data[0]:
+            if isinstance(data, list) and len(data) > 0 and 'aliquot_count' in data[0]:
                 kwargs['many'] = True
 
         return super(AliquotViewSet, self).get_serializer(*args, **kwargs)
