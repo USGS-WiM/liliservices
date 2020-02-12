@@ -1,7 +1,20 @@
 from datetime import datetime
 from queue import PriorityQueue
 from rest_framework import serializers
+from rest_framework.settings import api_settings
 from liliapi.models import *
+
+
+def jsonify_errors(data):
+    if isinstance(data, list) or isinstance(data, str):
+        # Errors raised as a list are non-field errors.
+        if hasattr(settings, 'NON_FIELD_ERRORS_KEY'):
+            key = settings.NON_FIELD_ERRORS_KEY
+        else:
+            key = api_settings.NON_FIELD_ERRORS_KEY
+        return {key: data}
+    else:
+        return data
 
 
 class NullableRStrip100DecimalField(serializers.DecimalField):
@@ -218,7 +231,7 @@ class AliquotListSerializer(serializers.ListSerializer):
                     else:
                         details.append("The submitted freezer (" + str(item['freezer']) + ") does not exist!")
             if not is_valid:
-                raise serializers.ValidationError(details)
+                raise serializers.ValidationError(jsonify_errors(details))
         elif self.context['request'].method == 'PUT':
             is_valid = True
             details = []
@@ -243,7 +256,7 @@ class AliquotListSerializer(serializers.ListSerializer):
                 if 'aliquot_number' not in item or item['aliquot_number'] == 0:
                     details.append("aliquot_number is a required field")
             if not is_valid:
-                raise serializers.ValidationError(details)
+                raise serializers.ValidationError(jsonify_errors(details))
         return data
 
     # bulk create
@@ -262,7 +275,8 @@ class AliquotListSerializer(serializers.ListSerializer):
                     row = freezer_location.row
                     spot = freezer_location.spot
                 else:
-                    raise serializers.ValidationError("No Freezer Location exists with ID: " + str(freezer_location_id))
+                    message = "No Freezer Location exists with ID: " + str(freezer_location_id)
+                    raise serializers.ValidationError(jsonify_errors(message))
             else:
                 freezer = validated_item.pop('freezer')
                 rack = validated_item.pop('rack')
@@ -330,14 +344,15 @@ class AliquotListSerializer(serializers.ListSerializer):
                                     row += 1
                                     if row > freezer_object.rows:
                                         message = "This box is full! No more spots can be allocated. Aborting."
-                                        raise serializers.ValidationError(message)
+                                        raise serializers.ValidationError(jsonify_errors(message))
 
                                 user = self.context['request'].user
                                 fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row,
                                                                     spot=spot, created_by=user, modified_by=user)
                                 validated_item['freezer_location'] = fl
                             else:
-                                raise serializers.ValidationError("No Freezer exists with ID: " + str(freezer))
+                                message = "No Freezer exists with ID: " + str(freezer)
+                                raise serializers.ValidationError(jsonify_errors(message))
 
                         aliquot = Aliquot.objects.create(**validated_item)
                         aliquots.append(aliquot)
@@ -347,7 +362,7 @@ class AliquotListSerializer(serializers.ListSerializer):
                 message += ") than are available in the box (" + str(avail_spots)
                 message += ") of the starting location indicated (freezer: " + str(freezer) + ", rack: " + str(rack)
                 message += ", box: " + str(box) + ", row: " + str(row) + ", spot: " + str(spot) + ")"
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError(jsonify_errors(message))
 
         return aliquots
 
