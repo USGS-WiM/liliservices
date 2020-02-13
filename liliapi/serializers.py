@@ -2,6 +2,7 @@ from datetime import datetime
 from queue import PriorityQueue
 from rest_framework import serializers
 from rest_framework.settings import api_settings
+from django.db.models import Max
 from liliapi.models import *
 
 
@@ -194,6 +195,7 @@ class FreezerSerializer(serializers.ModelSerializer):
 
 class AliquotListSerializer(serializers.ListSerializer):
 
+    # TODO: reject requests that overload boxes, by holding each validated box in memory before batch saving them if they all pass validation, rather than assessing each box in order like currently, which opens the possibility of early valid boxes being saved before an invalid box is encountered
     # ensure either a freezer_location ID or coordinates (freezer, rack, box, row, spot) is included in request data
     def validate(self, data):
         if self.context['request'].method == 'POST':
@@ -262,6 +264,10 @@ class AliquotListSerializer(serializers.ListSerializer):
     # bulk create
     def create(self, validated_data):
         aliquots = []
+        new_freezer_location_ids = []
+        is_valid = True
+        validated_items = []
+        errors = []
         for validated_item in validated_data:
 
             # pull out the freezer location fields from the request
@@ -290,8 +296,8 @@ class AliquotListSerializer(serializers.ListSerializer):
             else:
                 aliquot_count = 1
 
-            # pull out sample IDs from the request
-            sample_ids = validated_item.pop('samples')
+            # pull out sample IDs from the request (remove duplicates)
+            sample_ids = list(set(validated_item.pop('samples')))
 
             sample_count = 0
             freezer_object = Freezer.objects.filter(id=freezer).first()
@@ -317,22 +323,21 @@ class AliquotListSerializer(serializers.ListSerializer):
             if total_aliquot_count <= avail_spots:
                 for sample_id in sample_ids:
                     sample = Sample.objects.get(id=sample_id)
+                    # first determine if any aliquots exist for the parent sample
+                    prev_aliquot = Aliquot.objects.filter(
+                        sample=sample_id).aggregate(Max('aliquot_number'))['aliquot_number__max']
+                    max_aliquot_number = prev_aliquot if prev_aliquot else 0
                     for count_num in range(0, aliquot_count):
-                        validated_item['sample'] = sample
+                        new_aliquot = {"sample": sample}
 
-                        # first determine if any aliquots exist for the parent sample
-                        prev_aliquots = Aliquot.objects.filter(sample=sample_id)
-                        if prev_aliquots:
-                            max_aliquot_number = max(prev_aliquot.aliquot_number for prev_aliquot in prev_aliquots)
-                        else:
-                            max_aliquot_number = 0
-                        # then assign the proper aliquot_number
-                        validated_item['aliquot_number'] = max_aliquot_number + 1
+                        # increment and assign the proper aliquot_number
+                        max_aliquot_number += 1
+                        new_aliquot['aliquot_number'] = max_aliquot_number
 
                         # next create the freezer location for this aliquot to use
                         # use the existing freezer location if it was submitted and the aliquot count is exactly 1
                         if 'freezer_location' in validated_item and len(sample_ids) == 1 and aliquot_count == 1:
-                            validated_item['freezer_location'] = freezer_location
+                            new_aliquot['freezer_location'] = freezer_location
                         # otherwise create a new freezer location for all other aliquots
                         # ensure that all locations are real (i.e., no spot 10 when there can only be 9 spots)
                         else:
@@ -344,25 +349,44 @@ class AliquotListSerializer(serializers.ListSerializer):
                                     row += 1
                                     if row > freezer_object.rows:
                                         message = "This box is full! No more spots can be allocated. Aborting."
-                                        raise serializers.ValidationError(jsonify_errors(message))
+                                        errors.append(message)
+                                        is_valid = False
 
                                 user = self.context['request'].user
-                                fl = FreezerLocation.objects.create(freezer=freezer_object, rack=rack, box=box, row=row,
-                                                                    spot=spot, created_by=user, modified_by=user)
-                                validated_item['freezer_location'] = fl
+                                fl = FreezerLocation.objects.filter(freezer=freezer_object.id, rack=rack, box=box,
+                                                                    row=row, spot=spot).first()
+                                if not fl:
+                                    fl = FreezerLocation.objects.create(freezer=freezer_object,
+                                                                        rack=rack, box=box, row=row, spot=spot,
+                                                                        created_by=user, modified_by=user)
+                                    new_freezer_location_ids.append(fl.id)
+                                    new_aliquot['freezer_location'] = fl
+                                    validated_items.append(new_aliquot)
+                                else:
+                                    message = "The requested freezer location (freezer: " + str(freezer) + ", rack: "
+                                    message += str(rack) + ", box: " + str(box) + ", row: " + str(row) + ", spot: "
+                                    message += str(spot) + ") is already occupied."
+                                    errors.append(message)
+                                    is_valid = False
                             else:
                                 message = "No Freezer exists with ID: " + str(freezer)
-                                raise serializers.ValidationError(jsonify_errors(message))
-
-                        aliquot = Aliquot.objects.create(**validated_item)
-                        aliquots.append(aliquot)
+                                errors.append(message)
+                                is_valid = False
                     sample_count += 1
             else:
                 message = "More freezer locations have been requested (" + str(total_aliquot_count)
                 message += ") than are available in the box (" + str(avail_spots)
                 message += ") of the starting location indicated (freezer: " + str(freezer) + ", rack: " + str(rack)
                 message += ", box: " + str(box) + ", row: " + str(row) + ", spot: " + str(spot) + ")"
-                raise serializers.ValidationError(jsonify_errors(message))
+                errors.append(message)
+                is_valid = False
+        if is_valid:
+            for validated_item in validated_items:
+                aliquot = Aliquot.objects.create(**validated_item)
+                aliquots.append(aliquot)
+        else:
+            FreezerLocation.objects.filter(id__in=new_freezer_location_ids).delete()
+            raise serializers.ValidationError(jsonify_errors(errors))
 
         return aliquots
 
@@ -454,11 +478,11 @@ class SampleSerializer(serializers.ModelSerializer):
         if matrix.code == 'W':
             if 'filter_type' not in data:
                 message = "filter_type is a required field for the water matrix"
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError(jsonify_errors(message))
         elif matrix.code == 'SM':
             if 'post_dilution_volume' not in data:
                 message = "post_dilution_volume is a required field for the solid manure matrix"
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError(jsonify_errors(message))
         elif matrix.code == 'A':
             is_valid = True
             details = []
@@ -467,11 +491,12 @@ class SampleSerializer(serializers.ModelSerializer):
             if 'dissolution_volume' not in data:
                 details.append("dissolution_volume is a required field for the solid manure matrix")
             if not is_valid:
-                raise serializers.ValidationError(details)
+                raise serializers.ValidationError(jsonify_errors(details))
         if ('meter_reading_initial' in data and data['meter_reading_initial']
                 and 'meter_reading_final' in data and data['meter_reading_final']):
             if data['meter_reading_initial'] > data['meter_reading_final']:
-                raise serializers.ValidationError("meter_reading_final must be larger than meter_reading_initial")
+                message = "meter_reading_final must be larger than meter_reading_initial"
+                raise serializers.ValidationError(jsonify_errors(message))
         return data
 
     # # peg_neg_targets_extracted
@@ -630,7 +655,7 @@ class SampleAnalysisBatchSerializer(serializers.ModelSerializer):
                 # if yes, raise a validation error
                 message = "The samples list of an analysis batch cannot be altered"
                 message += " after the analysis batch has one or more extraction batches"
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError(jsonify_errors(message))
 
         return data
 
@@ -647,7 +672,7 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if self.context['request'].method == 'POST':
             if 'new_samples' not in data:
-                raise serializers.ValidationError("new_samples is a required field")
+                raise serializers.ValidationError(jsonify_errors("new_samples is a required field"))
 
         return data
 
@@ -703,7 +728,7 @@ class AnalysisBatchSerializer(serializers.ModelSerializer):
                 # if yes, raise a validation error
                 message = "The samples list of an analysis batch cannot be altered"
                 message += " after the analysis batch has one or more extraction batches"
-                raise serializers.ValidationError(message)
+                raise serializers.ValidationError(jsonify_errors(message))
 
         # update the Analysis Batch object
         instance.name = validated_data.get('name', instance.name)
@@ -832,11 +857,11 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if 'request' in self.context and self.context['request'].method == 'POST':
             # if 'new_rt' not in data:
-            #     raise serializers.ValidationError("new_rt is a required field")
+            #     raise serializers.ValidationError(jsonify_errors("new_rt is a required field"))
             if 'new_sample_extractions' not in data:
-                raise serializers.ValidationError("new_sample_extractions is a required field")
+                raise serializers.ValidationError(jsonify_errors("new_sample_extractions is a required field"))
             if 'new_replicates' not in data:
-                raise serializers.ValidationError("new_replicates is a required field")
+                raise serializers.ValidationError(jsonify_errors("new_replicates is a required field"))
             if 'new_sample_extractions' in data:
                 is_valid = True
                 details = []
@@ -854,7 +879,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         message += " (these two fields cannot both be null) "
                         details.append(message)
                 if not is_valid:
-                    raise serializers.ValidationError(details)
+                    raise serializers.ValidationError(jsonify_errors(details))
             if 'new_replicates' in data:
                 is_valid = True
                 details = []
@@ -866,7 +891,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         message = "target is a required field within new_replicates"
                         details.append(message)
                 if not is_valid:
-                    raise serializers.ValidationError(details)
+                    raise serializers.ValidationError(jsonify_errors(details))
         return data
 
     # on create, also create child objects (sample_extractions and replicates)
@@ -903,7 +928,7 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                         PCRReplicateBatch.objects.create(extraction_batch=extr_batch, target=target, replicate_number=x,
                                                          created_by=user, modified_by=user)
                 else:
-                    raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
+                    raise serializers.ValidationError(jsonify_errors("No Target exists with ID: " + str(target_id)))
 
         # create the child sample_extractions for this extraction batch
         if sample_extractions is not None:
@@ -922,7 +947,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             if inhib:
                                 sample_extraction['inhibition_dna'] = inhib
                             else:
-                                raise serializers.ValidationError("No Inhibition exists with ID: " + str(inhib_dna))
+                                message = "No Inhibition exists with ID: " + str(inhib_dna)
+                                raise serializers.ValidationError(jsonify_errors(message))
                         else:
                             # otherwise assume inhib_dna is a date string
                             dna = NucleicAcidType.objects.get(name="DNA")
@@ -946,7 +972,8 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                             if inhib:
                                 sample_extraction['inhibition_rna'] = inhib
                             else:
-                                raise serializers.ValidationError("No Inhibition exists with ID: " + str(inhib_rna))
+                                message = "No Inhibition exists with ID: " + str(inhib_rna)
+                                raise serializers.ValidationError(jsonify_errors(message))
                         else:
                             # otherwise assume inhib_rna is a date string
                             rna = NucleicAcidType.objects.get(name="RNA")
@@ -979,10 +1006,12 @@ class ExtractionBatchSerializer(serializers.ModelSerializer):
                                         sample_extraction=new_extr, pcrreplicate_batch=rep_batch,
                                         created_by=user, modified_by=user)
                             else:
-                                raise serializers.ValidationError("No Target exists with ID: " + str(target_id))
+                                message = "No Target exists with ID: " + str(target_id)
+                                raise serializers.ValidationError(jsonify_errors(message))
 
                 else:
-                    raise serializers.ValidationError("No SampleExtraction exists with Sample ID: " + str(sample_id))
+                    message = "No SampleExtraction exists with Sample ID: " + str(sample_id)
+                    raise serializers.ValidationError(jsonify_errors(message))
 
         # create the child reverse transcription if present
         if rt is not None:
@@ -1169,7 +1198,7 @@ class SampleExtractionSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if 'inhibition_dna' not in data and 'inhibition_rna' not in data:
             message = "Either inhibition_dna or inhibition_rna is required (these two fields cannot both be null)"
-            raise serializers.ValidationError(message)
+            raise serializers.ValidationError(jsonify_errors(message))
         return data
 
     class Meta:
@@ -1431,7 +1460,7 @@ class PCRReplicateBatchSerializer(serializers.ModelSerializer):
                 item.save()
             return instance
         else:
-            raise serializers.ValidationError(response_errors)
+            raise serializers.ValidationError(jsonify_errors(response_errors))
 
     created_by = serializers.StringRelatedField()
     modified_by = serializers.StringRelatedField()
@@ -1497,7 +1526,8 @@ class InhibitionListSerializer(serializers.ListSerializer):
         Ensure dilution factor is only ever 1, 5, or 10 (or null)
         """
         if value not in (1, 5, 10, None):
-            raise serializers.ValidationError("dilution_factor can only have a value of 1, 5, 10, or null")
+            message = "dilution_factor can only have a value of 1, 5, 10, or null"
+            raise serializers.ValidationError(jsonify_errors(message))
         return value
 
     # bulk create
@@ -1541,7 +1571,8 @@ class InhibitionSerializer(serializers.ModelSerializer):
         Ensure dilution factor is only ever 1, 5, or 10 (or null)
         """
         if value not in (1, 5, 10, None):
-            raise serializers.ValidationError("dilution_factor can only have a value of 1, 5, 10, or null")
+            message = "dilution_factor can only have a value of 1, 5, 10, or null"
+            raise serializers.ValidationError(jsonify_errors(message))
         return value
 
     class Meta:
@@ -1569,9 +1600,9 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
         Ensure inhibition_positive_control_cq_value and inhibitions are included in request data.
         """
         if 'inh_pos_cq_value' not in data:
-            raise serializers.ValidationError("inh_pos_cq_value is required")
+            raise serializers.ValidationError(jsonify_errors("inh_pos_cq_value is required"))
         if 'inhibitions' not in data:
-            raise serializers.ValidationError("inhibitions is required")
+            raise serializers.ValidationError(jsonify_errors("inhibitions is required"))
         ab = data['analysis_batch']
         en = data['extraction_number']
         na = data['nucleic_acid_type']
@@ -1594,7 +1625,7 @@ class InhibitionCalculateDilutionFactorSerializer(serializers.ModelSerializer):
                 message += "does not match the existing value (" + str(na) + ") in the database"
                 details.append(message)
         if not is_valid:
-            raise serializers.ValidationError(details)
+            raise serializers.ValidationError(jsonify_errors(details))
         return data
 
     created_by = serializers.StringRelatedField()
@@ -1690,7 +1721,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         if self.context['request'].method == 'POST':
             if 'password' not in data:
-                raise serializers.ValidationError("password is required")
+                raise serializers.ValidationError(jsonify_errors("password is required"))
         if 'password' in data:
             password = data['password']
             details = []
@@ -1719,7 +1750,7 @@ class UserSerializer(serializers.ModelSerializer):
                 message += "Contain symbols (~, !, @, #, $, %, ^, &, *); "
                 details.append(message)
             if details:
-                raise serializers.ValidationError(details)
+                raise serializers.ValidationError(jsonify_errors(details))
 
         return data
 
@@ -1727,10 +1758,11 @@ class UserSerializer(serializers.ModelSerializer):
         if 'request' in self.context and hasattr(self.context['request'], 'user'):
             requesting_user = self.context['request'].user
         else:
-            raise serializers.ValidationError("User could not be identified, please contact the administrator.")
+            message = "User could not be identified, please contact the administrator."
+            raise serializers.ValidationError(jsonify_errors(message))
 
         if not requesting_user.is_staff:
-            raise serializers.ValidationError("Only staff can create users.")
+            raise serializers.ValidationError(jsonify_errors("Only staff can create users."))
 
         if 'created_by' in validated_data:
             validated_data.pop('created_by')
@@ -1755,7 +1787,8 @@ class UserSerializer(serializers.ModelSerializer):
         if 'request' in self.context and hasattr(self.context['request'], 'user'):
             requesting_user = self.context['request'].user
         else:
-            raise serializers.ValidationError("User could not be identified, please contact the administrator.")
+            message = "User could not be identified, please contact the administrator."
+            raise serializers.ValidationError(jsonify_errors(message))
 
         if 'created_by' in validated_data:
             validated_data.pop('created_by')
@@ -1766,7 +1799,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         # non-superusers can only edit their username and email and first and last names and password
         if not requesting_user.is_authenticated:
-            raise serializers.ValidationError("You cannot edit user data.")
+            raise serializers.ValidationError(jsonify_errors("You cannot edit user data."))
         elif not requesting_user.is_superuser:
             if instance.id == requesting_user.id:
                 instance.username = validated_data.get('username', instance.username)
@@ -1776,7 +1809,7 @@ class UserSerializer(serializers.ModelSerializer):
                 if new_password is not None:
                     instance.set_password(new_password)
             else:
-                raise serializers.ValidationError("You can only edit your own user information.")
+                raise serializers.ValidationError(jsonify_errors("You can only edit your own user information."))
         elif requesting_user.is_superuser:
             instance.username = validated_data.get('username', instance.username)
             instance.email = validated_data.get('email', instance.email)
