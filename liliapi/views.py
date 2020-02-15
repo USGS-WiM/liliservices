@@ -248,6 +248,72 @@ class AliquotViewSet(HistoryViewSet):
     queryset = Aliquot.objects.all()
     serializer_class = AliquotCustomSerializer
 
+    @action(detail=False)
+    def get_location(self, request):
+        # get the freezer from the request query
+        freezer = request.query_params.get('freezer', None)
+        # get the rack from the request query
+        rack = request.query_params.get('rack', None)
+        # get the box from the request query
+        box = request.query_params.get('box', None)
+
+        # if a freezer was included in the query, use it, otherwise default to the first freezer
+        freezer = freezer if freezer else 1
+
+        # find all aliquots in the requested rack and/or box (and freezer)
+        if rack and box:
+            queryset = Aliquot.objects.filter(freezer_location__freezer=freezer,
+                                              freezer_location__rack=rack, freezer_location__box=box)
+        elif rack:
+            queryset = Aliquot.objects.filter(freezer_location__freezer=freezer, freezer_location__rack=rack)
+        elif box:
+            queryset = Aliquot.objects.filter(freezer_location__freezer=freezer, freezer_location__box=box)
+        else:
+            queryset = Aliquot.objects.none()
+
+        return Response(AliquotSlimSerializer(queryset, many=True).data)
+
+    @action(methods=['post'], detail=False)
+    def bulk_delete(self, request):
+        # ensure submitted data is a list of only IDs or a list of only aliquot_strings (SampleID-AliquotNumber)
+        if all([str(item).isdigit() for item in request.data]):
+            aliquots = Aliquot.objects.filter(id__in=request.data)
+            if len(aliquots) != len(request.data):
+                aliquot_ids = [aliquot.id for aliquot in aliquots]
+                invalid_ids = list(set(request.data).difference(aliquot_ids))
+                message = "Invalid request. No aliquots deleted. The following submitted values could not be found"
+                message += " in the database: " + str(invalid_ids)
+                return JsonResponse({"message": message}, status=400)
+            else:
+                freezer_location_ids = [aliquot.freezer_location_id for aliquot in aliquots]
+                Aliquot.objects.filter(id__in=request.data).delete()
+                FreezerLocation.objects.filter(id__in=freezer_location_ids).delete()
+                return JsonResponse({"message": "Aliquots deleted."}, status=200)
+        elif all([isinstance(item, str) and '-' in item for item in request.data]):
+            aliquot_ids = []
+            freezer_location_ids = []
+            invalid_ids = []
+            for item in request.data:
+                item_split = item.split('-')
+                aliquot = Aliquot.objects.filter(sample=item_split[0], aliquot_number=item_split[1]).first()
+                if aliquot:
+                    aliquot_ids.append(aliquot.id)
+                    freezer_location_ids.append(aliquot.freezer_location_id)
+                else:
+                    invalid_ids.append(item)
+            if len(invalid_ids) > 0:
+                message = "Invalid request. No aliquots deleted. The following submitted values could not be found"
+                message += " in the database: " + str(invalid_ids)
+                return JsonResponse({"message": message}, status=400)
+            else:
+                Aliquot.objects.filter(id__in=aliquot_ids).delete()
+                FreezerLocation.objects.filter(id__in=freezer_location_ids).delete()
+                return JsonResponse({"message": "Aliquots deleted."}, status=200)
+        else:
+            message = "Invalid request. Submitted data must be a list/array of aliquot IDs"
+            message += "or sample_id-aliquot_number combinations (e.g., '1001-3')"
+            return JsonResponse({"message": message}, status=400)
+
     def get_serializer_class(self):
         if not isinstance(self.request.data, list):
             return AliquotSerializer

@@ -470,6 +470,22 @@ class AliquotSerializer(serializers.ModelSerializer):
                   'created_date', 'created_by', 'modified_date', 'modified_by',)
 
 
+class AliquotSlimSerializer(serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField()
+    modified_by = serializers.StringRelatedField()
+    freezer = serializers.IntegerField(read_only=True, source='freezer_location.freezer.id')
+    rack = serializers.IntegerField(read_only=True, source='freezer_location.rack')
+    box = serializers.IntegerField(read_only=True, source='freezer_location.box')
+    row = serializers.IntegerField(read_only=True, source='freezer_location.row')
+    spot = serializers.IntegerField(read_only=True, source='freezer_location.spot')
+
+    class Meta:
+        model = Aliquot
+        fields = ('id', 'aliquot_string', 'sample', 'aliquot_number', 'frozen',
+                  'freezer', 'rack', 'box', 'row', 'spot',
+                  'created_date', 'created_by', 'modified_date', 'modified_by',)
+
+
 class SampleSerializer(serializers.ModelSerializer):
 
     # validate required fields by matrix (beyond the fields required for every sample record regardless of matrix)
