@@ -245,8 +245,8 @@ class Aliquot(HistoryModel):
         """Returns the concatenated parent ID and child series number of the record"""
         return '%s-%s' % (self.sample, self.aliquot_number)
 
-    sample = models.ForeignKey('Sample', models.PROTECT, related_name='aliquots')
-    freezer_location = models.ForeignKey('FreezerLocation', models.PROTECT, related_name='aliquots')
+    sample = models.ForeignKey('Sample', models.CASCADE, related_name='aliquots')
+    freezer_location = models.ForeignKey('FreezerLocation', models.CASCADE, related_name='aliquots')
     aliquot_number = NonnegativeIntegerField()
     frozen = models.BooleanField(default=True)
     history = HistoricalRecords(inherit=True, table_name='lili_aliquothistory',
