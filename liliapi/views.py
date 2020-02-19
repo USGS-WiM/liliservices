@@ -1,4 +1,6 @@
 from django.http import JsonResponse
+from django.utils import timezone
+from django.contrib.sessions.models import Session
 from rest_framework import views, viewsets, authentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,6 +9,7 @@ from rest_framework.exceptions import APIException
 from liliapi.serializers import *
 from liliapi.models import *
 from liliapi.permissions import *
+from liliapi.authentication import *
 from liliapi.tasks import *
 
 
@@ -1466,11 +1469,27 @@ class UserViewSet(HistoryViewSet):
 
 
 class AuthView(views.APIView):
-    authentication_classes = (authentication.BasicAuthentication,)
+    authentication_classes = (CustomBasicAuthentication,)
     serializer_class = UserSerializer
 
     def post(self, request):
-        return Response(self.serializer_class(request.user).data)
+
+        # remove all sessions to prevent CSRF missing error on subsequent basic auth requests
+        if request.user:
+            user_sessions = []
+            all_sessions = Session.objects.filter(expire_date__gte=timezone.now())
+            for session in all_sessions:
+                if str(request.user.id) == session.get_decoded().get('_auth_user_id'):
+                    user_sessions.append(session.pk)
+            Session.objects.filter(pk__in=user_sessions).delete()
+
+        resp = Response(self.serializer_class(request.user).data)
+
+        # attempt to remove CSRF and session cookies
+        resp.delete_cookie('csrftoken')
+        resp.delete_cookie('sessionid')
+
+        return resp
 
 
 ######
