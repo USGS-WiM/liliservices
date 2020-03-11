@@ -9,6 +9,7 @@ from rest_framework.exceptions import APIException
 from liliapi.serializers import *
 from liliapi.models import *
 from liliapi.permissions import *
+from liliapi.paginations import *
 from liliapi.authentication import *
 from liliapi.tasks import *
 
@@ -46,6 +47,7 @@ class HistoryViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = StandardResultsSetPagination
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, modified_by=self.request.user)
@@ -53,6 +55,11 @@ class HistoryViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
 
+    # override the default pagination to allow disabling of pagination
+    def paginate_queryset(self, *args, **kwargs):
+        if self.request and 'paginate' in self.request.query_params:
+            return super().paginate_queryset(*args, **kwargs)
+        return None
 
 ######
 #
