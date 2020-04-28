@@ -525,6 +525,7 @@ class FreezerLocationManager(models.Manager):
                 else:
                     cur_box += 1
             cur_rack += 1
+            cur_box = 1
         # return None if no last spot was found or adding a rack will exceed the number of racks allowed in any freezer
         return None
 
