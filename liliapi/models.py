@@ -511,11 +511,10 @@ class FreezerLocationManager(models.Manager):
         cur_box = last_spot.box
         while cur_rack <= last_spot.freezer.racks:
             while cur_box <= last_spot.freezer.boxes:
-                # get the initial spot in the box
-                first_spot = self.filter(
-                    freezer=last_spot.freezer.id, rack=cur_rack, box=cur_box, row=1, spot=1).first()
-                # if this box is empty (does not exit), return it, otherwise continue to the next box
-                if not first_spot:
+                # check if this box exists (meaning the actual physical box is empty)
+                cur_box_occupied = self.filter(freezer=last_spot.freezer.id, rack=cur_rack, box=cur_box)
+                if not cur_box_occupied:
+                    # if this box is empty (does not exit), return it, otherwise continue to the next box
                     next_empty_box['rack'] = cur_rack
                     next_empty_box['box'] = cur_box
                     next_empty_box['row'] = 1
