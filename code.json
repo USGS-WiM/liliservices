@@ -3,7 +3,7 @@
     "name": "liliservices",
     "organization": "U.S. Geological Survey",
     "description": "Web services for LILI (LIDE (Laboratory for Infectious Disease and the Environment) Information Management System)",
-    "version": "v1.2.2",
+    "version": "v1.2.3",
     "status": "Production",
 
     "permissions": {

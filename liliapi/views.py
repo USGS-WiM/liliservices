@@ -393,7 +393,16 @@ class FreezerLocationViewSet(HistoryViewSet):
             if next_spot is not None:
                 # start building the full response object
                 resp = next_spot
-                next_empty_box = FreezerLocation.objects.get_next_empty_box(last_spot)
+
+                # determine maximum available spots in a box in this freezer (for an empty box)
+                rows_in_box = last_spot.freezer.rows
+                spots_in_row = last_spot.freezer.spots
+                spots_in_box = rows_in_box * spots_in_row
+
+                # ensure next spot and next empty box are not the same
+                get_second_empty_box = True if next_spot['available_spots_in_box'] == spots_in_box else False
+                next_empty_box = FreezerLocation.objects.get_next_empty_box(last_spot, get_second_empty_box)
+
                 # then add the next empty box to the response object
                 resp.update({"next_empty_box": next_empty_box})
             # no next spot was found

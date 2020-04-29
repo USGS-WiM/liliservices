@@ -497,7 +497,7 @@ class FreezerLocationManager(models.Manager):
                 cur_rack += 1
 
     # get the next box with no occupied spots after a specified spot
-    def get_next_empty_box(self, last_spot):
+    def get_next_empty_box(self, last_spot, get_second_empty_box=False):
         # start building the next empty box object
         next_empty_box = {'freezer': last_spot.freezer.id}
 
@@ -514,13 +514,19 @@ class FreezerLocationManager(models.Manager):
                 # check if this box exists (meaning the actual physical box is empty)
                 cur_box_occupied = self.filter(freezer=last_spot.freezer.id, rack=cur_rack, box=cur_box)
                 if not cur_box_occupied:
-                    # if this box is empty (does not exit), return it, otherwise continue to the next box
-                    next_empty_box['rack'] = cur_rack
-                    next_empty_box['box'] = cur_box
-                    next_empty_box['row'] = 1
-                    next_empty_box['spot'] = 1
-                    next_empty_box['available_spots_in_box'] = spots_in_box
-                    return next_empty_box
+                    # if this box is empty (does not exit),
+                    #  and we are not looking for the second empty box (the 'next' empty box after the next empty box),
+                    #  return it, otherwise continue to the next box
+                    if get_second_empty_box:
+                        cur_box += 1
+                        get_second_empty_box = False
+                    else:
+                        next_empty_box['rack'] = cur_rack
+                        next_empty_box['box'] = cur_box
+                        next_empty_box['row'] = 1
+                        next_empty_box['spot'] = 1
+                        next_empty_box['available_spots_in_box'] = spots_in_box
+                        return next_empty_box
                 else:
                     cur_box += 1
             cur_rack += 1
