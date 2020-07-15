@@ -51,7 +51,7 @@ To use Celery in development, run `celery -A liliservices worker -l info` (note 
 
 ## Production server
 
-In a production environment (or really, any non-development environment) this Django project should be run through a dedicated web server, likely using the Web Server Gateway Interface [(WSGI)](https://wsgi.readthedocs.io/en/latest/). This repository includes sample configuration files (*.conf in the root folder) for running this project in [Apache HTTP Server](https://docs.djangoproject.com/en/dev/howto/deployment/wsgi/modwsgi/).
+In a production environment (or really, any non-development environment) this Django project should be run through a dedicated web server, likely using the Web Server Gateway Interface [(WSGI)](https://modwsgi.readthedocs.io/en/latest/). This repository includes sample configuration files (*.conf in the root folder) for running this project in [Apache HTTP Server](https://docs.djangoproject.com/en/dev/howto/deployment/wsgi/modwsgi/).
 
 Additionally, Celery must be set up as a service or daemon for Django to use it. On Linux (note that Celery is no longer supported on Windows) follow the instructions [here](https://docs.celeryproject.org/en/latest/userguide/daemonizing.html#daemonizing) (also read the docs about how Celery and Django connect [here](https://docs.celeryproject.org/en/latest/django/first-steps-with-django.html#django-first-steps)). For convenience, the necessary documents are in this repository:
 * `default_celeryd` (sourced from the [official Celery documentation](https://docs.celeryproject.org/en/latest/userguide/daemonizing.html#example-configuration), note that this file should be saved on the server as `/etc/default/celeryd`)
