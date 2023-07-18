@@ -1,5 +1,8 @@
 ![USGS](USGS_ID_black.png) ![WIM](wimlogo.png)
 
+# THIS REPO IS ARCHIVED
+## Please visit https://code.usgs.gov/WiM/liliservices for the active repo of this project.
+
 # LIDE Web Services
 
 This is the web services codebase for the Laboratory for Infectious Disease and the Environment's Laboratory Information Management System (LIDE LIMS) (the web client application codebase can be found [here](https://github.com/USGS-WiM/lili)).
